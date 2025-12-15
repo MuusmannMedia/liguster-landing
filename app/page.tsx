@@ -6,19 +6,11 @@ import Image from 'next/image';
 export default function LigusterLandingPage() {
   // --- STATE ---
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'neighbor' | 'event'>('neighbor');
   
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
-  const totalSlides = 10; // Opdateret til 10 billeder
+  const totalSlides = 10;
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
-
-  // AI State
-  const [neighborInput, setNeighborInput] = useState('');
-  const [neighborOutput, setNeighborOutput] = useState('Indtast en udfordring til venstre for at se magien ske...');
-  const [eventInput, setEventInput] = useState('');
-  const [eventOutput, setEventOutput] = useState('Fortæl os lidt om jeres fest, så kommer vi med forslag...');
-  const [loading, setLoading] = useState(false);
 
   // --- CAROUSEL LOGIC ---
   const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % totalSlides);
@@ -50,46 +42,7 @@ export default function LigusterLandingPage() {
     resetAutoPlay();
   };
 
-  // --- API CALL ---
-  const callGemini = async (prompt: string, type: 'neighbor' | 'event') => {
-    setLoading(true);
-    const setOutput = type === 'neighbor' ? setNeighborOutput : setEventOutput;
-    setOutput("Tænker så det knager...");
-
-    try {
-      const response = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Fejl ved forbindelse');
-      
-      setOutput(data.text);
-
-    } catch (error: any) {
-      console.error("Fejl:", error);
-      setOutput(`Hov, der skete en fejl: ${error.message}. (Husk at sætte API nøglen i .env.local lokalt eller på Vercel)`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNeighborGenerate = () => {
-    if (!neighborInput) return alert("Du skal skrive en udfordring først :)");
-    const prompt = `Du er en diplomatisk assistent for en dansk grundejerforening. Skriv en venlig besked til en nabo om: "${neighborInput}". Krav: Imødekommende tone, dansk sprog, løsningsorienteret.`;
-    callGemini(prompt, 'neighbor');
-  };
-
-  const handleEventGenerate = () => {
-    if (!eventInput) return alert("Du skal beskrive begivenheden først :)");
-    const prompt = `Du er en eventplanlægger for en grundejerforening. Baseret på noterne: "${eventInput}", kom med 3 forslag (Titel, Beskrivelse, Sjov detalje). Sprog: Dansk.`;
-    callGemini(prompt, 'event');
-  };
-
   // --- BILLEDER ---
-  // Disse filer skal ligge i 'public' mappen
   const slides = [
     '/app-01.png',
     '/app-02.png',
@@ -105,10 +58,8 @@ export default function LigusterLandingPage() {
 
   return (
     <div className="font-sans text-gray-800 bg-gray-50 min-h-screen pb-20">
-      {/* FontAwesome CDN */}
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
       
-      {/* Global Styles */}
       <style jsx global>{`
         .bg-liguster-gradient { background: linear-gradient(135deg, #0e2a47 0%, #1a4d7c 100%); }
         .text-liguster { color: #1a4d7c; }
@@ -120,22 +71,12 @@ export default function LigusterLandingPage() {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 3px solid #1a4d7c;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       `}</style>
 
       {/* Navigation */}
       <nav className="absolute w-full z-20 top-0 start-0 border-b border-white/10">
         <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
           <div className="flex items-center space-x-3">
-             {/* Logo */}
              <div className="relative h-10 w-32 md:h-12 md:w-40">
                 <Image 
                     src="/Liguster-logo-NEG.png" 
@@ -159,7 +100,6 @@ export default function LigusterLandingPage() {
 
       {/* Hero Section */}
       <section className="bg-liguster-gradient relative min-h-[95vh] flex items-center overflow-hidden">
-        {/* Background Icons */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-10 pointer-events-none">
           <i className="fa-solid fa-leaf absolute text-9xl text-white top-10 left-10 transform -rotate-12"></i>
           <i className="fa-solid fa-wifi absolute text-9xl text-white bottom-20 right-20 transform rotate-12"></i>
@@ -168,7 +108,7 @@ export default function LigusterLandingPage() {
         <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-24 md:pt-0">
           <div className="mr-auto place-self-center lg:col-span-7 fade-in-up">
             <span className="bg-blue-500/30 text-blue-100 text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-blue-400/50">
-              Nyhed: Version 2.0 med AI-assistent
+              Nyhed: Version 2.0
             </span>
             <h1 className="max-w-2xl mb-4 text-4xl font-extrabold tracking-tight leading-none md:text-5xl xl:text-6xl text-white">
               Det digitale samlingspunkt for din forening
@@ -189,7 +129,6 @@ export default function LigusterLandingPage() {
           
           <div className="hidden lg:mt-0 lg:col-span-5 lg:flex justify-center items-center relative">
             <div className="relative">
-              {/* Phone Mockup Frame */}
               <div 
                 className="mockup-frame w-[280px] h-[580px] bg-black relative z-10 mx-auto border-[12px] border-gray-800 rounded-[2.5rem] overflow-hidden"
                 onTouchStart={handleTouchStart}
@@ -211,8 +150,6 @@ export default function LigusterLandingPage() {
                     </div>
                   ))}
                 </div>
-
-                {/* Indicators */}
                 <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
                   {[...Array(totalSlides)].map((_, index) => (
                     <div 
@@ -227,7 +164,6 @@ export default function LigusterLandingPage() {
           </div>
         </div>
 
-        {/* Wave Divider */}
         <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-[0]">
             <svg className="relative block w-[calc(100%+1.3px)] h-[60px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
                 <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" className="fill-gray-50"></path>
@@ -266,64 +202,6 @@ export default function LigusterLandingPage() {
                     <p className="text-gray-600">Del referater, planlæg arbejdsdage og styrk naboskabet.</p>
                 </div>
             </div>
-        </div>
-      </section>
-
-      {/* AI Demo Section */}
-      <section className="py-16 bg-gradient-to-br from-blue-50 to-white border-y border-blue-100 relative">
-        <div className="max-w-screen-xl mx-auto px-4 relative z-10">
-          <div className="text-center mb-12">
-            <span className="text-blue-600 font-bold tracking-wider text-sm uppercase">Nyhed</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-2 mb-4">Liguster AI ✨</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Prøv vores nye AI assistent. Få hjælp til nabokommunikation eller planlægning.
-            </p>
-          </div>
-
-          <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-            {/* Tabs */}
-            <div className="flex border-b border-gray-200">
-              <button 
-                onClick={() => setActiveTab('neighbor')}
-                className={`flex-1 py-4 px-6 font-semibold flex items-center justify-center gap-2 transition-colors ${activeTab === 'neighbor' ? 'text-blue-800 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
-              >
-                <i className="fa-solid fa-hand-holding-heart"></i> Mægleren
-              </button>
-              <button 
-                onClick={() => setActiveTab('event')}
-                className={`flex-1 py-4 px-6 font-semibold flex items-center justify-center gap-2 transition-colors ${activeTab === 'event' ? 'text-blue-800 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}
-              >
-                <i className="fa-solid fa-champagne-glasses"></i> Festen
-              </button>
-            </div>
-
-            {/* AI Content */}
-            <div className="p-6 md:p-8">
-              <div className="grid md:grid-cols-2 gap-8">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {activeTab === 'neighbor' ? 'Hvad er problemet?' : 'Hvad skal fejres?'}
-                  </label>
-                  <textarea 
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-32 resize-none text-gray-900" 
-                    placeholder={activeTab === 'neighbor' ? "F.eks.: Min nabos hæk er vokset ind over mit skur..." : "F.eks.: Sommerfest, budget 2000kr..."}
-                    value={activeTab === 'neighbor' ? neighborInput : eventInput}
-                    onChange={(e) => activeTab === 'neighbor' ? setNeighborInput(e.target.value) : setEventInput(e.target.value)}
-                  ></textarea>
-                  <button 
-                    onClick={activeTab === 'neighbor' ? handleNeighborGenerate : handleEventGenerate}
-                    disabled={loading}
-                    className="mt-4 w-full bg-liguster hover:bg-gray-900 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2"
-                  >
-                    {loading ? <div className="loader"></div> : <span>Generer svar ✨</span>}
-                  </button>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-6 border border-gray-100 relative min-h-[200px] whitespace-pre-wrap text-gray-800">
-                  {activeTab === 'neighbor' ? neighborOutput : eventOutput}
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
