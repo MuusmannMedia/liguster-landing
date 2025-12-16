@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
@@ -34,10 +34,9 @@ type Event = { id: string; title: string; start_at: string; end_at: string; loca
 type ImagePreview = { id: number; image_url: string };
 
 // --- HJÆLPERE ---
-// RETTELSE HER: Ændret input-type til 'any' for at undgå TypeScript konflikt
 const getDisplayName = (m: any) => {
-  // Tjek om vi fik hele medlems-objektet eller bare user-delen
-  const user = m?.users || m; 
+  // Håndter både "users" objektet eller hvis m er selve brugeren
+  const user = m.users || m;
   const n = user?.name?.trim() || user?.username?.trim();
   if (n) return n;
   const email = user?.email || "";
@@ -169,7 +168,11 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- BESKEDER KNAP --- */}
-        <button className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors">
+        <button 
+          // Linker til ChatScreen eller besked-siden (hvis implementeret)
+          onClick={() => router.push('/Beskeder')}
+          className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
+        >
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">
              BESKEDER
            </div>
@@ -187,7 +190,6 @@ export default function ForeningDetaljePage() {
                 <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
                   {m.users?.avatar_url ? <img src={m.users.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>}
                 </div>
-                {/* Nu bruger vi m (hele medlemmet) i stedet for m.users */}
                 <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
               </div>
             ))}
@@ -196,6 +198,7 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- SAMTALER PREVIEW --- */}
+        {/* LINKER TIL: app/forening/[id]/threads/page.tsx -> som bruger ForeningThreads.tsx */}
         <div 
           onClick={() => router.push(`/forening/${id}/threads`)} 
           className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -219,6 +222,7 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- AKTIVITETER PREVIEW --- */}
+        {/* LINKER TIL: app/forening/[id]/events/page.tsx -> som bruger ForeningEvents.tsx */}
         <div 
           onClick={() => router.push(`/forening/${id}/events`)} 
           className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -241,6 +245,7 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- BILLEDER PREVIEW --- */}
+        {/* LINKER TIL: app/forening/[id]/images/page.tsx -> som bruger ForeningImages.tsx */}
         <div 
           onClick={() => router.push(`/forening/${id}/images`)} 
           className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
