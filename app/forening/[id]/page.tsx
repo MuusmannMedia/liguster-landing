@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
+import Image from 'next/image';
 
 // --- TYPER ---
 type Forening = {
@@ -33,10 +34,10 @@ type Event = { id: string; title: string; start_at: string; end_at: string; loca
 type ImagePreview = { id: number; image_url: string };
 
 // --- HJÆLPERE ---
-const getDisplayName = (user: any) => {
-  const n = user?.name?.trim() || user?.username?.trim();
+const getDisplayName = (m: Medlem) => {
+  const n = m.users?.name?.trim() || m.users?.username?.trim();
   if (n) return n;
-  const email = user?.email || "";
+  const email = m.users?.email || "";
   return email.includes("@") ? email.split("@")[0] : "Ukendt";
 };
 
@@ -92,7 +93,7 @@ export default function ForeningDetaljePage() {
       .from("foreningsmedlemmer")
       .select("user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (name, username, avatar_url, email)")
       .eq("forening_id", id);
-    if (data) setMedlemmer(data as any);
+    if (data) setMedlemmer(data as unknown as Medlem[]);
   };
 
   const fetchThreads = async () => {
@@ -106,7 +107,6 @@ export default function ForeningDetaljePage() {
   };
 
   const fetchImages = async () => {
-    // Vi skal finde de seneste events først, så billeder fra dem
     const { data: evs } = await supabase.from("forening_events").select("id").eq("forening_id", id).limit(5);
     if (evs && evs.length > 0) {
       const ids = evs.map(e => e.id);
@@ -184,7 +184,7 @@ export default function ForeningDetaljePage() {
                 <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
                   {m.users?.avatar_url ? <img src={m.users.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>}
                 </div>
-                <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m.users)}</span>
+                <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
               </div>
             ))}
             {approved.length === 0 && <p className="text-sm text-gray-400">Ingen medlemmer endnu.</p>}
@@ -192,7 +192,10 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- SAMTALER PREVIEW --- */}
-        <div onClick={() => alert("Åbner tråde...")} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => router.push(`/forening/${id}/threads`)} 
+          className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+        >
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
             SAMTALER
           </div>
@@ -212,7 +215,10 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- AKTIVITETER PREVIEW --- */}
-        <div onClick={() => alert("Åbner events...")} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => router.push(`/forening/${id}/events`)} 
+          className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+        >
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
             AKTIVITETER
           </div>
@@ -231,15 +237,18 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- BILLEDER PREVIEW --- */}
-        <div onClick={() => alert("Åbner billeder...")} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => router.push(`/forening/${id}/images`)} 
+          className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+        >
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
             BILLEDER
           </div>
           {images.length === 0 ? <p className="text-sm text-gray-400">Ingen billeder endnu.</p> : (
             <div className="flex gap-2 mt-2">
               {images.map(img => (
-                <div key={img.id} className="w-24 h-24 rounded-[14px] overflow-hidden bg-gray-100">
-                  <img src={img.image_url} className="w-full h-full object-cover" />
+                <div key={img.id} className="w-24 h-24 rounded-[14px] overflow-hidden bg-gray-100 relative">
+                  <Image src={img.image_url} alt="" fill className="object-cover" />
                 </div>
               ))}
             </div>
@@ -271,7 +280,7 @@ export default function ForeningDetaljePage() {
                 <div className="w-32 h-32 rounded-[20px] bg-gray-100 overflow-hidden mb-4">
                   {selectedMember.users?.avatar_url ? <img src={selectedMember.users.avatar_url} className="w-full h-full object-cover" /> : null}
                 </div>
-                <h3 className="text-xl font-bold">{getDisplayName(selectedMember.users)}</h3>
+                <h3 className="text-xl font-bold">{getDisplayName(selectedMember)}</h3>
                 <p className="text-sm text-gray-500 mb-6">{selectedMember.users?.email}</p>
                 <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 hover:text-black">← Tilbage til liste</button>
               </div>
@@ -284,7 +293,7 @@ export default function ForeningDetaljePage() {
                       {m.users?.avatar_url ? <img src={m.users.avatar_url} className="w-full h-full object-cover" /> : null}
                     </div>
                     <div>
-                      <p className="font-bold text-sm">{getDisplayName(m.users)}</p>
+                      <p className="font-bold text-sm">{getDisplayName(m)}</p>
                       <p className="text-[10px] text-gray-500 uppercase font-bold text-[#131921]">{m.rolle || 'MEDLEM'}</p>
                     </div>
                   </div>
