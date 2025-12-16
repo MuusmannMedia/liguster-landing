@@ -9,26 +9,19 @@ type Props = {
   onPostCreated: () => void;
 };
 
-// Opdateret liste fra din mobil-app
+// VIGTIGT: Dette skal matche navnet fra din App kode ("opslagsbilleder")
+const BUCKET_NAME = 'opslagsbilleder';
+
 const KATEGORIER = [
-  'Værktøj',
-  'Arbejde tilbydes',
-  'Affald',
-  'Mindre ting',
-  'Større ting',
-  'Hjælp søges',
-  'Hjælp tilbydes',
-  'Byttes',
-  'Udlejning',
-  'Sælges',
-  'Andet',
+  'Værktøj', 'Arbejde tilbydes', 'Affald', 'Mindre ting', 
+  'Større ting', 'Hjælp søges', 'Hjælp tilbydes', 
+  'Byttes', 'Udlejning', 'Sælges', 'Andet'
 ];
 
 export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Props) {
   const [loading, setLoading] = useState(false);
   const [overskrift, setOverskrift] = useState('');
   const [text, setText] = useState('');
-  // Vi sætter standardværdien til den første i listen
   const [kategori, setKategori] = useState(KATEGORIER[0]);
   const [omraade, setOmraade] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -54,18 +47,21 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
       let imageUrl = null;
 
       if (imageFile) {
+        // Vi laver et unikt filnavn
         const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${userId}/${fileName}`;
+        const fileName = `post_${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
+        
+        // VIGTIGT: Vi bruger samme mappestruktur som appen: posts/USER_ID/filnavn
+        const filePath = `posts/${userId}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('post-images')
+          .from(BUCKET_NAME) // Her bruger vi nu 'opslagsbilleder'
           .upload(filePath, imageFile);
 
         if (uploadError) throw uploadError;
 
         const { data: urlData } = supabase.storage
-          .from('post-images')
+          .from(BUCKET_NAME)
           .getPublicUrl(filePath);
         
         imageUrl = urlData.publicUrl;
@@ -84,14 +80,18 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
 
       if (dbError) throw dbError;
 
+      // Nulstil formular
       setOverskrift('');
       setText('');
+      setOmraade('');
       setImageFile(null);
+      
       onPostCreated();
       onClose();
 
     } catch (error: any) {
-      alert('Fejl ved oprettelse: ' + error.message);
+      console.error(error);
+      alert('Fejl ved oprettelse: ' + (error.message || 'Ukendt fejl'));
     } finally {
       setLoading(false);
     }
@@ -139,7 +139,6 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Overskrift</label>
               <input
                 type="text"
-                // HER ER RETTELSEN: text-[#131921] gør teksten mørk
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] text-[#131921] placeholder-gray-400 font-medium"
                 placeholder="F.eks. Boremaskine udlejes..."
                 value={overskrift}
@@ -180,7 +179,6 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Beskrivelse</label>
               <textarea
-                // HER ER RETTELSEN: text-[#131921]
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 h-32 outline-none focus:ring-2 focus:ring-[#131921] resize-none text-[#131921] placeholder-gray-400 font-medium"
                 placeholder="Beskriv tingen eller opgaven..."
                 value={text}
@@ -193,7 +191,6 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Område / By</label>
               <input
                 type="text"
-                // HER ER RETTELSEN: text-[#131921]
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] text-[#131921] placeholder-gray-400 font-medium"
                 placeholder="F.eks. Lyngby"
                 value={omraade}
