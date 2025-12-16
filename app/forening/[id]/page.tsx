@@ -34,11 +34,19 @@ type Event = { id: string; title: string; start_at: string; end_at: string; loca
 type ImagePreview = { id: number; image_url: string };
 
 // --- HJÆLPERE ---
-const getDisplayName = (m: Medlem) => {
-  const n = m.users?.name?.trim() || m.users?.username?.trim();
+// RETTELSE HER: Ændret input-type til 'any' for at undgå TypeScript konflikt
+const getDisplayName = (m: any) => {
+  // Tjek om vi fik hele medlems-objektet eller bare user-delen
+  const user = m?.users || m; 
+  const n = user?.name?.trim() || user?.username?.trim();
   if (n) return n;
-  const email = m.users?.email || "";
+  const email = user?.email || "";
   return email.includes("@") ? email.split("@")[0] : "Ukendt";
+};
+
+const isAdmin = (m: Medlem, ownerId?: string) => {
+  const r = (m.rolle || "").toLowerCase();
+  return r === "admin" || r === "administrator" || (!!ownerId && m.user_id === ownerId);
 };
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("da-DK", { day: 'numeric', month: 'short' });
@@ -179,7 +187,8 @@ export default function ForeningDetaljePage() {
                 <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
                   {m.users?.avatar_url ? <img src={m.users.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>}
                 </div>
-                <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m.users)}</span>
+                {/* Nu bruger vi m (hele medlemmet) i stedet for m.users */}
+                <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
               </div>
             ))}
             {approved.length === 0 && <p className="text-sm text-gray-400">Ingen medlemmer endnu.</p>}
@@ -275,7 +284,7 @@ export default function ForeningDetaljePage() {
                 <div className="w-32 h-32 rounded-[20px] bg-gray-100 overflow-hidden mb-4">
                   {selectedMember.users?.avatar_url ? <img src={selectedMember.users.avatar_url} className="w-full h-full object-cover" /> : null}
                 </div>
-                <h3 className="text-xl font-bold">{getDisplayName(selectedMember.users)}</h3>
+                <h3 className="text-xl font-bold">{getDisplayName(selectedMember)}</h3>
                 <p className="text-sm text-gray-500 mb-6">{selectedMember.users?.email}</p>
                 <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 hover:text-black">← Tilbage til liste</button>
               </div>
@@ -288,7 +297,7 @@ export default function ForeningDetaljePage() {
                       {m.users?.avatar_url ? <img src={m.users.avatar_url} className="w-full h-full object-cover" /> : null}
                     </div>
                     <div>
-                      <p className="font-bold text-sm">{getDisplayName(m.users)}</p>
+                      <p className="font-bold text-sm">{getDisplayName(m)}</p>
                       <p className="text-[10px] text-gray-500 uppercase font-bold text-[#131921]">{m.rolle || 'MEDLEM'}</p>
                     </div>
                   </div>
