@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-// HER ER RETTELSEN: Vi bruger ../.. i stedet for @ for at ramme lib-mappen sikkert
+// RETTELSE HER: Vi bruger ../.. for at gå helt tilbage til roden og finde lib-mappen
 import { supabase } from '../../lib/supabaseClient'; 
 import Link from 'next/link';
 
