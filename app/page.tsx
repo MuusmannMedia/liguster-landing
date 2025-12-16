@@ -307,7 +307,7 @@ export default function LigusterLandingPage() {
               <h3 className="text-xl font-bold mb-3 text-gray-900">6. Hold det trygt og overskueligt</h3>
               <p className="text-gray-600">
                 Liguster er bygget til at undgå konflikter: ingen offentlige kommentarspor i opslag.
-                Dialog foregår i privatbeskeder, og beskeder kan anmeldes. Sikkerhed og god tone er tænkt ind fra start.
+                Dialog foregår i privatbeskeder. Sikkerhed og god tone er tænkt ind fra start.
               </p>
             </div>
           </div>
