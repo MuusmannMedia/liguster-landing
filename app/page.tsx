@@ -61,23 +61,21 @@ export default function LigusterLandingPage() {
 
   return (
     <div className="font-sans text-gray-800 bg-gray-50 min-h-screen pb-20">
-      <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-      />
+      {/* Fjernet FontAwesome-link (da ikonerne skal væk) */}
 
       <style jsx global>{`
+        /* Mørkere blå gradient */
         .bg-liguster-gradient {
-          background: linear-gradient(135deg, #0e2a47 0%, #1a4d7c 100%);
+          background: linear-gradient(135deg, #071a2f 0%, #0b2b52 100%);
         }
         .text-liguster {
-          color: #1a4d7c;
+          color: #0b2b52;
         }
         .bg-liguster {
-          background-color: #1a4d7c;
+          background-color: #0b2b52;
         }
         .hover-bg-liguster:hover {
-          background-color: #0e2a47;
+          background-color: #071a2f;
         }
         .mockup-frame {
           box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
@@ -101,7 +99,8 @@ export default function LigusterLandingPage() {
       <nav className="absolute w-full z-20 top-0 start-0 border-b border-white/10">
         <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
           <div className="flex items-center space-x-3">
-            <div className="relative h-10 w-32 md:h-12 md:w-40">
+            {/* Større logo */}
+            <div className="relative h-14 w-44 md:h-16 md:w-56">
               <Image
                 src="/Liguster-logo-NEG.png"
                 alt="Liguster Logo"
@@ -115,9 +114,9 @@ export default function LigusterLandingPage() {
           <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse">
             <button
               onClick={() => setIsLoginOpen(true)}
-              className="text-white bg-white/20 hover:bg-white/30 font-medium rounded-lg text-sm px-5 py-2.5 transition-all backdrop-blur-sm border border-white/40 flex items-center"
+              className="text-white bg-white/20 hover:bg-white/30 font-medium rounded-lg text-sm px-5 py-2.5 transition-all backdrop-blur-sm border border-white/40"
             >
-              <i className="fa-solid fa-right-to-bracket mr-2"></i> Log ind
+              Log ind
             </button>
           </div>
         </div>
@@ -125,14 +124,11 @@ export default function LigusterLandingPage() {
 
       {/* Hero Section */}
       <section className="bg-liguster-gradient relative min-h-[95vh] flex items-center overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-10 pointer-events-none">
-          <i className="fa-solid fa-leaf absolute text-9xl text-white top-10 left-10 transform -rotate-12"></i>
-          <i className="fa-solid fa-wifi absolute text-9xl text-white bottom-20 right-20 transform rotate-12"></i>
-        </div>
+        {/* Fjernet de dekorative ikoner i baggrunden */}
 
         <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-24 md:pt-0">
           <div className="mr-auto place-self-center lg:col-span-7 fade-in-up">
-            <span className="bg-blue-500/30 text-blue-100 text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-blue-400/50">
+            <span className="bg-white/10 text-white text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-white/20">
               Nyhed: Demo / Betaversion
             </span>
 
@@ -153,13 +149,9 @@ export default function LigusterLandingPage() {
                 Se hvordan det virker
               </a>
 
-              <div className="flex items-center gap-4 text-white/80 text-sm mt-2 md:mt-0">
-                <div className="flex items-center">
-                  <i className="fa-brands fa-apple text-xl mr-2"></i> iOS
-                </div>
-                <div className="flex items-center">
-                  <i className="fa-brands fa-android text-xl mr-2"></i> Android
-                </div>
+              {/* Fjernet iOS/Android-ikoner og badges */}
+              <div className="flex items-center text-white/80 text-sm mt-2 md:mt-0">
+                Til iOS og Android
               </div>
             </div>
           </div>
@@ -210,20 +202,7 @@ export default function LigusterLandingPage() {
           </div>
         </div>
 
-        <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-[0]">
-          <svg
-            className="relative block w-[calc(100%+1.3px)] h-[60px]"
-            data-name="Layer 1"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 1200 120"
-            preserveAspectRatio="none"
-          >
-            <path
-              d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"
-              className="fill-gray-50"
-            ></path>
-          </svg>
-        </div>
+        {/* Fjernet bølge-SVG’en under hero */}
       </section>
 
       {/* Features Section (6 points) */}
@@ -241,9 +220,7 @@ export default function LigusterLandingPage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* 1 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-6 text-2xl">
-                <i className="fa-solid fa-pen-to-square"></i>
-              </div>
+              {/* Fjernet ikon */}
               <h3 className="text-xl font-bold mb-3 text-gray-900">1. Opret opslag</h3>
               <p className="text-gray-600">
                 Slå noget op til dit lokalområde eller din gruppe: “Gives væk”, “Søges”, “Lån”, “Hjælp” eller “Event”.
@@ -253,9 +230,7 @@ export default function LigusterLandingPage() {
 
             {/* 2 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="w-14 h-14 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-6 text-2xl">
-                <i className="fa-solid fa-people-group"></i>
-              </div>
+              {/* Fjernet ikon */}
               <h3 className="text-xl font-bold mb-3 text-gray-900">2. Opret din egen forening</h3>
               <p className="text-gray-600">
                 Lav et fællesskab på få minutter. Det kan være alt fra en grundejerforening og kolonihaveforening
@@ -265,9 +240,7 @@ export default function LigusterLandingPage() {
 
             {/* 3 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="w-14 h-14 bg-sky-100 rounded-xl flex items-center justify-center text-sky-600 mb-6 text-2xl">
-                <i className="fa-solid fa-screwdriver-wrench"></i>
-              </div>
+              {/* Fjernet ikon */}
               <h3 className="text-xl font-bold mb-3 text-gray-900">3. Lån og udlån</h3>
               <p className="text-gray-600">
                 Lån værktøj og hverdagsting i nærheden: boremaskine, trailer, stige, festborde eller en højtryksrenser.
@@ -277,9 +250,7 @@ export default function LigusterLandingPage() {
 
             {/* 4 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-6 text-2xl">
-                <i className="fa-solid fa-handshake-angle"></i>
-              </div>
+              {/* Fjernet ikon */}
               <h3 className="text-xl font-bold mb-3 text-gray-900">4. Tilbyd og få hjælp</h3>
               <p className="text-gray-600">
                 Spørg om hjælp eller tilbyd en hånd: bære en sofa op, vande planter i ferien, passe en kat,
@@ -289,9 +260,7 @@ export default function LigusterLandingPage() {
 
             {/* 5 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 mb-6 text-2xl">
-                <i className="fa-solid fa-calendar-check"></i>
-              </div>
+              {/* Fjernet ikon */}
               <h3 className="text-xl font-bold mb-3 text-gray-900">5. Saml folk om aktiviteter</h3>
               <p className="text-gray-600">
                 Lav opslag til aktiviteter og aftaler: arbejdsdag, fællesspisning, bytte-dag, spilaften,
@@ -301,9 +270,7 @@ export default function LigusterLandingPage() {
 
             {/* 6 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="w-14 h-14 bg-rose-100 rounded-xl flex items-center justify-center text-rose-600 mb-6 text-2xl">
-                <i className="fa-solid fa-shield-halved"></i>
-              </div>
+              {/* Fjernet ikon */}
               <h3 className="text-xl font-bold mb-3 text-gray-900">6. Hold det trygt og overskueligt</h3>
               <p className="text-gray-600">
                 Liguster er bygget til at undgå konflikter: ingen offentlige kommentarspor i opslag.
@@ -318,7 +285,8 @@ export default function LigusterLandingPage() {
       <footer className="bg-gray-950 text-gray-400 py-12 border-t border-gray-800 text-center mt-12">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="flex justify-center mb-6">
-            <div className="relative h-8 w-32 opacity-80">
+            {/* Valgfrit: større footer-logo (kan justeres) */}
+            <div className="relative h-10 w-40 opacity-80">
               <Image src="/Liguster-logo-NEG.png" alt="Logo" fill className="object-contain" />
             </div>
           </div>
@@ -333,8 +301,9 @@ export default function LigusterLandingPage() {
             <button
               onClick={() => setIsLoginOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              aria-label="Luk"
             >
-              <i className="fa-solid fa-xmark text-xl"></i>
+              ×
             </button>
 
             <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Log ind</h3>
