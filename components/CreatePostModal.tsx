@@ -9,7 +9,7 @@ type Props = {
   onPostCreated: () => void;
 };
 
-// VIGTIGT: Navnet på din bucket fra appen
+// Skal matche navnet på din bucket fra appen
 const BUCKET_NAME = 'opslagsbilleder';
 
 const KATEGORIER = [
@@ -18,40 +18,47 @@ const KATEGORIER = [
   'Byttes', 'Udlejning', 'Sælges', 'Andet'
 ];
 
-// --- HJÆLPEFUNKTION: Komprimer billede (Lånt fra din App kode) ---
-async function resizeImage(file: File, maxWidth = 1400, quality = 0.7): Promise<Blob> {
+// --- HJÆLPEFUNKTION: Robust Billed-komprimering ---
+async function resizeImage(file: File, maxWidth = 1200, quality = 0.8): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const elem = document.createElement('canvas');
-        const scaleFactor = Math.min(1, maxWidth / img.width);
-        
-        elem.width = img.width * scaleFactor;
-        elem.height = img.height * scaleFactor;
-        
-        const ctx = elem.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Kunne ikke behandle billede'));
-          return;
+    const img = new Image();
+    // Brug createObjectURL for bedre performance med store filer
+    const objectUrl = URL.createObjectURL(file);
+    img.src = objectUrl;
+
+    img.onload = () => {
+      // Frigiv hukommelse
+      URL.revokeObjectURL(objectUrl);
+
+      const elem = document.createElement('canvas');
+      // Beregn ny størrelse (behold aspect ratio)
+      const scaleFactor = Math.min(1, maxWidth / img.width);
+      
+      elem.width = img.width * scaleFactor;
+      elem.height = img.height * scaleFactor;
+      
+      const ctx = elem.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Browseren kunne ikke behandle billedet'));
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0, elem.width, elem.height);
+      
+      ctx.canvas.toBlob((blob) => {
+        if (blob) {
+          console.log(`Billede komprimeret: Fra ${(file.size / 1024).toFixed(0)}KB til ${(blob.size / 1024).toFixed(0)}KB`);
+          resolve(blob);
+        } else {
+          reject(new Error('Fejl ved generering af blob'));
         }
-        
-        ctx.drawImage(img, 0, 0, elem.width, elem.height);
-        
-        ctx.canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Fejl ved komprimering'));
-          }
-        }, 'image/jpeg', quality);
-      };
-      img.onerror = (error) => reject(error);
+      }, 'image/jpeg', quality);
     };
-    reader.onerror = (error) => reject(error);
+
+    img.onerror = (error) => {
+      URL.revokeObjectURL(objectUrl);
+      reject(error);
+    };
   });
 }
 
@@ -82,18 +89,19 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
       const userId = session.user.id;
 
       let imageUrl = null;
+      let imagePath = null;
 
       if (imageFile) {
-        // 1. Komprimer billedet FØR upload
+        console.log('Starter billedbehandling...');
+        // 1. Komprimer
         const compressedBlob = await resizeImage(imageFile);
         
-        // Lav et filnavn der ender på .jpg (siden vi konverterer til jpeg)
+        // 2. Upload
         const fileName = `post_${Date.now()}_${Math.floor(Math.random() * 1000)}.jpg`;
-        
-        // Sti: posts/USER_ID/filnavn
         const filePath = `posts/${userId}/${fileName}`;
 
-        // 2. Upload det lille billede
+        console.log('Uploader til:', BUCKET_NAME, filePath);
+
         const { error: uploadError } = await supabase.storage
           .from(BUCKET_NAME)
           .upload(filePath, compressedBlob, {
@@ -101,28 +109,43 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
             upsert: true
           });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error('Upload fejl:', uploadError);
+          throw uploadError;
+        }
 
+        // 3. Hent public URL
         const { data: urlData } = supabase.storage
           .from(BUCKET_NAME)
           .getPublicUrl(filePath);
         
         imageUrl = urlData.publicUrl;
+        imagePath = filePath; // Gem path hvis du får brug for det senere
+        console.log('Billede uploaded. URL:', imageUrl);
+      } else {
+        console.log('Intet billede valgt.');
       }
 
-      // 3. Gem i databasen
+      // 4. Gem i databasen (Både i images array og image_url)
+      const postData = {
+        overskrift,
+        text,
+        kategori,
+        omraade,
+        image_url: imageUrl,     // Legacy felt
+        images: imageUrl ? [imageUrl] : null, // Array felt (som appen bruger)
+        user_id: userId,
+      };
+
+      console.log('Gemmer post data:', postData);
+
       const { error: dbError } = await supabase
         .from('posts')
-        .insert({
-          overskrift,
-          text,
-          kategori,
-          omraade,
-          image_url: imageUrl,
-          user_id: userId,
-        });
+        .insert(postData);
 
       if (dbError) throw dbError;
+
+      console.log('Opslag oprettet succesfuldt!');
 
       // Nulstil og luk
       setOverskrift('');
@@ -134,7 +157,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
       onClose();
 
     } catch (error: any) {
-      console.error(error);
+      console.error('CRITICAL ERROR:', error);
       alert('Fejl ved oprettelse: ' + (error.message || 'Ukendt fejl'));
     } finally {
       setLoading(false);
