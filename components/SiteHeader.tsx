@@ -20,8 +20,9 @@ export default function SiteHeader() {
   const handleLogout = async () => {
     // 1. Log ud hos Supabase
     await supabase.auth.signOut();
-    // 2. Send brugeren tilbage til login-siden
-    router.replace('/login');
+    // 2. Send brugeren tilbage til forsiden (Landing Page)
+    // RETTELSE HER: Ændret fra '/login' til '/'
+    router.replace('/');
   };
 
   return (
