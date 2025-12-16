@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
-import CreatePostModal from '../../components/CreatePostModal'; // <--- NY
+import CreatePostModal from '../../components/CreatePostModal';
+import PostDetailModal from '../../components/PostDetailModal'; // <--- NY
 
 // Type definition
 type Post = {
@@ -25,8 +26,10 @@ export default function OpslagPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // State til at styre om "Opret"-vinduet er åbent
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null); // Til detaljevisning
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // SIKKERHEDSTJEK & DATA HENTNING
   useEffect(() => {
@@ -38,6 +41,8 @@ export default function OpslagPage() {
         router.replace('/login');
         return; 
       }
+      
+      setCurrentUserId(session.user.id); // Gem brugerens ID
       await fetchPosts();
     };
     checkUserAndFetch();
@@ -75,10 +80,9 @@ export default function OpslagPage() {
       <div className="bg-[#869FB9] py-6 px-4 shadow-sm">
         <div className="max-w-4xl mx-auto space-y-4">
           
-          {/* Opret Knap - Nu virker den! */}
           <button 
             className="w-full bg-[#131921] text-white font-bold text-lg py-4 rounded-2xl shadow-lg hover:bg-gray-900 transition-all uppercase tracking-wider flex items-center justify-center gap-2 transform hover:scale-[1.01]"
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsCreateModalOpen(true)}
           >
             <i className="fa-solid fa-plus-circle text-2xl"></i> Opret nyt opslag
           </button>
@@ -113,7 +117,8 @@ export default function OpslagPage() {
             <div 
               key={post.id} 
               className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer border border-gray-100 flex flex-col h-full"
-              onClick={() => alert(`Her ville vi åbne detaljer for: ${post.overskrift}`)}
+              // HER ER RETTELSEN: Vi sætter selectedPost når man klikker
+              onClick={() => setSelectedPost(post)}
             >
               {/* Billede */}
               {post.image_url ? (
@@ -152,7 +157,8 @@ export default function OpslagPage() {
                 </p>
                 
                 <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400 font-medium">
-                   <span>For 2 timer siden</span>
+                   {/* Simpel dato visning */}
+                   <span>{new Date(post.created_at).toLocaleDateString()}</span>
                    <span className="text-blue-600 font-bold">Læs mere →</span>
                 </div>
               </div>
@@ -163,13 +169,21 @@ export default function OpslagPage() {
 
       <SiteFooter />
 
-      {/* Vores nye Modal */}
+      {/* MODALS */}
       <CreatePostModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)}
         onPostCreated={() => {
-          fetchPosts(); // Genindlæs listen når vi har oprettet noget
+          fetchPosts(); 
         }}
+      />
+
+      {/* NY DETALJE MODAL */}
+      <PostDetailModal 
+        isOpen={!!selectedPost}
+        post={selectedPost}
+        onClose={() => setSelectedPost(null)}
+        currentUserId={currentUserId}
       />
     </div>
   );
