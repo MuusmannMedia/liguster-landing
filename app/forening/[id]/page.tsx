@@ -35,8 +35,7 @@ type ImagePreview = { id: number; image_url: string };
 
 // --- HJÆLPERE ---
 const getDisplayName = (m: any) => {
-  // Håndter både "users" objektet eller hvis m er selve brugeren
-  const user = m.users || m;
+  const user = m?.users || m; 
   const n = user?.name?.trim() || user?.username?.trim();
   if (n) return n;
   const email = user?.email || "";
@@ -169,8 +168,7 @@ export default function ForeningDetaljePage() {
 
         {/* --- BESKEDER KNAP --- */}
         <button 
-          // Linker til ChatScreen eller besked-siden (hvis implementeret)
-          onClick={() => router.push('/Beskeder')}
+          onClick={() => router.push('/Beskeder')} // Linker til beskeder (hvis den findes)
           className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
         >
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">
@@ -198,7 +196,7 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- SAMTALER PREVIEW --- */}
-        {/* LINKER TIL: app/forening/[id]/threads/page.tsx -> som bruger ForeningThreads.tsx */}
+        {/* LINKER TIL: app/forening/[id]/threads/page.tsx */}
         <div 
           onClick={() => router.push(`/forening/${id}/threads`)} 
           className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -222,7 +220,7 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- AKTIVITETER PREVIEW --- */}
-        {/* LINKER TIL: app/forening/[id]/events/page.tsx -> som bruger ForeningEvents.tsx */}
+        {/* LINKER TIL: app/forening/[id]/events/page.tsx */}
         <div 
           onClick={() => router.push(`/forening/${id}/events`)} 
           className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -245,7 +243,7 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- BILLEDER PREVIEW --- */}
-        {/* LINKER TIL: app/forening/[id]/images/page.tsx -> som bruger ForeningImages.tsx */}
+        {/* LINKER TIL: app/forening/[id]/images/page.tsx */}
         <div 
           onClick={() => router.push(`/forening/${id}/images`)} 
           className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
