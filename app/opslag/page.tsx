@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-import SiteHeader from '../../components/SiteHeader'; // Vores nye menu
-import SiteFooter from '../../components/SiteFooter'; // Vores nye footer
+import SiteHeader from '../../components/SiteHeader';
+import SiteFooter from '../../components/SiteFooter';
+import CreatePostModal from '../../components/CreatePostModal'; // <--- NY
 
 // Type definition
 type Post = {
@@ -23,6 +24,9 @@ export default function OpslagPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // State til at styre om "Opret"-vinduet er åbent
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // SIKKERHEDSTJEK & DATA HENTNING
   useEffect(() => {
@@ -65,17 +69,16 @@ export default function OpslagPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f0f2f5]">
-      {/* 1. Global Navigation */}
       <SiteHeader />
 
-      {/* 2. Sub-header med knapper og filtre (Nu under menuen) */}
+      {/* Filter Bar og Knapper */}
       <div className="bg-[#869FB9] py-6 px-4 shadow-sm">
         <div className="max-w-4xl mx-auto space-y-4">
           
-          {/* Opret Knap */}
+          {/* Opret Knap - Nu virker den! */}
           <button 
             className="w-full bg-[#131921] text-white font-bold text-lg py-4 rounded-2xl shadow-lg hover:bg-gray-900 transition-all uppercase tracking-wider flex items-center justify-center gap-2 transform hover:scale-[1.01]"
-            onClick={() => alert("Her kommer opret funktionen snart!")}
+            onClick={() => setIsModalOpen(true)}
           >
             <i className="fa-solid fa-plus-circle text-2xl"></i> Opret nyt opslag
           </button>
@@ -103,7 +106,7 @@ export default function OpslagPage() {
         </div>
       </div>
 
-      {/* 3. Selve listen med opslag */}
+      {/* Liste med opslag */}
       <main className="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {posts.map((post) => (
@@ -127,7 +130,6 @@ export default function OpslagPage() {
                 </div>
               )}
 
-              {/* Indhold */}
               <div className="flex-1 flex flex-col">
                 <div className="flex justify-between items-start mb-2">
                   {post.kategori && (
@@ -159,8 +161,16 @@ export default function OpslagPage() {
         </div>
       </main>
 
-      {/* 4. Global Footer */}
       <SiteFooter />
+
+      {/* Vores nye Modal */}
+      <CreatePostModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        onPostCreated={() => {
+          fetchPosts(); // Genindlæs listen når vi har oprettet noget
+        }}
+      />
     </div>
   );
 }
