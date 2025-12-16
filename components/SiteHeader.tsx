@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { supabase } from '../lib/supabaseClient';
 
 export default function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const menuItems = [
     { name: 'Opslag', href: '/opslag', icon: 'fa-layer-group' },
@@ -14,6 +16,13 @@ export default function SiteHeader() {
     { name: 'Mine opslag', href: '/mine-opslag', icon: 'fa-box-open' },
     { name: 'Mig', href: '/mig', icon: 'fa-user' },
   ];
+
+  const handleLogout = async () => {
+    // 1. Log ud hos Supabase
+    await supabase.auth.signOut();
+    // 2. Send brugeren tilbage til login-siden
+    router.replace('/login');
+  };
 
   return (
     <nav className="bg-[#131921] text-white sticky top-0 z-[100] shadow-md border-b border-gray-800">
@@ -54,6 +63,16 @@ export default function SiteHeader() {
                 </Link>
               );
             })}
+
+            {/* Log ud Knap */}
+            <button
+              onClick={handleLogout}
+              className="inline-flex flex-col items-center justify-center px-3 md:px-4 py-2 text-xs md:text-sm font-medium transition-colors duration-200 border-b-2 border-transparent text-gray-400 hover:text-red-400 hover:border-red-400"
+              title="Log ud"
+            >
+              <i className="fa-solid fa-right-from-bracket mb-1 text-sm md:text-lg"></i>
+              <span className="hidden md:inline">Log ud</span>
+            </button>
           </div>
 
         </div>
