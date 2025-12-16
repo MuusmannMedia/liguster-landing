@@ -130,21 +130,8 @@ export default function ForeningDetaljePage() {
 
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
         
-        {/* TOP NAVIGATION */}
-        <div className="flex justify-between items-center pt-2">
-          <button onClick={() => router.back()} className="w-10 h-10 rounded-full bg-[#131921] text-white flex items-center justify-center hover:bg-black transition-colors shadow-md">
-            ‹
-          </button>
-          
-          <button onClick={() => setShowMembers(true)} className="flex items-center gap-2 bg-blue-100 text-[#131921] px-4 py-2 rounded-full font-bold shadow-sm hover:bg-blue-200 transition-colors">
-            <i className="fa-solid fa-users"></i>
-            <span>{approved.length}</span>
-            {isOwner && pending.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{pending.length}</span>}
-          </button>
-        </div>
-
         {/* --- FORENING INFO KORT --- */}
-        <div className="bg-white rounded-[24px] p-5 shadow-md">
+        <div className="bg-white rounded-[24px] p-5 shadow-md mt-6">
           <div className="relative w-full h-56 md:h-72 rounded-[18px] overflow-hidden bg-gray-100 mb-4">
             {forening.billede_url ? (
               <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
@@ -155,7 +142,9 @@ export default function ForeningDetaljePage() {
 
           <h1 className="text-2xl font-black text-[#131921] mb-1 underline decoration-gray-300">{forening.navn}</h1>
           <p className="text-gray-700 font-bold mb-4">{forening.sted}</p>
-          <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap mb-4 line-clamp-3">
+          
+          {/* RETTELSE: Hele beskrivelsen vises nu (fjernet line-clamp) */}
+          <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap mb-4">
             {forening.beskrivelse}
           </p>
 
@@ -168,7 +157,7 @@ export default function ForeningDetaljePage() {
 
         {/* --- BESKEDER KNAP --- */}
         <button 
-          onClick={() => router.push('/Beskeder')} // Linker til beskeder (hvis den findes)
+          onClick={() => router.push('/Beskeder')}
           className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
         >
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">
@@ -196,7 +185,6 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- SAMTALER PREVIEW --- */}
-        {/* LINKER TIL: app/forening/[id]/threads/page.tsx */}
         <div 
           onClick={() => router.push(`/forening/${id}/threads`)} 
           className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -220,7 +208,6 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- AKTIVITETER PREVIEW --- */}
-        {/* LINKER TIL: app/forening/[id]/events/page.tsx */}
         <div 
           onClick={() => router.push(`/forening/${id}/events`)} 
           className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -243,7 +230,6 @@ export default function ForeningDetaljePage() {
         </div>
 
         {/* --- BILLEDER PREVIEW --- */}
-        {/* LINKER TIL: app/forening/[id]/images/page.tsx */}
         <div 
           onClick={() => router.push(`/forening/${id}/images`)} 
           className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
