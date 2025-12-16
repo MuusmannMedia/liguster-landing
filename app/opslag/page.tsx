@@ -21,12 +21,14 @@ type Post = {
   user_id: string;
 };
 
-// Samme kategorier som i opret-modalen
+// Data konstanter
 const KATEGORIER = [
   'Værktøj', 'Arbejde tilbydes', 'Affald', 'Mindre ting', 
   'Større ting', 'Hjælp søges', 'Hjælp tilbydes', 
   'Byttes', 'Udlejning', 'Sælges', 'Andet'
 ];
+
+const RADIUS_OPTIONS = [1, 2, 3, 5, 10, 20, 50];
 
 export default function OpslagPage() {
   const router = useRouter();
@@ -38,6 +40,7 @@ export default function OpslagPage() {
   const [radius, setRadius] = useState(50); // Standard 50 km
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
+  const [isRadiusMenuOpen, setIsRadiusMenuOpen] = useState(false); // <--- NY STATE
 
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -79,7 +82,7 @@ export default function OpslagPage() {
 
   // --- LOGIK: FILTRERING ---
   const filteredPosts = posts.filter((post) => {
-    // 1. Søgning (kigger i overskrift og tekst)
+    // 1. Søgning
     const matchesSearch = 
       searchQuery === '' ||
       post.overskrift.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -90,16 +93,11 @@ export default function OpslagPage() {
       selectedCategory === null || 
       post.kategori === selectedCategory;
 
+    // (Note: Radius filtrering kræver geolokation på opslagene i databasen, 
+    // så indtil videre er det kun en visuel indstilling)
+
     return matchesSearch && matchesCategory;
   });
-
-  // Cyklus for radius-knappen
-  const cycleRadius = () => {
-    const steps = [5, 10, 20, 50, 100];
-    const currentIndex = steps.indexOf(radius);
-    const nextIndex = (currentIndex + 1) % steps.length;
-    setRadius(steps[nextIndex]);
-  };
 
   if (loading) {
     return (
@@ -139,27 +137,22 @@ export default function OpslagPage() {
               />
             </div>
 
-            {/* Kategori Knap (Dropdown trigger) */}
+            {/* Kategori Knap */}
             <div className="relative">
               <button 
                 onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
                 className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-colors ${
                   selectedCategory 
-                    ? 'bg-[#131921] text-white' // Aktiv farve
+                    ? 'bg-[#131921] text-white' 
                     : 'bg-white text-[#131921] hover:bg-gray-50' 
                 }`}
               >
                 <i className="fa-solid fa-filter"></i>
               </button>
 
-              {/* Kategori Dropdown Menu */}
               {isCategoryMenuOpen && (
                 <>
-                  {/* Usynlig baggrund til at lukke menuen */}
-                  <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setIsCategoryMenuOpen(false)}
-                  />
+                  <div className="fixed inset-0 z-10" onClick={() => setIsCategoryMenuOpen(false)}/>
                   <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl z-20 overflow-hidden border border-gray-100 py-2">
                     <button
                       onClick={() => { setSelectedCategory(null); setIsCategoryMenuOpen(false); }}
@@ -182,9 +175,9 @@ export default function OpslagPage() {
               )}
             </div>
 
-            {/* Radius Knap */}
+            {/* Radius Knap - Åbner nu modal */}
             <button 
-              onClick={cycleRadius}
+              onClick={() => setIsRadiusMenuOpen(true)}
               className="h-12 px-4 bg-white rounded-xl flex items-center justify-center shadow-sm text-[#131921] font-bold text-sm hover:bg-gray-50 min-w-[70px]"
             >
               {radius} km
@@ -204,7 +197,6 @@ export default function OpslagPage() {
                 className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer border border-gray-100 flex flex-col h-full"
                 onClick={() => setSelectedPost(post)}
               >
-                {/* Billede */}
                 {post.image_url ? (
                   <div className="relative w-full h-48 mb-4 overflow-hidden rounded-xl">
                     <img 
@@ -249,7 +241,6 @@ export default function OpslagPage() {
             ))}
           </div>
         ) : (
-          /* Tom søgning */
           <div className="flex flex-col items-center justify-center pt-20 text-gray-400">
             <i className="fa-solid fa-magnifying-glass text-4xl mb-4 opacity-50"></i>
             <p className="text-lg font-medium">Ingen opslag fundet</p>
@@ -267,21 +258,53 @@ export default function OpslagPage() {
 
       <SiteFooter />
 
-      {/* MODALS */}
+      {/* --- OPRET MODAL --- */}
       <CreatePostModal 
         isOpen={isCreateModalOpen} 
         onClose={() => setIsCreateModalOpen(false)}
-        onPostCreated={() => {
-          fetchPosts(); 
-        }}
+        onPostCreated={() => fetchPosts()}
       />
 
+      {/* --- DETALJE MODAL --- */}
       <PostDetailModal 
         isOpen={!!selectedPost}
         post={selectedPost}
         onClose={() => setSelectedPost(null)}
         currentUserId={currentUserId}
       />
+
+      {/* --- RADIUS MODAL (NY) --- */}
+      {isRadiusMenuOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-200">
+            
+            <h3 className="text-lg font-bold text-[#131921] mb-6">Vis opslag indenfor</h3>
+            
+            <div className="w-full space-y-3">
+              {RADIUS_OPTIONS.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => { setRadius(r); setIsRadiusMenuOpen(false); }}
+                  className={`w-full py-3.5 rounded-2xl text-sm font-bold transition-all ${
+                    radius === r
+                      ? 'bg-[#131921] text-white shadow-md transform scale-[1.02]'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {r} km
+                </button>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => setIsRadiusMenuOpen(false)}
+              className="mt-8 text-[#131921] font-bold text-sm px-8 py-2.5 rounded-full hover:bg-gray-50 transition-colors"
+            >
+              Luk
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
