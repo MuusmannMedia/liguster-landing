@@ -108,11 +108,11 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
       setNewThreadTitle("");
       // Opdater cache for current user hvis nødvendigt
       if (!userCache[userId]) {
-         const { data: me } = await supabase.auth.getUser(); // Simpel fallback
-         // En rigtig løsning ville være at hente fra users tabellen, men vi antager det loader næste gang
+         const { data: me } = await supabase.auth.getUser(); 
       }
     } else {
-      alert("Fejl: " + error.message);
+      // HER VAR FEJLEN: Vi bruger nu error?.message || 'Ukendt fejl'
+      alert("Fejl: " + (error?.message || "Kunne ikke oprette tråd"));
     }
     setCreating(false);
   };
