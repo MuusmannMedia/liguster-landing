@@ -240,8 +240,9 @@ export default function ForeningPage() {
             {filtered.map(forening => (
               <div 
                 key={forening.id}
-                onClick={() => alert("Forening detaljer kommer snart!")} // Her skal vi linke til detaljesiden senere
-                className="bg-white rounded-[24px] p-4 shadow-sm hover:shadow-lg transition-shadow cursor-pointer flex flex-col h-full"
+                // RETTELSE: Naviger til detaljesiden
+                onClick={() => router.push(`/forening/${forening.id}`)}
+                className="bg-white rounded-[24px] p-4 shadow-sm hover:shadow-lg transition-shadow cursor-pointer flex flex-col h-full transform hover:scale-[1.02] duration-200"
               >
                 {/* Billede eller Placeholder */}
                 <div className="w-full h-48 rounded-[18px] mb-3 overflow-hidden bg-[#E7EBF0] flex items-center justify-center relative">
