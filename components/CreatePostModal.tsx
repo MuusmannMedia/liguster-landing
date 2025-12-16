@@ -9,7 +9,7 @@ type Props = {
   onPostCreated: () => void;
 };
 
-// VIGTIGT: Dette skal matche navnet fra din App kode ("opslagsbilleder")
+// VIGTIGT: Navnet på din bucket fra appen
 const BUCKET_NAME = 'opslagsbilleder';
 
 const KATEGORIER = [
@@ -17,6 +17,43 @@ const KATEGORIER = [
   'Større ting', 'Hjælp søges', 'Hjælp tilbydes', 
   'Byttes', 'Udlejning', 'Sælges', 'Andet'
 ];
+
+// --- HJÆLPEFUNKTION: Komprimer billede (Lånt fra din App kode) ---
+async function resizeImage(file: File, maxWidth = 1400, quality = 0.7): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const elem = document.createElement('canvas');
+        const scaleFactor = Math.min(1, maxWidth / img.width);
+        
+        elem.width = img.width * scaleFactor;
+        elem.height = img.height * scaleFactor;
+        
+        const ctx = elem.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Kunne ikke behandle billede'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, elem.width, elem.height);
+        
+        ctx.canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Fejl ved komprimering'));
+          }
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+}
 
 export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Props) {
   const [loading, setLoading] = useState(false);
@@ -47,16 +84,22 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
       let imageUrl = null;
 
       if (imageFile) {
-        // Vi laver et unikt filnavn
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `post_${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
+        // 1. Komprimer billedet FØR upload
+        const compressedBlob = await resizeImage(imageFile);
         
-        // VIGTIGT: Vi bruger samme mappestruktur som appen: posts/USER_ID/filnavn
+        // Lav et filnavn der ender på .jpg (siden vi konverterer til jpeg)
+        const fileName = `post_${Date.now()}_${Math.floor(Math.random() * 1000)}.jpg`;
+        
+        // Sti: posts/USER_ID/filnavn
         const filePath = `posts/${userId}/${fileName}`;
 
+        // 2. Upload det lille billede
         const { error: uploadError } = await supabase.storage
-          .from(BUCKET_NAME) // Her bruger vi nu 'opslagsbilleder'
-          .upload(filePath, imageFile);
+          .from(BUCKET_NAME)
+          .upload(filePath, compressedBlob, {
+            contentType: 'image/jpeg',
+            upsert: true
+          });
 
         if (uploadError) throw uploadError;
 
@@ -67,6 +110,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
         imageUrl = urlData.publicUrl;
       }
 
+      // 3. Gem i databasen
       const { error: dbError } = await supabase
         .from('posts')
         .insert({
@@ -80,7 +124,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
 
       if (dbError) throw dbError;
 
-      // Nulstil formular
+      // Nulstil og luk
       setOverskrift('');
       setText('');
       setOmraade('');
