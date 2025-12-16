@@ -6,20 +6,33 @@ import { supabase } from '../lib/supabaseClient';
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onPostCreated: () => void; // Så vi kan opdatere listen bagved
+  onPostCreated: () => void;
 };
 
-const KATEGORIER = ['Gives væk', 'Søges', 'Lån', 'Hjælp', 'Event', 'Andet'];
+// Opdateret liste fra din mobil-app
+const KATEGORIER = [
+  'Værktøj',
+  'Arbejde tilbydes',
+  'Affald',
+  'Mindre ting',
+  'Større ting',
+  'Hjælp søges',
+  'Hjælp tilbydes',
+  'Byttes',
+  'Udlejning',
+  'Sælges',
+  'Andet',
+];
 
 export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Props) {
   const [loading, setLoading] = useState(false);
   const [overskrift, setOverskrift] = useState('');
   const [text, setText] = useState('');
+  // Vi sætter standardværdien til den første i listen
   const [kategori, setKategori] = useState(KATEGORIER[0]);
-  const [omraade, setOmraade] = useState(''); // F.eks. bynavn
+  const [omraade, setOmraade] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
 
-  // Reference til den skjulte fil-input knap
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -34,14 +47,12 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
     try {
       setLoading(true);
 
-      // 1. Hent brugerens ID
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Ingen bruger logget ind');
       const userId = session.user.id;
 
       let imageUrl = null;
 
-      // 2. Upload billede (hvis der er valgt et)
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
@@ -53,7 +64,6 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
 
         if (uploadError) throw uploadError;
 
-        // Få den offentlige URL
         const { data: urlData } = supabase.storage
           .from('post-images')
           .getPublicUrl(filePath);
@@ -61,7 +71,6 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
         imageUrl = urlData.publicUrl;
       }
 
-      // 3. Gem opslaget i databasen
       const { error: dbError } = await supabase
         .from('posts')
         .insert({
@@ -75,11 +84,10 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
 
       if (dbError) throw dbError;
 
-      // 4. Succes! Luk og nulstil
       setOverskrift('');
       setText('');
       setImageFile(null);
-      onPostCreated(); // Fortæl "mor" at der er nyt data
+      onPostCreated();
       onClose();
 
     } catch (error: any) {
@@ -103,11 +111,11 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
 
         {/* Form - Scrollable content */}
         <div className="p-6 overflow-y-auto">
-          <form onSubmit={handleCreate} className="space-y-4">
+          <form onSubmit={handleCreate} className="space-y-5">
             
             {/* Kategori Vælger */}
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Kategori</label>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Kategori</label>
               <div className="flex flex-wrap gap-2">
                 {KATEGORIER.map(cat => (
                   <button
@@ -131,8 +139,9 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Overskrift</label>
               <input
                 type="text"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921]"
-                placeholder="F.eks. Gratis sofa..."
+                // HER ER RETTELSEN: text-[#131921] gør teksten mørk
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] text-[#131921] placeholder-gray-400 font-medium"
+                placeholder="F.eks. Boremaskine udlejes..."
                 value={overskrift}
                 onChange={e => setOverskrift(e.target.value)}
               />
@@ -171,7 +180,8 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Beskrivelse</label>
               <textarea
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 h-32 outline-none focus:ring-2 focus:ring-[#131921] resize-none"
+                // HER ER RETTELSEN: text-[#131921]
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 h-32 outline-none focus:ring-2 focus:ring-[#131921] resize-none text-[#131921] placeholder-gray-400 font-medium"
                 placeholder="Beskriv tingen eller opgaven..."
                 value={text}
                 onChange={e => setText(e.target.value)}
@@ -183,7 +193,8 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Område / By</label>
               <input
                 type="text"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921]"
+                // HER ER RETTELSEN: text-[#131921]
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] text-[#131921] placeholder-gray-400 font-medium"
                 placeholder="F.eks. Lyngby"
                 value={omraade}
                 onChange={e => setOmraade(e.target.value)}
