@@ -14,7 +14,8 @@ export default function LigusterLandingPage() {
 
   // --- CAROUSEL LOGIC ---
   const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % totalSlides);
-  const prevSlide = () => setCurrentSlide((prev) => (prev === 0 ? totalSlides - 1 : prev - 1));
+  const prevSlide = () =>
+    setCurrentSlide((prev) => (prev === 0 ? totalSlides - 1 : prev - 1));
 
   const resetAutoPlay = () => {
     if (autoPlayRef.current) clearInterval(autoPlayRef.current);
@@ -23,7 +24,9 @@ export default function LigusterLandingPage() {
 
   useEffect(() => {
     resetAutoPlay();
-    return () => { if (autoPlayRef.current) clearInterval(autoPlayRef.current); };
+    return () => {
+      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+    };
   }, []);
 
   // Swipe handlers
@@ -58,18 +61,39 @@ export default function LigusterLandingPage() {
 
   return (
     <div className="font-sans text-gray-800 bg-gray-50 min-h-screen pb-20">
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+      <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      />
 
       <style jsx global>{`
-        .bg-liguster-gradient { background: linear-gradient(135deg, #0e2a47 0%, #1a4d7c 100%); }
-        .text-liguster { color: #1a4d7c; }
-        .bg-liguster { background-color: #1a4d7c; }
-        .hover-bg-liguster:hover { background-color: #0e2a47; }
-        .mockup-frame { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-        .fade-in-up { animation: fadeInUp 0.8s ease-out; }
+        .bg-liguster-gradient {
+          background: linear-gradient(135deg, #0e2a47 0%, #1a4d7c 100%);
+        }
+        .text-liguster {
+          color: #1a4d7c;
+        }
+        .bg-liguster {
+          background-color: #1a4d7c;
+        }
+        .hover-bg-liguster:hover {
+          background-color: #0e2a47;
+        }
+        .mockup-frame {
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .fade-in-up {
+          animation: fadeInUp 0.8s ease-out;
+        }
         @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
       `}</style>
 
@@ -87,6 +111,7 @@ export default function LigusterLandingPage() {
               />
             </div>
           </div>
+
           <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse">
             <button
               onClick={() => setIsLoginOpen(true)}
@@ -110,13 +135,16 @@ export default function LigusterLandingPage() {
             <span className="bg-blue-500/30 text-blue-100 text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-blue-400/50">
               Nyhed: Demo / Betaversion
             </span>
+
             <h1 className="max-w-2xl mb-4 text-4xl font-extrabold tracking-tight leading-none md:text-5xl xl:text-6xl text-white">
               Del, lån og hjælp lokalt
             </h1>
+
             <p className="max-w-2xl mb-6 font-light text-gray-200 lg:mb-8 md:text-lg lg:text-xl">
               Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med fokus på tryghed,
               enkelhed og en grønnere hverdag.
             </p>
+
             <div className="flex flex-col md:flex-row gap-4">
               <a
                 href="#features"
@@ -124,9 +152,14 @@ export default function LigusterLandingPage() {
               >
                 Se hvordan det virker
               </a>
+
               <div className="flex items-center gap-4 text-white/80 text-sm mt-2 md:mt-0">
-                <div className="flex items-center"><i className="fa-brands fa-apple text-xl mr-2"></i> iOS</div>
-                <div className="flex items-center"><i className="fa-brands fa-android text-xl mr-2"></i> Android</div>
+                <div className="flex items-center">
+                  <i className="fa-brands fa-apple text-xl mr-2"></i> iOS
+                </div>
+                <div className="flex items-center">
+                  <i className="fa-brands fa-android text-xl mr-2"></i> Android
+                </div>
               </div>
             </div>
           </div>
@@ -143,7 +176,10 @@ export default function LigusterLandingPage() {
                   style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                 >
                   {slides.map((src, index) => (
-                    <div key={index} className="min-w-full h-full bg-gray-900 flex items-center justify-center relative">
+                    <div
+                      key={index}
+                      className="min-w-full h-full bg-gray-900 flex items-center justify-center relative"
+                    >
                       <Image
                         src={src}
                         alt={`App slide ${index + 1}`}
@@ -154,12 +190,18 @@ export default function LigusterLandingPage() {
                     </div>
                   ))}
                 </div>
+
                 <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
                   {[...Array(totalSlides)].map((_, index) => (
                     <div
                       key={index}
-                      onClick={() => { setCurrentSlide(index); resetAutoPlay(); }}
-                      className={`h-2 rounded-full cursor-pointer transition-all duration-300 ${index === currentSlide ? 'bg-white w-5' : 'bg-white/40 w-2'}`}
+                      onClick={() => {
+                        setCurrentSlide(index);
+                        resetAutoPlay();
+                      }}
+                      className={`h-2 rounded-full cursor-pointer transition-all duration-300 ${
+                        index === currentSlide ? 'bg-white w-5' : 'bg-white/40 w-2'
+                      }`}
                     />
                   ))}
                 </div>
@@ -169,45 +211,104 @@ export default function LigusterLandingPage() {
         </div>
 
         <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-[0]">
-          <svg className="relative block w-[calc(100%+1.3px)] h-[60px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-            <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" className="fill-gray-50"></path>
+          <svg
+            className="relative block w-[calc(100%+1.3px)] h-[60px]"
+            data-name="Layer 1"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 1200 120"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"
+              className="fill-gray-50"
+            ></path>
           </svg>
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features Section (6 points) */}
       <section id="features" className="py-16 md:py-24 bg-gray-50">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Et stærkere nabolag – helt enkelt</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Opret opslag, find det du mangler, og hjælp hinanden lokalt. Liguster er bygget til at være rolig, tryg og nem at bruge.
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Hvad kan du bruge Liguster til?
+            </h2>
+            <p className="text-gray-600 max-w-3xl mx-auto">
+              Liguster er et lokalt samlingspunkt, hvor du kan dele, låne, hjælpe og organisere fællesskaber – uden støj og med fokus på tryghed.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* 1 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
               <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-6 text-2xl">
-                <i className="fa-solid fa-hand-holding-heart"></i>
+                <i className="fa-solid fa-pen-to-square"></i>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-900">Giv videre</h3>
-              <p className="text-gray-600">Gør det nemt at give ting videre til nogen i nærheden – og undgå at smide ud.</p>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">1. Opret opslag</h3>
+              <p className="text-gray-600">
+                Slå noget op til dit lokalområde eller din gruppe: “Gives væk”, “Søges”, “Lån”, “Hjælp” eller “Event”.
+                Det kan være alt fra en stol du vil give videre, til en efterlysning af en stige eller en hjælpende hånd.
+              </p>
             </div>
 
+            {/* 2 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
               <div className="w-14 h-14 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-6 text-2xl">
-                <i className="fa-solid fa-screwdriver-wrench"></i>
+                <i className="fa-solid fa-people-group"></i>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-900">Lån af hinanden</h3>
-              <p className="text-gray-600">Lån værktøj og hverdagsting lokalt – og byg gensidighed med “tilgode”.</p>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">2. Opret din egen forening</h3>
+              <p className="text-gray-600">
+                Lav et fællesskab på få minutter. Det kan være alt fra en grundejerforening og kolonihaveforening
+                til en Trivial Pursuit-klub, en løbeklub, en forældregruppe eller en vennegruppe i opgangen.
+              </p>
             </div>
 
+            {/* 3 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
               <div className="w-14 h-14 bg-sky-100 rounded-xl flex items-center justify-center text-sky-600 mb-6 text-2xl">
+                <i className="fa-solid fa-screwdriver-wrench"></i>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">3. Lån og udlån</h3>
+              <p className="text-gray-600">
+                Lån værktøj og hverdagsting i nærheden: boremaskine, trailer, stige, festborde eller en højtryksrenser.
+                Når du låner noget ud, kan du tilbyde et “tilgode” – så det bliver nemt at hjælpe hinanden igen senere.
+              </p>
+            </div>
+
+            {/* 4 */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-6 text-2xl">
+                <i className="fa-solid fa-handshake-angle"></i>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">4. Tilbyd og få hjælp</h3>
+              <p className="text-gray-600">
+                Spørg om hjælp eller tilbyd en hånd: bære en sofa op, vande planter i ferien, passe en kat,
+                samle et IKEA-møbel eller hente en pakke. Små ting, der gør hverdagen lettere – lokalt.
+              </p>
+            </div>
+
+            {/* 5 */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <div className="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 mb-6 text-2xl">
+                <i className="fa-solid fa-calendar-check"></i>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">5. Saml folk om aktiviteter</h3>
+              <p className="text-gray-600">
+                Lav opslag til aktiviteter og aftaler: arbejdsdag, fællesspisning, bytte-dag, spilaften,
+                julehygge eller en tur i skoven. Nemt at samle folk – uden at det drukner i kommentarer og støj.
+              </p>
+            </div>
+
+            {/* 6 */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <div className="w-14 h-14 bg-rose-100 rounded-xl flex items-center justify-center text-rose-600 mb-6 text-2xl">
                 <i className="fa-solid fa-shield-halved"></i>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-900">Trygt & uden støj</h3>
-              <p className="text-gray-600">Ingen offentlige kommentarspor. Privatbeskeder kan anmeldes, og sikkerhed er en prioritet.</p>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">6. Hold det trygt og overskueligt</h3>
+              <p className="text-gray-600">
+                Liguster er bygget til at undgå konflikter: ingen offentlige kommentarspor i opslag.
+                Dialog foregår i privatbeskeder, og beskeder kan anmeldes. Sikkerhed og god tone er tænkt ind fra start.
+              </p>
             </div>
           </div>
         </div>
@@ -229,15 +330,23 @@ export default function LigusterLandingPage() {
       {isLoginOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl">
-            <button onClick={() => setIsLoginOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+            <button
+              onClick={() => setIsLoginOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
               <i className="fa-solid fa-xmark text-xl"></i>
             </button>
+
             <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Log ind</h3>
             <p className="text-center text-gray-500 mb-6">
               Dette er en demo. Login og adgang styres i den endelige version af appen.
             </p>
+
             <div className="space-y-3">
-              <button onClick={() => setIsLoginOpen(false)} className="w-full bg-liguster hover:bg-gray-900 text-white py-3 rounded-lg font-bold transition-colors">
+              <button
+                onClick={() => setIsLoginOpen(false)}
+                className="w-full bg-liguster hover:bg-gray-900 text-white py-3 rounded-lg font-bold transition-colors"
+              >
                 Luk
               </button>
             </div>
