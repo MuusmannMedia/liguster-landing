@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import Link from 'next/link'; // <--- Ny import til navigation
 
 export default function LigusterLandingPage() {
   // --- STATE ---
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  // (Login state er fjernet, da vi nu linker til en ny side)
 
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -61,7 +62,7 @@ export default function LigusterLandingPage() {
 
   return (
     <div className="font-sans text-gray-800 bg-gray-50 min-h-screen pb-20">
-      {/* FontAwesome beholdes pga. ikoner i de 6 punkter (features) */}
+      {/* FontAwesome */}
       <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -103,7 +104,7 @@ export default function LigusterLandingPage() {
       <nav className="absolute w-full z-20 top-0 start-0 border-b border-white/10">
         <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
           <div className="flex items-center space-x-3">
-            {/* Større logo */}
+            {/* Logo */}
             <div className="relative h-14 w-44 md:h-16 md:w-56">
               <Image
                 src="/Liguster-logo-NEG.png"
@@ -116,21 +117,20 @@ export default function LigusterLandingPage() {
           </div>
 
           <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse">
-            <button
-              onClick={() => setIsLoginOpen(true)}
+            {/* Ændret fra button til Link */}
+            <Link
+              href="/login"
               className="text-white bg-white/20 hover:bg-white/30 font-medium rounded-lg text-sm px-5 py-2.5 transition-all backdrop-blur-sm border border-white/40 flex items-center"
             >
-              {/* IKKE dekorativ: beholdes som funktionelt ikon i knappen */}
               <i className="fa-solid fa-right-to-bracket mr-2"></i> Log ind
-            </button>
+            </Link>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
       <section className="bg-liguster-gradient relative min-h-[95vh] flex items-center overflow-hidden">
-        {/* Fjernet de dekorative baggrunds-ikoner (leaf/wifi) */}
-
+        
         <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-24 md:pt-0">
           <div className="mr-auto place-self-center lg:col-span-7 fade-in-up">
             <span className="bg-white/10 text-white text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-white/20">
@@ -210,11 +210,9 @@ export default function LigusterLandingPage() {
             </div>
           </div>
         </div>
-
-        {/* Fjernet bølge-SVG’en under hero */}
       </section>
 
-      {/* Features Section (6 points) */}
+      {/* Features Section */}
       <section id="features" className="py-16 md:py-24 bg-gray-50">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="text-center mb-16">
@@ -313,34 +311,6 @@ export default function LigusterLandingPage() {
           <p className="text-sm">&copy; 2025 Liguster. Alle rettigheder forbeholdes.</p>
         </div>
       </footer>
-
-      {/* Login Modal */}
-      {isLoginOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-2xl">
-            <button
-              onClick={() => setIsLoginOpen(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-            >
-              <i className="fa-solid fa-xmark text-xl"></i>
-            </button>
-
-            <h3 className="text-2xl font-bold text-gray-900 mb-2 text-center">Log ind</h3>
-            <p className="text-center text-gray-500 mb-6">
-              Dette er en demo. Login og adgang styres i den endelige version af appen.
-            </p>
-
-            <div className="space-y-3">
-              <button
-                onClick={() => setIsLoginOpen(false)}
-                className="w-full bg-liguster hover:bg-gray-900 text-white py-3 rounded-lg font-bold transition-colors"
-              >
-                Luk
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
