@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
 import CreatePostModal from '../../components/CreatePostModal';
-import PostDetailModal from '../../components/PostDetailModal'; // <--- NY
+import PostDetailModal from '../../components/PostDetailModal';
 
 // Type definition
 type Post = {
@@ -15,20 +15,33 @@ type Post = {
   overskrift: string;
   text: string;
   image_url?: string;
+  images?: string[];
   kategori?: string;
   omraade?: string;
   user_id: string;
 };
 
+// Samme kategorier som i opret-modalen
+const KATEGORIER = [
+  'Værktøj', 'Arbejde tilbydes', 'Affald', 'Mindre ting', 
+  'Større ting', 'Hjælp søges', 'Hjælp tilbydes', 
+  'Byttes', 'Udlejning', 'Sælges', 'Andet'
+];
+
 export default function OpslagPage() {
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   
-  // State
+  // Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [radius, setRadius] = useState(50); // Standard 50 km
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
+
+  // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null); // Til detaljevisning
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // SIKKERHEDSTJEK & DATA HENTNING
@@ -42,7 +55,7 @@ export default function OpslagPage() {
         return; 
       }
       
-      setCurrentUserId(session.user.id); // Gem brugerens ID
+      setCurrentUserId(session.user.id);
       await fetchPosts();
     };
     checkUserAndFetch();
@@ -64,6 +77,30 @@ export default function OpslagPage() {
     }
   };
 
+  // --- LOGIK: FILTRERING ---
+  const filteredPosts = posts.filter((post) => {
+    // 1. Søgning (kigger i overskrift og tekst)
+    const matchesSearch = 
+      searchQuery === '' ||
+      post.overskrift.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.text.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // 2. Kategori filter
+    const matchesCategory = 
+      selectedCategory === null || 
+      post.kategori === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  // Cyklus for radius-knappen
+  const cycleRadius = () => {
+    const steps = [5, 10, 20, 50, 100];
+    const currentIndex = steps.indexOf(radius);
+    const nextIndex = (currentIndex + 1) % steps.length;
+    setRadius(steps[nextIndex]);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#869FB9] flex flex-col items-center justify-center">
@@ -77,7 +114,7 @@ export default function OpslagPage() {
       <SiteHeader />
 
       {/* Filter Bar og Knapper */}
-      <div className="bg-[#869FB9] py-6 px-4 shadow-sm">
+      <div className="bg-[#869FB9] py-6 px-4 shadow-sm relative z-10">
         <div className="max-w-4xl mx-auto space-y-4">
           
           <button 
@@ -87,8 +124,10 @@ export default function OpslagPage() {
             <i className="fa-solid fa-plus-circle text-2xl"></i> Opret nyt opslag
           </button>
 
-          {/* Filter Bar */}
-          <div className="flex items-center gap-2 bg-white/20 p-2 rounded-2xl backdrop-blur-sm">
+          {/* Filter Bar Container */}
+          <div className="flex items-center gap-2 bg-white/20 p-2 rounded-2xl backdrop-blur-sm relative">
+            
+            {/* Søgefelt */}
             <div className="flex-1 relative">
               <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
               <input
@@ -99,11 +138,56 @@ export default function OpslagPage() {
                 className="w-full bg-white rounded-xl pl-10 pr-4 py-3 text-gray-900 outline-none shadow-sm focus:ring-2 focus:ring-[#131921]"
               />
             </div>
-            <button className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-[#131921] hover:bg-gray-50">
-              <i className="fa-solid fa-filter"></i>
-            </button>
-            <button className="h-12 px-4 bg-white rounded-xl flex items-center justify-center shadow-sm text-[#131921] font-bold text-sm hover:bg-gray-50">
-              50 km
+
+            {/* Kategori Knap (Dropdown trigger) */}
+            <div className="relative">
+              <button 
+                onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
+                className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-colors ${
+                  selectedCategory 
+                    ? 'bg-[#131921] text-white' // Aktiv farve
+                    : 'bg-white text-[#131921] hover:bg-gray-50' 
+                }`}
+              >
+                <i className="fa-solid fa-filter"></i>
+              </button>
+
+              {/* Kategori Dropdown Menu */}
+              {isCategoryMenuOpen && (
+                <>
+                  {/* Usynlig baggrund til at lukke menuen */}
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setIsCategoryMenuOpen(false)}
+                  />
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl z-20 overflow-hidden border border-gray-100 py-2">
+                    <button
+                      onClick={() => { setSelectedCategory(null); setIsCategoryMenuOpen(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm font-bold hover:bg-gray-50 ${!selectedCategory ? 'text-[#131921] bg-gray-50' : 'text-gray-600'}`}
+                    >
+                      Alle kategorier
+                    </button>
+                    <div className="h-px bg-gray-100 my-1" />
+                    {KATEGORIER.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => { setSelectedCategory(cat); setIsCategoryMenuOpen(false); }}
+                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 ${selectedCategory === cat ? 'text-[#131921] font-bold bg-blue-50' : 'text-gray-600'}`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Radius Knap */}
+            <button 
+              onClick={cycleRadius}
+              className="h-12 px-4 bg-white rounded-xl flex items-center justify-center shadow-sm text-[#131921] font-bold text-sm hover:bg-gray-50 min-w-[70px]"
+            >
+              {radius} km
             </button>
           </div>
 
@@ -112,59 +196,73 @@ export default function OpslagPage() {
 
       {/* Liste med opslag */}
       <main className="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {posts.map((post) => (
-            <div 
-              key={post.id} 
-              className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer border border-gray-100 flex flex-col h-full"
-              // HER ER RETTELSEN: Vi sætter selectedPost når man klikker
-              onClick={() => setSelectedPost(post)}
-            >
-              {/* Billede */}
-              {post.image_url ? (
-                <div className="relative w-full h-48 mb-4 overflow-hidden rounded-xl">
-                  <img 
-                    src={post.image_url} 
-                    alt={post.overskrift}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-              ) : (
-                <div className="w-full h-32 bg-gray-50 rounded-xl mb-4 flex items-center justify-center text-gray-300">
-                  <i className="fa-solid fa-image text-3xl"></i>
-                </div>
-              )}
+        {filteredPosts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredPosts.map((post) => (
+              <div 
+                key={post.id} 
+                className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer border border-gray-100 flex flex-col h-full"
+                onClick={() => setSelectedPost(post)}
+              >
+                {/* Billede */}
+                {post.image_url ? (
+                  <div className="relative w-full h-48 mb-4 overflow-hidden rounded-xl">
+                    <img 
+                      src={post.image_url} 
+                      alt={post.overskrift}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-32 bg-gray-50 rounded-xl mb-4 flex items-center justify-center text-gray-300">
+                    <i className="fa-solid fa-image text-3xl"></i>
+                  </div>
+                )}
 
-              <div className="flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-2">
-                  {post.kategori && (
-                    <span className="inline-block bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-xs font-bold border border-blue-100">
-                      {post.kategori}
-                    </span>
-                  )}
-                  {post.omraade && (
-                    <span className="text-gray-400 text-xs flex items-center gap-1">
-                      <i className="fa-solid fa-location-dot"></i> {post.omraade}
-                    </span>
-                  )}
-                </div>
+                <div className="flex-1 flex flex-col">
+                  <div className="flex justify-between items-start mb-2">
+                    {post.kategori && (
+                      <span className="inline-block bg-blue-50 text-blue-800 px-3 py-1 rounded-full text-xs font-bold border border-blue-100">
+                        {post.kategori}
+                      </span>
+                    )}
+                    {post.omraade && (
+                      <span className="text-gray-400 text-xs flex items-center gap-1">
+                        <i className="fa-solid fa-location-dot"></i> {post.omraade}
+                      </span>
+                    )}
+                  </div>
 
-                <h3 className="text-gray-900 font-bold text-lg mb-2 leading-tight">
-                  {post.overskrift}
-                </h3>
-                <p className="text-gray-500 text-sm mb-4 line-clamp-2">
-                  {post.text}
-                </p>
-                
-                <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400 font-medium">
-                   {/* Simpel dato visning */}
-                   <span>{new Date(post.created_at).toLocaleDateString()}</span>
-                   <span className="text-blue-600 font-bold">Læs mere →</span>
+                  <h3 className="text-gray-900 font-bold text-lg mb-2 leading-tight">
+                    {post.overskrift}
+                  </h3>
+                  <p className="text-gray-500 text-sm mb-4 line-clamp-2">
+                    {post.text}
+                  </p>
+                  
+                  <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400 font-medium">
+                     <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                     <span className="text-blue-600 font-bold">Læs mere →</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          /* Tom søgning */
+          <div className="flex flex-col items-center justify-center pt-20 text-gray-400">
+            <i className="fa-solid fa-magnifying-glass text-4xl mb-4 opacity-50"></i>
+            <p className="text-lg font-medium">Ingen opslag fundet</p>
+            {(searchQuery || selectedCategory) && (
+              <button 
+                onClick={() => { setSearchQuery(''); setSelectedCategory(null); }}
+                className="mt-4 text-[#131921] underline text-sm"
+              >
+                Nulstil filtre
+              </button>
+            )}
+          </div>
+        )}
       </main>
 
       <SiteFooter />
@@ -178,7 +276,6 @@ export default function OpslagPage() {
         }}
       />
 
-      {/* NY DETALJE MODAL */}
       <PostDetailModal 
         isOpen={!!selectedPost}
         post={selectedPost}
