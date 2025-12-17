@@ -63,7 +63,6 @@ function BeskederContent() {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   
-  // ÆNDRING 1: Ref til containeren i stedet for bunden
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 1. Initialisering
@@ -180,12 +179,15 @@ function BeskederContent() {
           setIsDirectMessage(false);
         }
       } else if (initialThreads.length > 0) {
-        const first = initialThreads[0];
-        setActiveThreadId(first.id);
-        setIsDirectMessage(!!first.isDm);
-        if(first.isDm && first.dmUserId) {
-             const { data: tUser } = await supabase.from('users').select('*').eq('id', first.dmUserId).single();
-             if(tUser) setDmTargetUser(tUser);
+        // --- RETTELSE HER: Kun vælg første tråd automatisk hvis vi er på DESKTOP ---
+        if (window.innerWidth >= 768) {
+          const first = initialThreads[0];
+          setActiveThreadId(first.id);
+          setIsDirectMessage(!!first.isDm);
+          if(first.isDm && first.dmUserId) {
+               const { data: tUser } = await supabase.from('users').select('*').eq('id', first.dmUserId).single();
+               if(tUser) setDmTargetUser(tUser);
+          }
         }
       }
 
@@ -265,13 +267,10 @@ function BeskederContent() {
 
   }, [activeThreadId, isDirectMessage]);
 
-  // ÆNDRING 2: Opdateret scroll funktion
   const scrollToBottom = () => {
-    // Vi bruger setTimeout for at sikre DOM'en er opdateret
     setTimeout(() => {
       if (scrollRef.current) {
         const { scrollHeight, clientHeight } = scrollRef.current;
-        // Scroll kun containeren, ikke vinduet
         scrollRef.current.scrollTo({
           top: scrollHeight - clientHeight,
           behavior: 'smooth'
@@ -386,14 +385,20 @@ function BeskederContent() {
             {activeThreadId ? (
               <>
                 <div className="p-4 border-b border-gray-100 flex items-center gap-3 shadow-sm z-10 bg-white">
-                  <button onClick={() => setActiveThreadId(null)} className="md:hidden w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-sm">‹</button>
-                  <div className="flex-1">
+                  {/* ÆNDRING: Meget tydeligere tilbage-knap */}
+                  <button 
+                    onClick={() => setActiveThreadId(null)} 
+                    className="md:hidden w-10 h-10 flex items-center justify-center bg-white text-[#131921] rounded-full shadow-md border border-gray-100 z-50 hover:bg-gray-50 active:scale-95 transition-all"
+                  >
+                    <i className="fa-solid fa-arrow-left text-lg"></i>
+                  </button>
+                  
+                  <div className="flex-1 ml-2">
                     <h3 className="font-bold text-[#131921]">{activeThreadInfo.title}</h3>
                     <p className="text-xs text-gray-500">{activeThreadInfo.subtitle}</p>
                   </div>
                 </div>
 
-                {/* ÆNDRING 3: Ref sat på container-div'en her */}
                 <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F5F7FA]">
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-60">
@@ -423,7 +428,6 @@ function BeskederContent() {
                       );
                     })
                   )}
-                  {/* ÆNDRING 4: Fjernet empty div ref */}
                 </div>
 
                 <div className="p-4 bg-white border-t border-gray-100">
