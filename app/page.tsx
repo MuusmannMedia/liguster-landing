@@ -165,8 +165,9 @@ export default function LigusterLandingPage() {
 
           <div className="hidden lg:mt-0 lg:col-span-5 lg:flex justify-center items-center relative">
             <div className="relative">
+              {/* STØRRE TELEFON HER */}
               <div
-                className="mockup-frame w-[280px] h-[580px] bg-black relative z-10 mx-auto border-[12px] border-gray-800 rounded-[2.5rem] overflow-hidden"
+                className="mockup-frame w-[340px] h-[700px] bg-black relative z-10 mx-auto border-[14px] border-gray-800 rounded-[3rem] overflow-hidden"
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
               >
