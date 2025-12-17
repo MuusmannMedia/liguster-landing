@@ -132,8 +132,8 @@ export default function ForeningDetaljePage() {
         
         {/* --- FORENING INFO KORT --- */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6">
-          {/* RETTELSE: Billedet er nu 1:1 aspect ratio */}
-          <div className="relative w-full aspect-square max-w-md mx-auto rounded-[18px] overflow-hidden bg-gray-100 mb-4">
+          {/* RETTELSE: Fjernet max-w-md og mx-auto så den fylder bredden ud, men bevarer aspect-square */}
+          <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100 mb-4">
             {forening.billede_url ? (
               <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
             ) : (
