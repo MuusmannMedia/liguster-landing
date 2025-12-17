@@ -138,7 +138,7 @@ function BeskederContent() {
     init();
   }, [startId, dmUserId, router]);
 
-  // 2. Hent beskeder & Realtime (Ingen setInterval!)
+  // 2. Hent beskeder & Realtime
   useEffect(() => {
     if (!activeThreadId) return;
     
@@ -153,7 +153,10 @@ function BeskederContent() {
         .eq('thread_id', activeThreadId)
         .order('created_at', { ascending: true });
       
-      data = isDirectMessage ? res.data?.map(m => ({ ...m, user_id: m.sender_id })) : res.data;
+      // RETTELSE HER: Tilføjet "?? null" for at undgå undefined
+      data = isDirectMessage 
+        ? (res.data?.map((m: any) => ({ ...m, user_id: m.sender_id })) ?? null) 
+        : res.data;
 
       if (data) {
         const userIds = [...new Set(data.map((m: any) => m.user_id))];
@@ -176,7 +179,7 @@ function BeskederContent() {
 
     fetchMessages();
 
-    // REALTIME SUBSCRIPTION (Erstatter setInterval og fjerner hop)
+    // REALTIME SUBSCRIPTION
     const table = isDirectMessage ? 'messages' : 'forening_messages';
     const channel = supabase
       .channel(`chat:${activeThreadId}`)
@@ -185,21 +188,17 @@ function BeskederContent() {
         { event: 'INSERT', schema: 'public', table: table, filter: `thread_id=eq.${activeThreadId}` },
         async (payload) => {
           const newMsg = payload.new as any;
-          // Undgå dubletter (hvis vi selv lige har sendt den)
           setMessages((prev) => {
             if (prev.some(m => m.id === newMsg.id)) return prev;
             
-            // Hent bruger info for den nye besked
             const senderId = isDirectMessage ? newMsg.sender_id : newMsg.user_id;
-            // (Vi kender nok allerede brugeren, ellers brug default)
             
-            // Simpel tilføjelse (bruger info opdateres næste gang man loader, eller vi kunne hente det)
             return [...prev, {
               id: newMsg.id,
               text: newMsg.text,
               created_at: newMsg.created_at,
               user_id: senderId,
-              users: { name: '...', avatar_url: null } // Vi lader den bare komme ind
+              users: { name: '...', avatar_url: null }
             }].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
           });
           scrollToBottom();
@@ -214,7 +213,6 @@ function BeskederContent() {
   }, [activeThreadId, isDirectMessage]);
 
   const scrollToBottom = () => {
-    // Kun scroll hvis vi er tæt på bunden eller ved første load
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -262,7 +260,6 @@ function BeskederContent() {
       alert("Fejl ved afsendelse: " + error.message);
       setMessages(prev => prev.filter(m => m.id !== tempId));
     } else if (data) {
-      // Erstat temp besked med den rigtige fra DB (så ID passer)
       setMessages(prev => prev.map(m => m.id === tempId ? { ...optimisticMsg, id: data.id } : m));
     }
   };
