@@ -143,7 +143,7 @@ export default function ForeningDetaljePage() {
           <h1 className="text-2xl font-black text-[#131921] mb-1 underline decoration-gray-300">{forening.navn}</h1>
           <p className="text-gray-700 font-bold mb-4">{forening.sted}</p>
           
-          {/* RETTELSE: Hele beskrivelsen vises nu (fjernet line-clamp) */}
+          {/* FULD BESKRIVELSE (ingen line-clamp) */}
           <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap mb-4">
             {forening.beskrivelse}
           </p>
@@ -157,7 +157,8 @@ export default function ForeningDetaljePage() {
 
         {/* --- BESKEDER KNAP --- */}
         <button 
-          onClick={() => router.push('/Beskeder')}
+          // Linker til besked-siden med forenings-ID som parameter
+          onClick={() => router.push(`/beskeder?id=${id}`)}
           className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
         >
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">
