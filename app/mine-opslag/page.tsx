@@ -182,84 +182,82 @@ export default function MineOpslagPage() {
             <p className="text-sm mt-2 opacity-70">Opret dit første opslag ovenfor!</p>
           </div>
         ) : (
-          <>
-            <h2 className="text-white text-2xl font-bold mb-6 px-2">Mine Opslag</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {posts.map(post => {
-                const img = getPrimaryImage(post);
-                const expiry = getExpiry(post);
+          /* RETTELSE: Fjernet h2 overskrift herfra */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {posts.map(post => {
+              const img = getPrimaryImage(post);
+              const expiry = getExpiry(post);
 
-                return (
-                  <div key={post.id} className="bg-white rounded-[24px] overflow-hidden shadow-md flex flex-col h-full hover:shadow-xl transition-shadow">
-                    {/* Billede */}
-                    <div className="w-full aspect-square bg-[#E7EBF0] relative flex items-center justify-center overflow-hidden">
-                      {img ? (
-                        <img src={img} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-[#536071] font-bold text-sm">Ingen billede</span>
+              return (
+                <div key={post.id} className="bg-white rounded-[24px] overflow-hidden shadow-md flex flex-col h-full hover:shadow-xl transition-shadow">
+                  {/* Billede */}
+                  <div className="w-full aspect-square bg-[#E7EBF0] relative flex items-center justify-center overflow-hidden">
+                    {img ? (
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[#536071] font-bold text-sm">Ingen billede</span>
+                    )}
+                  </div>
+
+                  {/* Indhold */}
+                  <div className="p-4 flex-1 flex flex-col">
+                    {/* Tags */}
+                    <div className="flex gap-2 mb-3">
+                      {post.kategori && (
+                        <span className="bg-[#EBF2FA] text-[#131921] text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wide">
+                          {post.kategori}
+                        </span>
+                      )}
+                      {expiry.label && (
+                        <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wide border ${
+                          expiry.state === 'overdue' ? 'bg-red-50 text-red-600 border-red-200' : 
+                          expiry.state === 'soon' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
+                          'bg-[#EBF2FA] text-[#131921] border-transparent'
+                        }`}>
+                          {expiry.label}
+                        </span>
                       )}
                     </div>
 
-                    {/* Indhold */}
-                    <div className="p-4 flex-1 flex flex-col">
-                      {/* Tags */}
-                      <div className="flex gap-2 mb-3">
-                        {post.kategori && (
-                          <span className="bg-[#EBF2FA] text-[#131921] text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wide">
-                            {post.kategori}
-                          </span>
-                        )}
-                        {expiry.label && (
-                          <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wide border ${
-                            expiry.state === 'overdue' ? 'bg-red-50 text-red-600 border-red-200' : 
-                            expiry.state === 'soon' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
-                            'bg-[#EBF2FA] text-[#131921] border-transparent'
-                          }`}>
-                            {expiry.label}
-                          </span>
-                        )}
-                      </div>
+                    <h3 className="font-bold text-lg text-[#131921] underline decoration-gray-300 mb-1 truncate">{post.overskrift}</h3>
+                    <p className="text-sm font-semibold text-[#222] mb-2 truncate">{post.omraade}</p>
+                    <p className="text-sm text-[#444] line-clamp-2 mb-4 flex-1">{post.text}</p>
 
-                      <h3 className="font-bold text-lg text-[#131921] underline decoration-gray-300 mb-1 truncate">{post.overskrift}</h3>
-                      <p className="text-sm font-semibold text-[#222] mb-2 truncate">{post.omraade}</p>
-                      <p className="text-sm text-[#444] line-clamp-2 mb-4 flex-1">{post.text}</p>
-
-                      {/* Knapper */}
-                      <div className="flex gap-2 pt-2 border-t border-gray-100">
-                        <button 
-                          onClick={() => handleExtend(post)}
-                          className={`flex-1 py-2 rounded-full text-[10px] font-bold text-white uppercase tracking-wider ${expiry.state === 'overdue' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-[#131921] hover:bg-gray-800'}`}
-                        >
-                          {expiry.state === 'overdue' ? 'Aktivér igen' : 'Forlæng'}
-                        </button>
-                        
-                        <button onClick={() => setEditPost(post)} className="px-4 py-2 bg-[#131921] text-white rounded-full text-[10px] font-bold uppercase hover:bg-gray-800">
-                          Ret
-                        </button>
-                        
-                        <button onClick={() => handleDelete(post.id)} className="px-4 py-2 bg-red-500 text-white rounded-full text-[10px] font-bold uppercase hover:bg-red-600">
-                          Slet
-                        </button>
-                      </div>
+                    {/* Knapper */}
+                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                      <button 
+                        onClick={() => handleExtend(post)}
+                        className={`flex-1 py-2 rounded-full text-[10px] font-bold text-white uppercase tracking-wider ${expiry.state === 'overdue' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-[#131921] hover:bg-gray-800'}`}
+                      >
+                        {expiry.state === 'overdue' ? 'Aktivér igen' : 'Forlæng'}
+                      </button>
+                      
+                      <button onClick={() => setEditPost(post)} className="px-4 py-2 bg-[#131921] text-white rounded-full text-[10px] font-bold uppercase hover:bg-gray-800">
+                        Ret
+                      </button>
+                      
+                      <button onClick={() => handleDelete(post.id)} className="px-4 py-2 bg-red-500 text-white rounded-full text-[10px] font-bold uppercase hover:bg-red-600">
+                        Slet
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </>
+                </div>
+              );
+            })}
+          </div>
         )}
       </main>
 
       <SiteFooter />
 
-      {/* OPRET MODAL (Den nye fælles komponent) */}
+      {/* OPRET MODAL */}
       <CreatePostModal 
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onPostCreated={() => userId && fetchPosts(userId)}
       />
 
-      {/* REDIGER MODAL (Midlertidig simpel modal indtil CreatePostModal understøtter edit) */}
+      {/* REDIGER MODAL */}
       <EditPostModal 
         isOpen={!!editPost}
         onClose={() => setEditPost(null)}
