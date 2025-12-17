@@ -359,7 +359,7 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
               {modalMode === 'details' && activeEvent && (
                 <div className="space-y-6">
                   {activeEvent.image_url && (
-                    <div className="relative h-48 w-full rounded-xl overflow-hidden">
+                    <div className="relative w-full aspect-square rounded-xl overflow-hidden">
                       <img src={activeEvent.image_url} alt="" className="w-full h-full object-cover" />
                     </div>
                   )}
