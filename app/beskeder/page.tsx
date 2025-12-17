@@ -8,7 +8,7 @@ import SiteFooter from '../../components/SiteFooter';
 
 // --- TYPER ---
 type ThreadItem = {
-  id: string; // thread_id
+  id: string;
   title: string;
   created_at: string;
   forening_id: string;
@@ -26,10 +26,11 @@ type ChatMessage = {
   };
 };
 
-// --- HJÆLPER: Konverter sti til URL ---
+// --- HJÆLPER: Konverter sti til URL (VIGTIG FIX) ---
 const getAvatarUrl = (path: string | null | undefined) => {
   if (!path) return null;
   if (path.startsWith('http')) return path; // Allerede en url
+  // Hent public url fra 'avatars' bucket
   const { data } = supabase.storage.from('avatars').getPublicUrl(path);
   return data.publicUrl;
 };
@@ -70,7 +71,7 @@ function BeskederContent() {
       if (profile) {
         setMyProfile({
           name: profile.name || 'Mig',
-          avatar_url: getAvatarUrl(profile.avatar_url)
+          avatar_url: getAvatarUrl(profile.avatar_url) // Konverter min avatar her
         });
       }
 
@@ -199,7 +200,6 @@ function BeskederContent() {
 
     if (error) {
       alert("Fejl ved afsendelse: " + error.message);
-      // Fjern den midlertidige besked ved fejl (kunne forbedres)
       setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
@@ -265,10 +265,9 @@ function BeskederContent() {
                         : `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}&background=random`;
 
                       return (
-                        /* RETTELSE: flex-row-reverse vender rækkefølgen, så billede kommer yderst til højre */
                         <div key={msg.id} className={`flex gap-3 items-end ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                           
-                          {/* AVATAR */}
+                          {/* AVATAR - Med fallback */}
                           <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 shadow-sm border border-gray-100 relative">
                             <img src={avatarSrc} alt="" className="w-full h-full object-cover" />
                           </div>

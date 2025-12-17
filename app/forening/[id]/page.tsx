@@ -42,9 +42,12 @@ const getDisplayName = (m: any) => {
   return email.includes("@") ? email.split("@")[0] : "Ukendt";
 };
 
-const isAdmin = (m: Medlem, ownerId?: string) => {
-  const r = (m.rolle || "").toLowerCase();
-  return r === "admin" || r === "administrator" || (!!ownerId && m.user_id === ownerId);
+// NY HJÆLPER: Konverter avatar sti til URL
+const getAvatarUrl = (path: string | null | undefined) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path; 
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+  return data.publicUrl;
 };
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("da-DK", { day: 'numeric', month: 'short' });
@@ -117,7 +120,6 @@ export default function ForeningDetaljePage() {
   };
 
   const approved = medlemmer.filter(m => m.status === "approved");
-  const pending = medlemmer.filter(m => m.status === "pending");
   const isMember = approved.some(m => m.user_id === userId);
   const isOwner = forening?.oprettet_af === userId;
 
@@ -132,7 +134,6 @@ export default function ForeningDetaljePage() {
         
         {/* --- FORENING INFO KORT --- */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6">
-          {/* RETTELSE: Fjernet max-w-md og mx-auto så den fylder bredden ud, men bevarer aspect-square */}
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100 mb-4">
             {forening.billede_url ? (
               <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
@@ -144,7 +145,6 @@ export default function ForeningDetaljePage() {
           <h1 className="text-2xl font-black text-[#131921] mb-1 underline decoration-gray-300">{forening.navn}</h1>
           <p className="text-gray-700 font-bold mb-4">{forening.sted}</p>
           
-          {/* FULD BESKRIVELSE (ingen line-clamp) */}
           <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap mb-4">
             {forening.beskrivelse}
           </p>
@@ -158,7 +158,6 @@ export default function ForeningDetaljePage() {
 
         {/* --- BESKEDER KNAP --- */}
         <button 
-          // Linker til besked-siden med forenings-ID som parameter
           onClick={() => router.push(`/beskeder?id=${id}`)}
           className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
         >
@@ -174,14 +173,18 @@ export default function ForeningDetaljePage() {
             <button onClick={() => setShowMembers(true)} className="text-xs font-bold text-gray-500 hover:text-black">Se alle</button>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 px-2 scrollbar-hide">
-            {approved.map(m => (
-              <div key={m.user_id} className="flex flex-col items-center min-w-[64px]" onClick={() => { setSelectedMember(m); setShowMembers(true); }}>
-                <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
-                  {m.users?.avatar_url ? <img src={m.users.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>}
+            {approved.map(m => {
+              // Hent korrekt avatar URL
+              const avatarSrc = getAvatarUrl(m.users?.avatar_url);
+              return (
+                <div key={m.user_id} className="flex flex-col items-center min-w-[64px] cursor-pointer" onClick={() => { setSelectedMember(m); setShowMembers(true); }}>
+                  <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
+                    {avatarSrc ? <img src={avatarSrc} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>}
+                  </div>
+                  <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
                 </div>
-                <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
-              </div>
-            ))}
+              );
+            })}
             {approved.length === 0 && <p className="text-sm text-gray-400">Ingen medlemmer endnu.</p>}
           </div>
         </div>
@@ -204,7 +207,6 @@ export default function ForeningDetaljePage() {
                   </div>
                 </div>
               ))}
-              {threads.length >= 3 && <p className="text-xs text-gray-400 mt-2">Viser de 3 seneste - tryk for at se alle.</p>}
             </div>
           )}
         </div>
@@ -272,27 +274,43 @@ export default function ForeningDetaljePage() {
             
             {selectedMember ? (
               <div className="flex flex-col items-center pt-4">
-                <div className="w-32 h-32 rounded-[20px] bg-gray-100 overflow-hidden mb-4">
-                  {selectedMember.users?.avatar_url ? <img src={selectedMember.users.avatar_url} className="w-full h-full object-cover" /> : null}
+                <div className="w-32 h-32 rounded-[20px] bg-gray-100 overflow-hidden mb-4 relative">
+                  {(() => {
+                    const src = getAvatarUrl(selectedMember.users?.avatar_url);
+                    return src ? <img src={src} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-200 flex items-center justify-center text-4xl">?</div>;
+                  })()}
                 </div>
                 <h3 className="text-xl font-bold">{getDisplayName(selectedMember)}</h3>
+                <p className="text-[10px] uppercase font-bold text-[#131921] mb-1">{selectedMember.rolle || 'MEDLEM'}</p>
                 <p className="text-sm text-gray-500 mb-6">{selectedMember.users?.email}</p>
-                <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 hover:text-black">← Tilbage til liste</button>
+                
+                {/* NY KNAP: SKRIV TIL MEDLEM */}
+                <button 
+                  onClick={() => router.push(`/beskeder?dmUser=${selectedMember.user_id}`)}
+                  className="w-full py-3 bg-[#131921] text-white rounded-full font-bold mb-3 hover:bg-gray-900 transition-colors"
+                >
+                  Skriv til medlem
+                </button>
+
+                <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 hover:text-black mt-2">← Tilbage til liste</button>
               </div>
             ) : (
               <div className="max-h-[60vh] overflow-y-auto">
                 <h3 className="font-black text-[#131921] mb-4">MEDLEMMER ({approved.length})</h3>
-                {approved.map(m => (
-                  <div key={m.user_id} onClick={() => setSelectedMember(m)} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl cursor-pointer">
-                    <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden">
-                      {m.users?.avatar_url ? <img src={m.users.avatar_url} className="w-full h-full object-cover" /> : null}
+                {approved.map(m => {
+                  const avatarSrc = getAvatarUrl(m.users?.avatar_url);
+                  return (
+                    <div key={m.user_id} onClick={() => setSelectedMember(m)} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl cursor-pointer">
+                      <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden">
+                        {avatarSrc ? <img src={avatarSrc} className="w-full h-full object-cover" /> : null}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">{getDisplayName(m)}</p>
+                        <p className="text-[10px] text-gray-500 uppercase font-bold text-[#131921]">{m.rolle || 'MEDLEM'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-sm">{getDisplayName(m)}</p>
-                      <p className="text-[10px] text-gray-500 uppercase font-bold text-[#131921]">{m.rolle || 'MEDLEM'}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
