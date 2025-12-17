@@ -53,8 +53,24 @@ export default function MigPage() {
       
       // Hent profil data
       const { data } = await supabase.from('users').select('*').eq('id', session.user.id).single();
+      
       if (data) {
-        setProfile(data);
+        // --- LOGIK FRA APPEN: Håndter avatar URL ---
+        let finalAvatarUrl = null;
+        if (data.avatar_url) {
+          // Hvis det allerede er en fuld http-url
+          if (data.avatar_url.startsWith('http')) {
+            finalAvatarUrl = `${data.avatar_url}?t=${Date.now()}`;
+          } else {
+            // Hvis det er en sti (som appen gemmer), hent public URL
+            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.avatar_url);
+            if (urlData?.publicUrl) {
+              finalAvatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+            }
+          }
+        }
+
+        setProfile({ ...data, avatar_url: finalAvatarUrl });
         setNewName(data.name || "");
       } else {
         setNewName(session.user.user_metadata?.full_name || "");
@@ -96,16 +112,21 @@ export default function MigPage() {
     try {
       setUploading(true);
       const compressedBlob = await resizeImage(file);
-      const filePath = `public/${user.id}_${Date.now()}.jpg`;
+      
+      // Vi bruger samme sti-struktur som appen: userId/timestamp.jpg
+      const filePath = `${user.id}/${Date.now()}.jpg`;
 
-      const { error: upErr } = await supabase.storage.from('avatars').upload(filePath, compressedBlob, { upsert: true });
+      // Upload
+      const { error: upErr } = await supabase.storage.from('avatars').upload(filePath, compressedBlob, { upsert: false });
       if (upErr) throw upErr;
 
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const publicUrl = data.publicUrl;
-
-      const { error: updErr } = await supabase.from('users').update({ avatar_url: publicUrl }).eq('id', user.id);
+      // Opdater DB med STIEN (ikke URL'en), så appen også forstår det
+      const { error: updErr } = await supabase.from('users').update({ avatar_url: filePath }).eq('id', user.id);
       if (updErr) throw updErr;
+
+      // Generer URL til visning her og nu
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const publicUrl = data.publicUrl ? `${data.publicUrl}?t=${Date.now()}` : null;
 
       setProfile({ ...profile, avatar_url: publicUrl });
     } catch (err: any) {
@@ -128,8 +149,6 @@ export default function MigPage() {
     if (!session) return;
 
     try {
-      // Kalder din edge function til sletning (hvis du har en)
-      // Ellers skal du bruge supabase.rpc eller manuel logik hvis tilladt
       const res = await fetch('https://gizskyfynvyvhnaqcyax.functions.supabase.co/delete-account', {
         method: 'POST',
         headers: { 
@@ -150,7 +169,9 @@ export default function MigPage() {
   if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>;
 
   const displayName = profile?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Bruger";
-  const avatarUrl = profile?.avatar_url || `https://ui-avatars.com/api/?name=${displayName}&background=random`;
+  
+  // Fallback hvis ingen avatar
+  const avatarUrl = profile?.avatar_url || `https://ui-avatars.com/api/?name=${displayName}&background=random&size=256`;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
@@ -167,7 +188,7 @@ export default function MigPage() {
               alt="Profil" 
               fill 
               className="object-cover"
-              unoptimized // Nødvendig for eksterne URL'er hvis ikke configureret i next.config.js
+              unoptimized // Vigtigt da vi henter fra eksterne URL'er (Supabase storage)
             />
             {uploading && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white">
