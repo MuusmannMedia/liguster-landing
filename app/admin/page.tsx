@@ -9,7 +9,7 @@ import Image from 'next/image';
 
 // --- KONFIGURATION ---
 // Indsæt den/de emails, der må se denne side
-const ADMIN_EMAILS = ['kontakt@liguster-app.dk', 'din-egen-email@gmail.com']; 
+const ADMIN_EMAILS = ['kontakt@liguster-app.dk', 'morten.muusmann@gmail.com']; 
 
 // --- HJÆLPERE ---
 const getAvatarUrl = (path: string | null | undefined) => {
