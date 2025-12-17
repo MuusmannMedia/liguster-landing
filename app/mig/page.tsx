@@ -181,8 +181,8 @@ export default function MigPage() {
         
         <div className="bg-white w-full rounded-[30px] p-8 shadow-xl flex flex-col items-center">
           
-          {/* Avatar */}
-          <div className="relative w-40 h-48 md:w-56 md:h-64 rounded-[24px] overflow-hidden mb-6 bg-gray-100 shadow-inner">
+          {/* Avatar - NU KVADRATISK (1:1) */}
+          <div className="relative w-full max-w-[300px] aspect-square rounded-[24px] overflow-hidden mb-6 bg-gray-100 shadow-inner">
             <Image 
               src={avatarUrl} 
               alt="Profil" 
