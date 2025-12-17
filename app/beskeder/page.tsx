@@ -22,16 +22,26 @@ type ChatMessage = {
   user_id: string;
   users?: {
     name?: string;
-    avatar_url?: string;
+    avatar_url?: string | null;
   };
+};
+
+// --- HJÆLPER: Konverter sti til URL ---
+const getAvatarUrl = (path: string | null | undefined) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path; // Allerede en url
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+  return data.publicUrl;
 };
 
 function BeskederContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const startId = searchParams.get('id'); // Kan være foreningId eller threadId
+  const startId = searchParams.get('id');
 
   const [userId, setUserId] = useState<string | null>(null);
+  const [myProfile, setMyProfile] = useState<{ name: string, avatar_url: string | null } | null>(null);
+  
   const [threads, setThreads] = useState<ThreadItem[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -40,7 +50,7 @@ function BeskederContent() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 1. Hent bruger og alle forenings-tråde
+  // 1. Hent bruger, min profil og alle tråde
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -50,7 +60,21 @@ function BeskederContent() {
       }
       setUserId(session.user.id);
 
-      // A. Find alle foreninger jeg er medlem af
+      // Hent min egen profil (til at vise mit billede når jeg sender beskeder)
+      const { data: profile } = await supabase
+        .from('users')
+        .select('name, avatar_url')
+        .eq('id', session.user.id)
+        .single();
+      
+      if (profile) {
+        setMyProfile({
+          name: profile.name || 'Mig',
+          avatar_url: getAvatarUrl(profile.avatar_url)
+        });
+      }
+
+      // Hent medlemskaber
       const { data: memberships } = await supabase
         .from('foreningsmedlemmer')
         .select('forening_id')
@@ -60,14 +84,11 @@ function BeskederContent() {
       const myForeningIds = memberships?.map((m: any) => m.forening_id) || [];
 
       if (myForeningIds.length > 0) {
-        // B. Hent tråde fra disse foreninger
+        // Hent tråde
         const { data: threadData } = await supabase
           .from('forening_threads')
           .select(`
-            id, 
-            title, 
-            created_at, 
-            forening_id, 
+            id, title, created_at, forening_id, 
             foreninger ( navn )
           `)
           .in('forening_id', myForeningIds)
@@ -79,17 +100,15 @@ function BeskederContent() {
             title: t.title,
             created_at: t.created_at,
             forening_id: t.forening_id,
-            forening: t.foreninger // { navn: "..." }
+            forening: t.foreninger
           }));
           
           setThreads(mappedThreads);
 
-          // Hvis URL har ?id=... (forening ID), find første tråd i den forening
           if (startId) {
             const match = mappedThreads.find(t => t.forening_id === startId);
             if (match) setActiveThreadId(match.id);
           } else if (mappedThreads.length > 0) {
-            // Ellers vælg bare den nyeste tråd
             setActiveThreadId(mappedThreads[0].id);
           }
         }
@@ -104,7 +123,7 @@ function BeskederContent() {
     if (!activeThreadId) return;
     
     const fetchMessages = async () => {
-      // 1. Hent beskeder
+      // Hent beskeder
       const { data: msgs } = await supabase
         .from('forening_messages')
         .select('id, text, created_at, user_id')
@@ -112,19 +131,26 @@ function BeskederContent() {
         .order('created_at', { ascending: true });
 
       if (msgs) {
-        // 2. Hent brugernavne (manuel join for stabilitet)
+        // Hent unikke bruger-ID'er fra beskederne
         const userIds = [...new Set(msgs.map(m => m.user_id))];
+        
+        // Hent brugerinfo
         const { data: users } = await supabase
           .from('users')
           .select('id, name, avatar_url')
           .in('id', userIds);
         
         const userMap: Record<string, any> = {};
-        users?.forEach(u => userMap[u.id] = u);
+        users?.forEach(u => {
+          userMap[u.id] = {
+            name: u.name,
+            avatar_url: getAvatarUrl(u.avatar_url) // Konverter sti til URL her
+          };
+        });
 
         const fullMessages = msgs.map(m => ({
           ...m,
-          users: userMap[m.user_id] || { name: 'Ukendt' }
+          users: userMap[m.user_id] || { name: 'Ukendt', avatar_url: null }
         }));
 
         setMessages(fullMessages as any);
@@ -133,6 +159,11 @@ function BeskederContent() {
     };
 
     fetchMessages();
+    
+    // Polling for nye beskeder (simpel realtime)
+    const interval = setInterval(fetchMessages, 5000); 
+    return () => clearInterval(interval);
+
   }, [activeThreadId]);
 
   const scrollToBottom = () => {
@@ -144,26 +175,32 @@ function BeskederContent() {
     const text = newMessage.trim();
     setNewMessage("");
 
-    const { data, error } = await supabase
+    // Optimistisk update: Vis beskeden med det samme med min profil
+    const tempId = "temp-" + Date.now();
+    setMessages(prev => [...prev, { 
+      id: tempId,
+      text: text,
+      created_at: new Date().toISOString(),
+      user_id: userId,
+      users: { 
+        name: myProfile?.name || 'Mig', 
+        avatar_url: myProfile?.avatar_url 
+      }
+    }]);
+    scrollToBottom();
+
+    const { error } = await supabase
       .from('forening_messages')
       .insert([{ 
         thread_id: activeThreadId,
         user_id: userId, 
         text: text
-      }])
-      .select()
-      .single();
+      }]);
 
     if (error) {
       alert("Fejl ved afsendelse: " + error.message);
-    } else if (data) {
-      // Optimistisk update
-      // (Vi burde hente rigtig brugerinfo, men "Mig" virker fint indtil refresh)
-      setMessages(prev => [...prev, { 
-        ...data, 
-        users: { name: 'Mig', avatar_url: null } // Midlertidig
-      } as any]);
-      scrollToBottom();
+      // Fjern den midlertidige besked ved fejl (kunne forbedres)
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
 
@@ -178,7 +215,7 @@ function BeskederContent() {
       <main className="flex-1 w-full max-w-6xl mx-auto p-4 pb-20">
         <div className="bg-white rounded-[30px] shadow-xl overflow-hidden min-h-[70vh] flex flex-col md:flex-row">
           
-          {/* SIDEBAR (Liste over tråde) */}
+          {/* SIDEBAR */}
           <div className={`w-full md:w-80 bg-gray-50 border-r border-gray-100 flex-shrink-0 flex flex-col ${activeThreadId ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-5 border-b border-gray-100">
               <h2 className="text-xl font-black text-[#131921]">Indbakke</h2>
@@ -222,12 +259,22 @@ function BeskederContent() {
                   ) : (
                     messages.map(msg => {
                       const isMe = msg.user_id === userId;
+                      // Fallback avatar hvis ingen findes
+                      const avatarSrc = msg.users?.avatar_url 
+                        ? msg.users.avatar_url 
+                        : `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}&background=random`;
+
                       return (
-                        <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                          <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 mt-1 shadow-sm border border-gray-100">
-                            {msg.users?.avatar_url ? <img src={msg.users.avatar_url} className="w-full h-full object-cover" /> : null}
+                        /* RETTELSE: flex-row-reverse vender rækkefølgen, så billede kommer yderst til højre */
+                        <div key={msg.id} className={`flex gap-3 items-end ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                          
+                          {/* AVATAR */}
+                          <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 shadow-sm border border-gray-100 relative">
+                            <img src={avatarSrc} alt="" className="w-full h-full object-cover" />
                           </div>
-                          <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm ${isMe ? 'bg-[#131921] text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none'}`}>
+
+                          {/* TALEBOBLE */}
+                          <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm relative ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none'}`}>
                             {!isMe && <p className="text-[10px] font-bold text-gray-400 mb-1">{msg.users?.name || 'Ukendt'}</p>}
                             <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                             <p className={`text-[9px] mt-1 text-right ${isMe ? 'text-gray-400' : 'text-gray-300'}`}>
