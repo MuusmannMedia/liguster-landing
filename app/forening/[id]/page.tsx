@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
@@ -42,7 +42,6 @@ const getDisplayName = (m: any) => {
   return email.includes("@") ? email.split("@")[0] : "Ukendt";
 };
 
-// NY HJÆLPER: Konverter avatar sti til URL (Vigtigt!)
 const getAvatarUrl = (path: string | null | undefined) => {
   if (!path) return null;
   if (path.startsWith('http')) return path; 
@@ -51,6 +50,44 @@ const getAvatarUrl = (path: string | null | undefined) => {
 };
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("da-DK", { day: 'numeric', month: 'short' });
+const fmtTime = (d: string) => new Date(d).toLocaleTimeString("da-DK", { hour: '2-digit', minute: '2-digit' });
+
+// --- KALENDER HJÆLPERE ---
+const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
+const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+const toKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+const buildMonthGrid = (base: Date) => {
+  const first = startOfMonth(base);
+  const last = endOfMonth(base);
+  const firstWeekday = (first.getDay() + 6) % 7; // Mandag = 0
+  const daysInMonth = last.getDate();
+  const cells: Date[] = [];
+  
+  // Fyld op med dage fra forrige måned
+  for (let i = 0; i < firstWeekday; i++) {
+    const d = new Date(first);
+    d.setDate(first.getDate() - (firstWeekday - i));
+    cells.push(d);
+  }
+  // Dage i denne måned
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(new Date(base.getFullYear(), base.getMonth(), d));
+  }
+  // Fyld op til 42 celler (6 uger)
+  while (cells.length < 42) {
+    const lastCell = cells[cells.length - 1];
+    const next = new Date(lastCell);
+    next.setDate(lastCell.getDate() + 1);
+    cells.push(next);
+  }
+  
+  // Opdel i uger
+  const weeks: Date[][] = [];
+  for (let i = 0; i < 6; i++) weeks.push(cells.slice(i * 7, i * 7 + 7));
+  return weeks;
+};
 
 export default function ForeningDetaljePage() {
   const params = useParams();
@@ -66,6 +103,11 @@ export default function ForeningDetaljePage() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [images, setImages] = useState<ImagePreview[]>([]);
+
+  // Kalender State
+  const [monthCursor, setMonthCursor] = useState(new Date());
+  const [calendarEvents, setCalendarEvents] = useState<Event[]>([]);
+  const [selectedDateEvents, setSelectedDateEvents] = useState<{date: string, events: Event[]} | null>(null);
 
   // Modal State
   const [showMembers, setShowMembers] = useState(false);
@@ -86,6 +128,11 @@ export default function ForeningDetaljePage() {
     };
     init();
   }, [id]);
+
+  // Hent kalender events når måned skifter
+  useEffect(() => {
+    fetchCalendarEvents(monthCursor);
+  }, [id, monthCursor]);
 
   const fetchForening = async () => {
     const { data } = await supabase.from("foreninger").select("*").eq("id", id).single();
@@ -110,6 +157,23 @@ export default function ForeningDetaljePage() {
     if (data) setEvents(data);
   };
 
+  const fetchCalendarEvents = async (base: Date) => {
+    const first = startOfMonth(base);
+    const last = endOfMonth(base);
+    // Hent lidt ekstra buffer
+    const bufferStart = new Date(first); bufferStart.setDate(first.getDate() - 7);
+    const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
+
+    const { data } = await supabase
+      .from("forening_events")
+      .select("id, title, start_at, end_at, location, price")
+      .eq("forening_id", id)
+      .gte("start_at", bufferStart.toISOString())
+      .lte("start_at", bufferEnd.toISOString());
+    
+    if (data) setCalendarEvents(data);
+  };
+
   const fetchImages = async () => {
     const { data: evs } = await supabase.from("forening_events").select("id").eq("forening_id", id).limit(5);
     if (evs && evs.length > 0) {
@@ -122,6 +186,22 @@ export default function ForeningDetaljePage() {
   const approved = medlemmer.filter(m => m.status === "approved");
   const isMember = approved.some(m => m.user_id === userId);
   const isOwner = forening?.oprettet_af === userId;
+
+  // Map datoer til events for hurtigt opslag
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, Event[]>();
+    calendarEvents.forEach(e => {
+      const key = toKey(new Date(e.start_at));
+      const list = map.get(key) || [];
+      list.push(e);
+      map.set(key, list);
+    });
+    return map;
+  }, [calendarEvents]);
+
+  const changeMonth = (delta: number) => {
+    setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+  };
 
   if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>;
   if (!forening) return <div className="min-h-screen bg-[#869FB9] p-10 text-center text-white">Forening ikke fundet</div>;
@@ -166,7 +246,7 @@ export default function ForeningDetaljePage() {
            </div>
         </button>
 
-        {/* --- MEDLEMMER PREVIEW (SCROLL) --- */}
+        {/* --- MEDLEMMER PREVIEW --- */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="flex justify-between items-center mb-3 px-2">
             <h3 className="font-black text-[#131921]">MEDLEMMER</h3>
@@ -174,7 +254,6 @@ export default function ForeningDetaljePage() {
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 px-2 scrollbar-hide">
             {approved.map(m => {
-              // Hent korrekt avatar URL
               const avatarSrc = getAvatarUrl(m.users?.avatar_url);
               return (
                 <div key={m.user_id} className="flex flex-col items-center min-w-[64px] cursor-pointer" onClick={() => { setSelectedMember(m); setShowMembers(true); }}>
@@ -233,6 +312,53 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
+        {/* --- KALENDER SEKTION (NY!) --- */}
+        <div className="bg-white rounded-[24px] p-4 shadow-sm">
+          <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
+            KALENDER
+          </div>
+          
+          <div className="flex items-center justify-between mb-4 px-2">
+            <button onClick={() => changeMonth(-1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">‹</button>
+            <h3 className="font-bold text-[#131921] capitalize">
+              {monthCursor.toLocaleDateString("da-DK", { month: 'long', year: 'numeric' })}
+            </h3>
+            <button onClick={() => changeMonth(1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">›</button>
+          </div>
+
+          <div className="grid grid-cols-7 text-center mb-2">
+            {['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'].map(d => (
+              <span key={d} className="text-xs font-bold text-gray-400 uppercase">{d}</span>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {buildMonthGrid(monthCursor).map((week, wIdx) => (
+              week.map((day, dIdx) => {
+                const isCurrentMonth = day.getMonth() === monthCursor.getMonth();
+                const key = toKey(day);
+                const dayEvents = eventsByDate.get(key) || [];
+                const hasEvents = dayEvents.length > 0;
+
+                return (
+                  <div 
+                    key={`${wIdx}-${dIdx}`} 
+                    onClick={() => hasEvents && setSelectedDateEvents({ date: key, events: dayEvents })}
+                    className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative cursor-pointer ${
+                      isCurrentMonth ? 'text-gray-800' : 'text-gray-300'
+                    } ${hasEvents ? 'bg-blue-50 font-bold hover:bg-blue-100' : ''}`}
+                  >
+                    {day.getDate()}
+                    {hasEvents && (
+                      <div className="absolute bottom-1.5 w-1.5 h-1.5 bg-[#131921] rounded-full"></div>
+                    )}
+                  </div>
+                );
+              })
+            ))}
+          </div>
+        </div>
+
         {/* --- BILLEDER PREVIEW --- */}
         <div 
           onClick={() => router.push(`/forening/${id}/images`)} 
@@ -284,7 +410,6 @@ export default function ForeningDetaljePage() {
                 <p className="text-[10px] uppercase font-bold text-[#131921] mb-1">{selectedMember.rolle || 'MEDLEM'}</p>
                 <p className="text-sm text-gray-500 mb-6">{selectedMember.users?.email}</p>
                 
-                {/* NY KNAP: SKRIV TIL MEDLEM */}
                 <button 
                   onClick={() => router.push(`/beskeder?dmUser=${selectedMember.user_id}`)}
                   className="w-full py-3 bg-[#131921] text-white rounded-full font-bold mb-3 hover:bg-gray-900 transition-colors"
@@ -313,6 +438,32 @@ export default function ForeningDetaljePage() {
                 })}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* KALENDER EVENT MODAL */}
+      {selectedDateEvents && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
+            <button onClick={() => setSelectedDateEvents(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black text-xl">✕</button>
+            
+            <h3 className="font-black text-[#131921] mb-1 capitalize">
+              {new Date(selectedDateEvents.date).toLocaleDateString("da-DK", { weekday: 'long', day: 'numeric', month: 'long' })}
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">{selectedDateEvents.events.length} aktiviteter</p>
+
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+              {selectedDateEvents.events.map(e => (
+                <div key={e.id} className="bg-gray-50 p-3 rounded-xl">
+                  <h4 className="font-bold text-[#131921]">{e.title}</h4>
+                  <p className="text-xs text-gray-600 mt-1">
+                    {fmtTime(e.start_at)} {e.end_at ? `- ${fmtTime(e.end_at)}` : ''}
+                  </p>
+                  {e.location && <p className="text-xs text-gray-500 mt-0.5">📍 {e.location}</p>}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
