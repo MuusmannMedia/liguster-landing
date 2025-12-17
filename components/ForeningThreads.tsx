@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import Image from 'next/image';
 
 // --- TYPER ---
 type ThreadRow = {
@@ -13,17 +12,17 @@ type ThreadRow = {
   created_by: string;
 };
 
-type MessageRow = {
+// Vi definerer UI-beskeden separat for at håndtere bruger-info manuelt
+type UiMessage = {
   id: string;
   user_id: string;
   text: string;
   created_at: string;
-  users?: {
+  user: {
     name?: string | null;
-    username?: string | null;
     email?: string | null;
     avatar_url?: string | null;
-  } | null;
+  };
 };
 
 type Props = {
@@ -49,12 +48,12 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
 
   // Modal / Chat State
   const [activeThread, setActiveThread] = useState<ThreadRow | null>(null);
-  const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [messages, setMessages] = useState<UiMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   
-  // Cache af brugernavne til trådlisten (opretter-info)
-  const [userCache, setUserCache] = useState<Record<string, string>>({});
+  // Cache til brugernavne (så vi slipper for joins der kan fejle)
+  const [userCache, setUserCache] = useState<Record<string, any>>({});
 
   useEffect(() => {
     fetchThreads();
@@ -70,28 +69,68 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
     
     if (data) {
       setThreads(data);
-      // Hent navne på oprettere vi ikke kender
-      const unknownIds = [...new Set(data.map(t => t.created_by))].filter(id => !userCache[id]);
-      if (unknownIds.length > 0) {
-        const { data: users } = await supabase.from("users").select("id, name, username, email").in("id", unknownIds);
-        if (users) {
-          const newCache = { ...userCache };
-          users.forEach(u => newCache[u.id] = getDisplayName(u));
-          setUserCache(newCache);
-        }
-      }
+      // Hent navne på tråd-oprettere
+      resolveUserNames(data.map(t => t.created_by));
     }
     setLoading(false);
   };
 
+  // Robust funktion til at hente beskeder og derefter brugere (Ligesom i appen)
   const fetchMessages = async (threadId: string) => {
-    const { data } = await supabase
+    // 1. Hent rå beskeder
+    const { data: rawMsgs, error } = await supabase
       .from("forening_messages")
-      .select("id, user_id, text, created_at, users:users (name, username, email, avatar_url)")
+      .select("id, user_id, text, created_at")
       .eq("thread_id", threadId)
       .order("created_at", { ascending: true });
     
-    if (data) setMessages(data as any);
+    if (error || !rawMsgs) {
+      console.error("Fejl ved hentning af beskeder:", error);
+      setMessages([]);
+      return;
+    }
+
+    // 2. Find unikke bruger-ID'er vi mangler info på
+    const userIds = [...new Set(rawMsgs.map(m => m.user_id))];
+    await resolveUserNames(userIds);
+
+    // 3. Sammensæt beskeder med brugerdata fra cachen
+    const uiMsgs: UiMessage[] = rawMsgs.map(m => {
+      // Vi henter fra cachen. Hvis brugeren ikke er loadet endnu, viser vi midlertidig info.
+      // (State opdatering er async, så vi stoler på at resolveUserNames trigger en re-render)
+      return {
+        ...m,
+        user: userCache[m.user_id] || { name: '...', email: '' }
+      };
+    });
+
+    setMessages(uiMsgs);
+  };
+
+  // Hjælper til at hente brugere og gemme i cache
+  const resolveUserNames = async (ids: string[]) => {
+    // Filtrer ID'er vi allerede kender fra
+    const missing = ids.filter(id => !userCache[id]);
+    if (missing.length === 0) return;
+
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, name, username, email, avatar_url")
+      .in("id", missing);
+
+    if (users) {
+      setUserCache(prev => {
+        const next = { ...prev };
+        users.forEach(u => { next[u.id] = u; });
+        return next;
+      });
+      
+      // Hvis chatten er åben, opdater beskederne med de nye navne
+      setMessages(prev => prev.map(msg => ({
+        ...msg,
+        user: users.find(u => u.id === msg.user_id) || msg.user
+      })));
+    }
   };
 
   const createThread = async () => {
@@ -106,12 +145,7 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
     if (!error && data) {
       setThreads(prev => [data, ...prev]);
       setNewThreadTitle("");
-      // Opdater cache for current user hvis nødvendigt
-      if (!userCache[userId]) {
-         const { data: me } = await supabase.auth.getUser(); 
-      }
     } else {
-      // HER VAR FEJLEN: Vi bruger nu error?.message || 'Ukendt fejl'
       alert("Fejl: " + (error?.message || "Kunne ikke oprette tråd"));
     }
     setCreating(false);
@@ -128,20 +162,32 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
 
   const openThread = (t: ThreadRow) => {
     setActiveThread(t);
+    setMessages([]); // Tøm mens vi loader for at undgå at vise gamle beskeder
     fetchMessages(t.id);
   };
 
   const sendMessage = async () => {
     if (!activeThread || !userId || !newMessage.trim()) return;
     setSending(true);
+    const text = newMessage.trim();
+    
     const { data, error } = await supabase
       .from("forening_messages")
-      .insert([{ thread_id: activeThread.id, user_id: userId, text: newMessage.trim() }])
-      .select("*, users:users (name, username, email, avatar_url)")
+      .insert([{ thread_id: activeThread.id, user_id: userId, text }])
+      .select()
       .single();
     
     if (!error && data) {
-      setMessages(prev => [...prev, data as any]);
+      // Tilføj beskeden med det samme (optimistisk opdatering)
+      const myUserData = userCache[userId] || { name: 'Mig', email: '' };
+      const newMsg: UiMessage = {
+        id: data.id,
+        user_id: userId,
+        text: data.text,
+        created_at: data.created_at,
+        user: myUserData
+      };
+      setMessages(prev => [...prev, newMsg]);
       setNewMessage("");
     }
     setSending(false);
@@ -165,7 +211,7 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
             onChange={e => setNewThreadTitle(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && createThread()}
             placeholder="Ny tråd - skriv en overskrift..."
-            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-[#131921]"
+            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-[#131921] text-[#131921]"
           />
           <button 
             onClick={createThread} 
@@ -178,7 +224,7 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
       )}
 
       {/* TRÅD LISTE */}
-      <div className="space-y-3">
+      <div className="space-y-3 pb-20">
         {threads.length === 0 && <p className="text-center text-gray-400 py-10">Ingen tråde endnu.</p>}
         
         {threads.map(t => (
@@ -186,7 +232,7 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
             <div>
               <h3 className="font-bold text-[#131921] text-lg">{t.title}</h3>
               <p className="text-xs text-gray-500 mt-1">
-                Oprettet af {userCache[t.created_by] || '...'} · {new Date(t.created_at).toLocaleDateString()}
+                Oprettet af {userCache[t.created_by] ? getDisplayName(userCache[t.created_by]) : '...'} · {new Date(t.created_at).toLocaleDateString()}
               </p>
             </div>
             
@@ -202,48 +248,58 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
         ))}
       </div>
 
-      {/* CHAT MODAL */}
+      {/* CHAT MODAL (SAMME DESIGN SOM APP) */}
       {activeThread && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl h-[80vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-2xl h-[80vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col relative">
             
             {/* Header */}
-            <div className="bg-[#131921] px-6 py-4 flex justify-between items-center shrink-0">
-              <h2 className="text-white font-bold text-lg truncate pr-4">{activeThread.title}</h2>
-              <button onClick={() => setActiveThread(null)} className="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
+            <div className="bg-white px-6 py-4 flex justify-between items-center shrink-0 border-b border-gray-100">
+              <h2 className="text-[#131921] font-black text-xl truncate pr-4">{activeThread.title}</h2>
+              <button onClick={() => setActiveThread(null)} className="bg-[#131921] text-white rounded-xl px-3 py-1 font-bold text-sm hover:bg-gray-900 transition-colors">Luk</button>
             </div>
 
             {/* Beskeder */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
               {messages.length === 0 && <p className="text-center text-gray-400 mt-10">Ingen beskeder endnu.</p>}
               
               {messages.map(msg => {
+                // Tjek om det er mig, for evt. styling (valgfrit - appen har dem alle til venstre, men vi kan gøre dem lidt forskellige hvis ønsket)
                 const isMe = msg.user_id === userId;
+                
                 return (
-                  <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                    <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden shrink-0 mt-1">
-                      {msg.users?.avatar_url ? <img src={msg.users.avatar_url} className="w-full h-full object-cover" /> : null}
-                    </div>
-                    
-                    <div className={`max-w-[80%] rounded-2xl p-3 shadow-sm relative group ${isMe ? 'bg-[#131921] text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'}`}>
-                      <p className={`text-[10px] font-bold mb-1 opacity-70 ${isMe ? 'text-gray-300' : 'text-[#254890]'}`}>
-                        {getDisplayName(msg.users)}
-                      </p>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                      <p className={`text-[9px] mt-1 text-right opacity-50 ${isMe ? 'text-white' : 'text-gray-500'}`}>
-                        {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </p>
-
-                      {/* Slet knap (hover) */}
-                      {(isUserAdmin || isMe) && (
-                        <button 
-                          onClick={() => deleteMessage(msg.id)}
-                          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                        >
-                          &times;
-                        </button>
+                  <div key={msg.id} className="flex gap-3 py-2 border-b border-gray-50 last:border-0 group relative">
+                    {/* Avatar */}
+                    <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden shrink-0 mt-1 flex items-center justify-center font-bold text-gray-400 border border-gray-100">
+                      {msg.user?.avatar_url ? (
+                        <img src={msg.user.avatar_url} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>?</span>
                       )}
                     </div>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-xs font-black text-[#223]">
+                          {getDisplayName(msg.user)}
+                        </p>
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </span>
+                      </div>
+                      <p className="text-sm text-[#111] mt-1 leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                    </div>
+
+                    {/* Slet knap (hover) */}
+                    {(isUserAdmin || isMe) && (
+                      <button 
+                        onClick={() => deleteMessage(msg.id)}
+                        className="absolute top-2 right-2 text-gray-300 hover:text-red-500 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Slet besked"
+                      >
+                        <i className="fa-solid fa-trash"></i>
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -251,24 +307,24 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
 
             {/* Input felt */}
             {isMember ? (
-              <div className="p-4 bg-white border-t border-gray-100 flex gap-3 shrink-0">
+              <div className="p-3 border-t border-gray-100 flex gap-2 shrink-0 bg-white">
                 <input 
                   value={newMessage}
                   onChange={e => setNewMessage(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendMessage()}
                   placeholder="Skriv en besked..."
-                  className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-[#131921]"
+                  className="flex-1 bg-[#F4F6F8] rounded-xl px-4 py-3 outline-none text-black placeholder-gray-400 font-medium"
                 />
                 <button 
                   onClick={sendMessage} 
                   disabled={sending || !newMessage.trim()}
-                  className="w-12 h-12 rounded-full bg-[#131921] text-white flex items-center justify-center hover:bg-gray-900 disabled:opacity-50 transition-colors"
+                  className="bg-[#131921] text-white px-5 rounded-xl font-black hover:bg-gray-900 disabled:opacity-50 transition-colors"
                 >
-                  <i className="fa-solid fa-paper-plane text-sm"></i>
+                  {sending ? '...' : 'Send'}
                 </button>
               </div>
             ) : (
-              <div className="p-4 bg-gray-100 text-center text-xs text-gray-500 font-bold uppercase tracking-wider">
+              <div className="p-4 bg-gray-50 text-center text-xs text-gray-500 font-bold uppercase tracking-wider">
                 Kun medlemmer kan skrive her
               </div>
             )}
