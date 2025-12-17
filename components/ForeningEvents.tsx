@@ -442,24 +442,24 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
               {/* === CREATE / EDIT MODE === */}
               {(modalMode === 'create' || modalMode === 'edit') && (
                 <form onSubmit={handleSave} className="space-y-4">
-                  <input required placeholder="Overskrift" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-[#131921] outline-none" value={title} onChange={e => setTitle(e.target.value)} />
-                  <textarea placeholder="Beskrivelse" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 h-24 resize-none outline-none" value={description} onChange={e => setDescription(e.target.value)} />
-                  <input placeholder="Sted (f.eks. Klubhus)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" value={location} onChange={e => setLocation(e.target.value)} />
+                  <input required placeholder="Overskrift" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-[#131921] outline-none text-[#131921] placeholder-gray-500" value={title} onChange={e => setTitle(e.target.value)} />
+                  <textarea placeholder="Beskrivelse" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 h-24 resize-none outline-none text-[#131921] placeholder-gray-500" value={description} onChange={e => setDescription(e.target.value)} />
+                  <input placeholder="Sted (f.eks. Klubhus)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500" value={location} onChange={e => setLocation(e.target.value)} />
                   
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-bold text-gray-500 ml-1">Start</label>
-                      <input required type="datetime-local" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm" value={startAt} onChange={e => setStartAt(e.target.value)} />
+                      <input required type="datetime-local" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm text-[#131921]" value={startAt} onChange={e => setStartAt(e.target.value)} />
                     </div>
                     <div>
                       <label className="text-xs font-bold text-gray-500 ml-1">Slut</label>
-                      <input required type="datetime-local" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm" value={endAt} onChange={e => setEndAt(e.target.value)} />
+                      <input required type="datetime-local" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm text-[#131921]" value={endAt} onChange={e => setEndAt(e.target.value)} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <input type="number" placeholder="Pris (kr)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" value={price} onChange={e => setPrice(e.target.value)} />
-                    <input type="number" placeholder="Max antal" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none" value={capacity} onChange={e => setCapacity(e.target.value)} />
+                    <input type="number" placeholder="Pris (kr)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500" value={price} onChange={e => setPrice(e.target.value)} />
+                    <input type="number" placeholder="Max antal" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500" value={capacity} onChange={e => setCapacity(e.target.value)} />
                   </div>
 
                   <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer">
