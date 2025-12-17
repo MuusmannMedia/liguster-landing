@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
+// Importer din nye modal
+import CreatePostModal from '../../components/CreatePostModal';
 
 // --- TYPER ---
 type Post = {
@@ -15,7 +17,7 @@ type Post = {
   text: string | null;
   kategori: string | null;
   image_url: string | null;
-  images?: string[] | null; // Nogle gange gemt som array
+  images?: string[] | null;
   created_at: string;
   expires_at?: string | null;
 };
@@ -24,12 +26,9 @@ type Post = {
 const MS_DAY = 24 * 60 * 60 * 1000;
 const EXPIRES_DAYS = 14;
 
-// Beregn udløbsstatus (som i appen)
 const getExpiry = (p: Post) => {
   const createdMs = p.created_at ? new Date(p.created_at).getTime() : NaN;
   const expiresMsExplicit = p.expires_at ? new Date(p.expires_at).getTime() : NaN;
-
-  // Brug explicit udløb eller fallback (14 dage fra oprettelse)
   const expiresAt = !isNaN(expiresMsExplicit) ? expiresMsExplicit : (!isNaN(createdMs) ? createdMs + EXPIRES_DAYS * MS_DAY : NaN);
   
   if (isNaN(expiresAt)) return { label: "", state: "ok" };
@@ -41,139 +40,51 @@ const getExpiry = (p: Post) => {
   const hours = Math.floor((diff % MS_DAY) / (60 * 60 * 1000));
 
   const label = days > 0 ? `Udløber om ${days}d ${hours}t` : `Udløber om ${hours}t`;
-  const state = diff < 2 * MS_DAY ? "soon" : "ok"; // Rød hvis under 2 dage
+  const state = diff < 2 * MS_DAY ? "soon" : "ok";
   return { label, state };
 };
 
-// Billed-helper (hvis gemt som array eller string)
 const getPrimaryImage = (p: Post) => {
   if (p.image_url) return p.image_url;
   if (p.images && p.images.length > 0) return p.images[0];
   return null;
 };
 
-// Billed-komprimering
-async function resizeImage(file: File, maxWidth = 1200, quality = 0.8): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = document.createElement('img');
-    const objectUrl = URL.createObjectURL(file);
-    img.src = objectUrl;
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      const elem = document.createElement('canvas');
-      const scaleFactor = Math.min(1, maxWidth / img.width);
-      elem.width = img.width * scaleFactor;
-      elem.height = img.height * scaleFactor;
-      const ctx = elem.getContext('2d');
-      if (!ctx) { reject(new Error('Canvas error')); return; }
-      ctx.drawImage(img, 0, 0, elem.width, elem.height);
-      ctx.canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Blob error')), 'image/jpeg', quality);
-    };
-    img.onerror = (e) => { URL.revokeObjectURL(objectUrl); reject(e); };
-  });
-}
-
-// --- MODAL: OPRET/REDIGER OPSLAG ---
-function PostModal({ isOpen, onClose, userId, initialData, onSaved }: { isOpen: boolean, onClose: () => void, userId: string, initialData: Post | null, onSaved: () => void }) {
-  const [overskrift, setOverskrift] = useState("");
-  const [omraade, setOmraade] = useState("");
+// --- SIMPEL EDIT MODAL (Kun til redigering, indtil CreatePostModal understøtter det) ---
+function EditPostModal({ isOpen, onClose, post, onSaved }: { isOpen: boolean, onClose: () => void, post: Post | null, onSaved: () => void }) {
   const [text, setText] = useState("");
-  const [kategori, setKategori] = useState("Værktøj"); // Default
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Udfyld felter hvis vi redigerer
   useEffect(() => {
-    if (initialData) {
-      setOverskrift(initialData.overskrift || "");
-      setOmraade(initialData.omraade || "");
-      setText(initialData.text || "");
-      setKategori(initialData.kategori || "Værktøj");
-    } else {
-      setOverskrift(""); setOmraade(""); setText(""); setKategori("Værktøj"); setImageFile(null);
-    }
-  }, [initialData, isOpen]);
+    if (post) setText(post.text || "");
+  }, [post]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !post) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      let imageUrl = initialData?.image_url || null;
-
-      // Upload nyt billede
-      if (imageFile) {
-        const compressed = await resizeImage(imageFile);
-        const path = `posts/${userId}/${Date.now()}.jpg`;
-        const { error: upErr } = await supabase.storage.from("post-images").upload(path, compressed, { upsert: true });
-        if (upErr) throw upErr;
-        const { data: urlData } = supabase.storage.from("post-images").getPublicUrl(path);
-        imageUrl = urlData.publicUrl;
-      }
-
-      const payload = {
-        user_id: userId,
-        overskrift,
-        omraade,
-        text,
-        kategori,
-        image_url: imageUrl,
-        // Hvis nyt opslag, sæt expires_at
-        ...(initialData ? {} : { expires_at: new Date(Date.now() + 14 * MS_DAY).toISOString() })
-      };
-
-      if (initialData) {
-        const { error } = await supabase.from("posts").update(payload).eq("id", initialData.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("posts").insert([payload]);
-        if (error) throw error;
-      }
-
+    const { error } = await supabase.from("posts").update({ text }).eq("id", post.id);
+    setLoading(false);
+    if (!error) {
       onSaved();
       onClose();
-    } catch (err: any) {
-      alert("Fejl: " + err.message);
-    } finally {
-      setLoading(false);
+    } else {
+      alert("Fejl: " + error.message);
     }
   };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="bg-[#131921] px-5 py-4 flex justify-between items-center shrink-0">
-          <h2 className="text-white font-bold uppercase tracking-wider">{initialData ? "Rediger Opslag" : "Nyt Opslag"}</h2>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
-        </div>
-        <div className="overflow-y-auto p-5">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input required placeholder="Overskrift (Hvad vil du låne/udleje?)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-[#131921] text-[#131921]" value={overskrift} onChange={e => setOverskrift(e.target.value)} />
-            <input required placeholder="Område (f.eks. Vejnavn)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-[#131921] text-[#131921]" value={omraade} onChange={e => setOmraade(e.target.value)} />
-            
-            <select className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921]" value={kategori} onChange={e => setKategori(e.target.value)}>
-              <option value="Værktøj">Værktøj</option>
-              <option value="Have">Have</option>
-              <option value="Elektronik">Elektronik</option>
-              <option value="Fest">Fest</option>
-              <option value="Andet">Andet</option>
-            </select>
-
-            <textarea required placeholder="Beskrivelse..." className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 h-28 resize-none outline-none focus:border-[#131921] text-[#131921]" value={text} onChange={e => setText(e.target.value)} />
-
-            <div className="p-3 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-center cursor-pointer relative hover:bg-gray-100">
-              <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
-              <span className="text-sm font-bold text-gray-500">
-                {imageFile ? `Valgt: ${imageFile.name}` : initialData?.image_url ? "Skift billede (valgfrit)" : "+ Vælg billede"}
-              </span>
-            </div>
-
-            <button type="submit" disabled={loading} className="w-full py-4 bg-[#131921] text-white rounded-xl font-bold hover:bg-gray-900 mt-2">
-              {loading ? "Gemmer..." : initialData ? "Gem Ændringer" : "Opret Opslag"}
-            </button>
-          </form>
-        </div>
+      <div className="bg-white w-full max-w-md rounded-2xl p-6">
+        <h2 className="font-bold text-lg mb-4">Rediger beskrivelse</h2>
+        <form onSubmit={handleUpdate}>
+          <textarea className="w-full border p-2 rounded-xl h-32 mb-4" value={text} onChange={e => setText(e.target.value)} />
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg font-bold">Annuller</button>
+            <button type="submit" disabled={loading} className="flex-1 py-2 bg-[#131921] text-white rounded-lg font-bold">Gem</button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -186,8 +97,8 @@ export default function MineOpslagPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Modal states
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editPost, setEditPost] = useState<Post | null>(null);
 
   useEffect(() => {
@@ -229,7 +140,6 @@ export default function MineOpslagPage() {
     try {
       const currentExpiry = post.expires_at ? new Date(post.expires_at).getTime() : NaN;
       const now = Date.now();
-      // Forlæng fra nuværende udløb (hvis i fremtiden) eller fra nu
       const base = !isNaN(currentExpiry) && currentExpiry > now ? currentExpiry : now;
       const newExpiry = new Date(base + 7 * MS_DAY).toISOString();
 
@@ -243,16 +153,6 @@ export default function MineOpslagPage() {
     }
   };
 
-  const openCreate = () => {
-    setEditPost(null);
-    setIsModalOpen(true);
-  };
-
-  const openEdit = (p: Post) => {
-    setEditPost(p);
-    setIsModalOpen(true);
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
@@ -262,7 +162,7 @@ export default function MineOpslagPage() {
         {/* Sticky Header Action */}
         <div className="sticky top-20 z-10 mb-6 flex justify-center">
           <button 
-            onClick={openCreate}
+            onClick={() => setIsCreateOpen(true)}
             className="bg-[#131921] text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-gray-900 transition-transform active:scale-95 tracking-wide text-sm"
           >
             OPRET NYT OPSLAG
@@ -325,7 +225,7 @@ export default function MineOpslagPage() {
                         {expiry.state === 'overdue' ? 'Aktivér igen' : 'Forlæng'}
                       </button>
                       
-                      <button onClick={() => openEdit(post)} className="px-4 py-2 bg-[#131921] text-white rounded-full text-[10px] font-bold uppercase hover:bg-gray-800">
+                      <button onClick={() => setEditPost(post)} className="px-4 py-2 bg-[#131921] text-white rounded-full text-[10px] font-bold uppercase hover:bg-gray-800">
                         Ret
                       </button>
                       
@@ -343,15 +243,20 @@ export default function MineOpslagPage() {
 
       <SiteFooter />
 
-      {userId && (
-        <PostModal 
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          userId={userId}
-          initialData={editPost}
-          onSaved={() => fetchPosts(userId)}
-        />
-      )}
+      {/* OPRET MODAL (Den nye fælles komponent) */}
+      <CreatePostModal 
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onPostCreated={() => userId && fetchPosts(userId)}
+      />
+
+      {/* REDIGER MODAL (Midlertidig simpel modal indtil CreatePostModal understøtter edit) */}
+      <EditPostModal 
+        isOpen={!!editPost}
+        onClose={() => setEditPost(null)}
+        post={editPost}
+        onSaved={() => userId && fetchPosts(userId)}
+      />
     </div>
   );
 }
