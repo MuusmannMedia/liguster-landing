@@ -211,19 +211,16 @@ export default function LigusterLandingPage() {
         </div>
       </section>
 
-      {/* --- OPRET BRUGER CTA (Flyttet herop & Større Logo) --- */}
+      {/* --- OPRET BRUGER CTA --- */}
       <section className="py-16 md:py-24 bg-white border-b border-gray-100">
         <div className="max-w-5xl mx-auto px-4">
           <div className="bg-liguster-gradient rounded-[2.5rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
             
-            {/* Dekorativt logo baggrund */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] opacity-5 pointer-events-none">
-               <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="bg" />
-            </div>
+            {/* BACKGROUND LOGO REMOVED HERE */}
 
             <div className="relative z-10 flex flex-col items-center">
-              {/* Logo i toppen - NU MEGET STØRRE */}
-              <div className="relative w-96 h-32 mb-8">
+              {/* Logo i toppen - NU ENDNU STØRRE */}
+              <div className="relative w-[500px] h-[165px] mb-10">
                  <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="Liguster" />
               </div>
               
