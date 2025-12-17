@@ -315,6 +315,10 @@ export default function LigusterLandingPage() {
               <Link href="/privatliv" className="text-gray-500 hover:text-white transition-colors">
                 Privatlivspolitik
               </Link>
+              <span className="text-gray-700">•</span>
+              <Link href="/vilkaar" className="text-gray-500 hover:text-white transition-colors">
+                Brugervilkår
+              </Link>
             </div>
           </div>
 

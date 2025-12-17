@@ -23,7 +23,10 @@ export default function SiteFooter() {
             <Link href="/privatliv" className="text-gray-500 hover:text-white transition-colors">
               Privatlivspolitik
             </Link>
-            {/* Du kan tilføje flere links her senere, fx "Vilkår" */}
+            <span className="text-gray-700">•</span>
+            <Link href="/vilkaar" className="text-gray-500 hover:text-white transition-colors">
+              Brugervilkår
+            </Link>
           </div>
         </div>
 
