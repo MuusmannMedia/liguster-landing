@@ -13,21 +13,21 @@ type ThreadItem = {
   created_at: string;
   forening_id?: string;
   forening?: { navn: string };
-  isDm?: boolean; // Ny flag for at skelne
+  isDm?: boolean;
 };
 
 type ChatMessage = {
   id: string;
   text: string;
   created_at: string;
-  user_id: string; // I 'messages' tabellen hedder den sender_id, men vi normaliserer til user_id
+  user_id: string;
   users?: {
     name?: string;
     avatar_url?: string | null;
   };
 };
 
-// --- HJÆLPER: Konverter sti til URL ---
+// --- HJÆLPERE ---
 const getAvatarUrl = (path: string | null | undefined) => {
   if (!path) return null;
   if (path.startsWith('http')) return path; 
@@ -35,7 +35,6 @@ const getAvatarUrl = (path: string | null | undefined) => {
   return data.publicUrl;
 };
 
-// --- UUID GENERATOR (Hvis ingen findes) ---
 const makeUuid = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -47,16 +46,16 @@ const makeUuid = () => {
 function BeskederContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const startId = searchParams.get('id'); // Forening ID
-  const dmUserId = searchParams.get('dmUser'); // Direkte besked modtager ID
+  const startId = searchParams.get('id');
+  const dmUserId = searchParams.get('dmUser');
 
   const [userId, setUserId] = useState<string | null>(null);
   const [myProfile, setMyProfile] = useState<{ name: string, avatar_url: string | null } | null>(null);
   
   const [threads, setThreads] = useState<ThreadItem[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [isDirectMessage, setIsDirectMessage] = useState(false); // Holder styr på om vi er i DM mode
-  const [dmTargetUser, setDmTargetUser] = useState<any>(null); // Brugeren vi skriver med
+  const [isDirectMessage, setIsDirectMessage] = useState(false);
+  const [dmTargetUser, setDmTargetUser] = useState<any>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -80,7 +79,7 @@ function BeskederContent() {
         setMyProfile({ name: profile.name || 'Mig', avatar_url: getAvatarUrl(profile.avatar_url) });
       }
 
-      // Hent forenings-tråde (sidebar)
+      // Hent forenings-tråde
       const { data: memberships } = await supabase.from('foreningsmedlemmer').select('forening_id').eq('user_id', session.user.id).eq('status', 'approved');
       const myForeningIds = memberships?.map((m: any) => m.forening_id) || [];
 
@@ -105,15 +104,12 @@ function BeskederContent() {
       }
       setThreads(initialThreads);
 
-      // --- DM LOGIC ---
+      // DM Logic
       if (dmUserId) {
-        // Hent modtager info
         const { data: targetUser } = await supabase.from('users').select('*').eq('id', dmUserId).single();
         if (targetUser) {
           setDmTargetUser(targetUser);
           setIsDirectMessage(true);
-
-          // Find eksisterende tråd ID i 'messages' tabellen
           const { data: existingMsgs } = await supabase
             .from('messages')
             .select('thread_id')
@@ -123,13 +119,10 @@ function BeskederContent() {
           if (existingMsgs && existingMsgs.length > 0) {
             setActiveThreadId(existingMsgs[0].thread_id);
           } else {
-            // Generer nyt thread ID (som appen gør)
-            const newThreadId = makeUuid();
-            setActiveThreadId(newThreadId);
+            setActiveThreadId(makeUuid());
           }
         }
       } else if (startId) {
-        // Forening link
         const match = initialThreads.find(t => t.forening_id === startId);
         if (match) {
           setActiveThreadId(match.id);
@@ -145,45 +138,33 @@ function BeskederContent() {
     init();
   }, [startId, dmUserId, router]);
 
-  // 2. Hent beskeder (Afhængig af om det er DM eller Forening)
+  // 2. Hent beskeder & Realtime (Ingen setInterval!)
   useEffect(() => {
     if (!activeThreadId) return;
     
+    // Initial fetch
     const fetchMessages = async () => {
       let data: any[] | null = null;
+      const table = isDirectMessage ? 'messages' : 'forening_messages';
 
-      if (isDirectMessage) {
-        // Hent fra 'messages' tabellen
-        const res = await supabase
-          .from('messages')
-          .select('id, text, created_at, sender_id') // sender_id er brugeren
-          .eq('thread_id', activeThreadId)
-          .order('created_at', { ascending: true });
-        data = res.data?.map(m => ({ ...m, user_id: m.sender_id })) || [];
-      } else {
-        // Hent fra 'forening_messages'
-        const res = await supabase
-          .from('forening_messages')
-          .select('id, text, created_at, user_id')
-          .eq('thread_id', activeThreadId)
-          .order('created_at', { ascending: true });
-        data = res.data;
-      }
+      const res = await supabase
+        .from(table)
+        .select(isDirectMessage ? 'id, text, created_at, sender_id' : 'id, text, created_at, user_id')
+        .eq('thread_id', activeThreadId)
+        .order('created_at', { ascending: true });
+      
+      data = isDirectMessage ? res.data?.map(m => ({ ...m, user_id: m.sender_id })) : res.data;
 
       if (data) {
-        // Join Users
-        const userIds = [...new Set(data.map(m => m.user_id))];
+        const userIds = [...new Set(data.map((m: any) => m.user_id))];
         const { data: users } = await supabase.from('users').select('id, name, avatar_url').in('id', userIds);
         
         const userMap: Record<string, any> = {};
         users?.forEach(u => {
-          userMap[u.id] = {
-            name: u.name,
-            avatar_url: getAvatarUrl(u.avatar_url)
-          };
+          userMap[u.id] = { name: u.name, avatar_url: getAvatarUrl(u.avatar_url) };
         });
 
-        const fullMessages = data.map(m => ({
+        const fullMessages = data.map((m: any) => ({
           ...m,
           users: userMap[m.user_id] || { name: 'Ukendt', avatar_url: null }
         }));
@@ -194,13 +175,47 @@ function BeskederContent() {
     };
 
     fetchMessages();
-    const interval = setInterval(fetchMessages, 4000); 
-    return () => clearInterval(interval);
+
+    // REALTIME SUBSCRIPTION (Erstatter setInterval og fjerner hop)
+    const table = isDirectMessage ? 'messages' : 'forening_messages';
+    const channel = supabase
+      .channel(`chat:${activeThreadId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: table, filter: `thread_id=eq.${activeThreadId}` },
+        async (payload) => {
+          const newMsg = payload.new as any;
+          // Undgå dubletter (hvis vi selv lige har sendt den)
+          setMessages((prev) => {
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            
+            // Hent bruger info for den nye besked
+            const senderId = isDirectMessage ? newMsg.sender_id : newMsg.user_id;
+            // (Vi kender nok allerede brugeren, ellers brug default)
+            
+            // Simpel tilføjelse (bruger info opdateres næste gang man loader, eller vi kunne hente det)
+            return [...prev, {
+              id: newMsg.id,
+              text: newMsg.text,
+              created_at: newMsg.created_at,
+              user_id: senderId,
+              users: { name: '...', avatar_url: null } // Vi lader den bare komme ind
+            }].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          });
+          scrollToBottom();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
 
   }, [activeThreadId, isDirectMessage]);
 
   const scrollToBottom = () => {
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    // Kun scroll hvis vi er tæt på bunden eller ved første load
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const handleSend = async () => {
@@ -210,43 +225,48 @@ function BeskederContent() {
 
     // Optimistisk update
     const tempId = "temp-" + Date.now();
-    setMessages(prev => [...prev, { 
+    const optimisticMsg = { 
       id: tempId,
       text: text,
       created_at: new Date().toISOString(),
       user_id: userId,
       users: { name: myProfile?.name || 'Mig', avatar_url: myProfile?.avatar_url }
-    }]);
+    };
+    
+    setMessages(prev => [...prev, optimisticMsg]);
     scrollToBottom();
 
     let error = null;
+    let data = null;
 
     if (isDirectMessage && dmTargetUser) {
-      // Indsæt i 'messages'
-      const { error: e } = await supabase.from('messages').insert([{
+      const res = await supabase.from('messages').insert([{
         thread_id: activeThreadId,
         sender_id: userId,
         receiver_id: dmTargetUser.id,
         text: text
-      }]);
-      error = e;
+      }]).select().single();
+      error = res.error;
+      data = res.data;
     } else {
-      // Indsæt i 'forening_messages'
-      const { error: e } = await supabase.from('forening_messages').insert([{ 
+      const res = await supabase.from('forening_messages').insert([{ 
         thread_id: activeThreadId,
         user_id: userId, 
         text: text
-      }]);
-      error = e;
+      }]).select().single();
+      error = res.error;
+      data = res.data;
     }
 
     if (error) {
       alert("Fejl ved afsendelse: " + error.message);
       setMessages(prev => prev.filter(m => m.id !== tempId));
+    } else if (data) {
+      // Erstat temp besked med den rigtige fra DB (så ID passer)
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...optimisticMsg, id: data.id } : m));
     }
   };
 
-  // Find aktiv tråd info til headeren
   const activeThreadInfo = isDirectMessage 
     ? { title: dmTargetUser?.name || 'Direkte Besked', subtitle: 'Privat samtale' }
     : threads.find(t => t.id === activeThreadId) 
@@ -270,7 +290,6 @@ function BeskederContent() {
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               
-              {/* Vis DM hvis aktiv */}
               {isDirectMessage && dmTargetUser && (
                 <button className="w-full text-left p-3 rounded-xl flex flex-col gap-1 bg-white shadow-sm ring-1 ring-[#131921] mb-2">
                   <span className="font-bold text-sm text-[#131921]">{dmTargetUser.name}</span>
@@ -295,7 +314,7 @@ function BeskederContent() {
           <div className={`flex-1 flex flex-col bg-white ${!activeThreadId ? 'hidden md:flex' : 'flex'}`}>
             {activeThreadId ? (
               <>
-                <div className="p-4 border-b border-gray-100 flex items-center gap-3 shadow-sm z-10">
+                <div className="p-4 border-b border-gray-100 flex items-center gap-3 shadow-sm z-10 bg-white">
                   <button onClick={() => setActiveThreadId(null)} className="md:hidden w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-sm">‹</button>
                   <div className="flex-1">
                     <h3 className="font-bold text-[#131921]">{activeThreadInfo.title}</h3>
