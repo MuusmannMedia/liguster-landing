@@ -165,7 +165,6 @@ export default function LigusterLandingPage() {
 
           <div className="hidden lg:mt-0 lg:col-span-5 lg:flex justify-center items-center relative">
             <div className="relative">
-              {/* STØRRE TELEFON HER */}
               <div
                 className="mockup-frame w-[340px] h-[700px] bg-black relative z-10 mx-auto border-[14px] border-gray-800 rounded-[3rem] overflow-hidden"
                 onTouchStart={handleTouchStart}
@@ -295,6 +294,44 @@ export default function LigusterLandingPage() {
                 Dialog foregår i privatbeskeder. Sikkerhed og god tone er tænkt ind fra start.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* NYT AFSNIT: OPRET BRUGER CTA */}
+      <section className="py-16 md:py-24 bg-white border-t border-gray-100">
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="bg-liguster-gradient rounded-[2.5rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
+            
+            {/* Dekorativt logo baggrund */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] opacity-5 pointer-events-none">
+               <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="bg" />
+            </div>
+
+            <div className="relative z-10 flex flex-col items-center">
+              {/* Logo i toppen */}
+              <div className="relative w-48 h-16 mb-6">
+                 <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="Liguster" />
+              </div>
+              
+              <h2 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-tight">
+                Klar til at gøre en forskel lokalt?
+              </h2>
+              
+              <p className="text-blue-100 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
+                Opret en bruger i dag og vær med til at skabe mere liv, tryghed og fællesskab på din vej. 
+                Det er gratis, enkelt og tager kun et øjeblik.
+              </p>
+
+              <Link 
+                href="/hemmelig-opret" 
+                className="bg-white text-[#0b2b52] font-black text-lg px-10 py-4 rounded-full shadow-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 inline-flex items-center gap-2"
+              >
+                <i className="fa-solid fa-user-plus"></i>
+                Opret bruger nu
+              </Link>
+            </div>
+
           </div>
         </div>
       </section>
