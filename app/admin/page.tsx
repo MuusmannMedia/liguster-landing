@@ -147,13 +147,14 @@ export default function AdminPage() {
 
             {/* SØGEFELT */}
             <div className="relative w-full md:w-96">
-              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 transform -translate-y-1/2 text-[#131921]"></i>
               <input 
                 type="text" 
                 placeholder="Søg efter navn eller email..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#131921] transition-all"
+                // RETTELSE HER: Tilføjet text-[#131921] og placeholder-gray-500
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 text-[#131921] placeholder-gray-500 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#131921] transition-all"
               />
             </div>
           </div>
