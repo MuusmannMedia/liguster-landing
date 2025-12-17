@@ -32,6 +32,9 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [isAuthorized, setIsAuthorized] = useState(false);
   
+  // Søgning
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Modal state
   const [inspectUser, setInspectUser] = useState<any | null>(null);
   const [inspectLoading, setInspectLoading] = useState(false);
@@ -60,12 +63,12 @@ export default function AdminPage() {
     checkAccess();
   }, [router]);
 
-  // 1. HENT KUN BRUGERE (Simpelt og sikkert)
+  // 1. HENT KUN BRUGERE
   const fetchUsers = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('users')
-      .select('*') // Vi henter IKKE relationer her for at undgå fejl
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -77,20 +80,17 @@ export default function AdminPage() {
     setLoading(false);
   };
 
-  // 2. HENT INDHOLD NÅR MAN KLIKKER (Separat kald)
+  // 2. HENT INDHOLD VED INSPEKTION
   const handleInspectClick = async (user: any) => {
     setInspectUser(user);
     setInspectLoading(true);
-    setUserContent({ posts: [], foreninger: [] }); // Nulstil
+    setUserContent({ posts: [], foreninger: [] }); 
 
-    // Hent opslag
     const { data: posts } = await supabase
       .from('posts')
       .select('id, overskrift, created_at')
-      .eq('user_id', user.id); // Vi søger manuelt i stedet for join
+      .eq('user_id', user.id); 
 
-    // Hent foreninger (Husk at tjekke om kolonnen hedder 'oprettet_af' eller 'user_id' i din database)
-    // Her gætter jeg på 'oprettet_af' baseret på tidligere kode, ret hvis det er forkert.
     const { data: foreninger } = await supabase
       .from('foreninger')
       .select('id, navn, created_at')
@@ -104,11 +104,9 @@ export default function AdminPage() {
   };
 
   // --- SLETTE FUNKTIONER ---
-
   const handleDeleteUser = async (userId: string) => {
     if(!confirm("ER DU SIKKER? Dette sletter brugeren permanent.")) return;
     
-    // Slet brugeren
     const { error } = await supabase.from('users').delete().eq('id', userId);
     
     if (error) {
@@ -118,6 +116,14 @@ export default function AdminPage() {
       setInspectUser(null);
     }
   };
+
+  // --- SØGE LOGIK ---
+  const filteredUsers = users.filter(u => {
+    const query = searchQuery.toLowerCase();
+    const name = (u.name || "").toLowerCase();
+    const email = (u.email || "").toLowerCase();
+    return name.includes(query) || email.includes(query);
+  });
 
   if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center text-white">Indlæser brugere...</div>;
   if (!isAuthorized) return null;
@@ -129,10 +135,26 @@ export default function AdminPage() {
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 pb-20">
         
         <div className="bg-white rounded-[30px] p-8 shadow-xl mt-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-black text-[#131921]">Admin Oversigt</h1>
-            <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold text-sm">
-              {users.length} Brugere fundet
+          
+          {/* HEADER & SØGNING */}
+          <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-black text-[#131921]">Admin Oversigt</h1>
+              <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold text-sm">
+                {users.length} Total
+              </div>
+            </div>
+
+            {/* SØGEFELT */}
+            <div className="relative w-full md:w-96">
+              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+              <input 
+                type="text" 
+                placeholder="Søg efter navn eller email..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#131921] transition-all"
+              />
             </div>
           </div>
 
@@ -147,7 +169,12 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="text-sm text-gray-700">
-                {users.map((u) => {
+                {filteredUsers.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-gray-400">Ingen brugere fundet.</td>
+                  </tr>
+                )}
+                {filteredUsers.map((u) => {
                   const avatarSrc = getAvatarUrl(u.avatar_url) || `https://ui-avatars.com/api/?name=${u.name || '?'}&background=random`;
                   
                   return (
@@ -166,7 +193,7 @@ export default function AdminPage() {
                       <td className="p-4 text-right space-x-2">
                         <button 
                           onClick={() => handleInspectClick(u)}
-                          className="bg-[#131921] text-white font-bold text-xs px-4 py-2 rounded-full hover:bg-gray-800 transition-colors"
+                          className="bg-[#131921] text-white font-bold text-xs px-4 py-2 rounded-full hover:bg-gray-800 transition-colors shadow-sm"
                         >
                           INSPEKTÉR
                         </button>
@@ -193,7 +220,6 @@ export default function AdminPage() {
               ✕
             </button>
 
-            {/* Bruger Header i Modal */}
             <div className="flex items-center gap-4 border-b border-gray-100 pb-6 mb-6">
               <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden relative border-2 border-white shadow-md">
                 <Image 
@@ -219,10 +245,12 @@ export default function AdminPage() {
             </div>
 
             {inspectLoading ? (
-              <div className="text-center py-10 text-gray-500">Henter indhold...</div>
+              <div className="text-center py-10 text-gray-500 flex flex-col items-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#131921] mb-2"></div>
+                Henter indhold...
+              </div>
             ) : (
               <>
-                {/* --- LISTE OVER OPSLAG --- */}
                 <div className="mb-8">
                   <h3 className="text-lg font-bold text-[#131921] mb-3 flex items-center gap-2">
                     <i className="fa-solid fa-pen-to-square"></i> Brugerens Opslag ({userContent.posts.length})
@@ -240,7 +268,6 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* --- LISTE OVER FORENINGER --- */}
                 <div>
                   <h3 className="text-lg font-bold text-[#131921] mb-3 flex items-center gap-2">
                     <i className="fa-solid fa-users"></i> Brugerens Foreninger ({userContent.foreninger.length})
