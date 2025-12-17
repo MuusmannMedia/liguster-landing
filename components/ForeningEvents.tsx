@@ -442,24 +442,24 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
               {/* === CREATE / EDIT MODE === */}
               {(modalMode === 'create' || modalMode === 'edit') && (
                 <form onSubmit={handleSave} className="space-y-4">
-                  <input required placeholder="Overskrift" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-[#131921] outline-none text-[#131921] placeholder-gray-500" value={title} onChange={e => setTitle(e.target.value)} />
-                  <textarea placeholder="Beskrivelse" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 h-24 resize-none outline-none text-[#131921] placeholder-gray-500" value={description} onChange={e => setDescription(e.target.value)} />
-                  <input placeholder="Sted (f.eks. Klubhus)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500" value={location} onChange={e => setLocation(e.target.value)} />
+                  <input required placeholder="Overskrift" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-[#131921] outline-none text-[#131921] placeholder-gray-500 font-medium" value={title} onChange={e => setTitle(e.target.value)} />
+                  <textarea placeholder="Beskrivelse" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 h-24 resize-none outline-none text-[#131921] placeholder-gray-500 font-medium" value={description} onChange={e => setDescription(e.target.value)} />
+                  <input placeholder="Sted (f.eks. Klubhus)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500 font-medium" value={location} onChange={e => setLocation(e.target.value)} />
                   
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-bold text-gray-500 ml-1">Start</label>
-                      <input required type="datetime-local" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm text-[#131921]" value={startAt} onChange={e => setStartAt(e.target.value)} />
+                      <input required type="datetime-local" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm text-[#131921] placeholder-gray-500 font-medium" value={startAt} onChange={e => setStartAt(e.target.value)} />
                     </div>
                     <div>
                       <label className="text-xs font-bold text-gray-500 ml-1">Slut</label>
-                      <input required type="datetime-local" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm text-[#131921]" value={endAt} onChange={e => setEndAt(e.target.value)} />
+                      <input required type="datetime-local" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm text-[#131921] placeholder-gray-500 font-medium" value={endAt} onChange={e => setEndAt(e.target.value)} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <input type="number" placeholder="Pris (kr)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500" value={price} onChange={e => setPrice(e.target.value)} />
-                    <input type="number" placeholder="Max antal" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500" value={capacity} onChange={e => setCapacity(e.target.value)} />
+                    <input type="number" placeholder="Pris (kr)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500 font-medium" value={price} onChange={e => setPrice(e.target.value)} />
+                    <input type="number" placeholder="Max antal" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500 font-medium" value={capacity} onChange={e => setCapacity(e.target.value)} />
                   </div>
 
                   <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer">
@@ -492,20 +492,20 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
 function EventCard({ ev, count, onClick }: { ev: EventRow, count: number, onClick: () => void }) {
   return (
     <div onClick={onClick} className="bg-white border border-gray-100 rounded-xl p-3 flex gap-4 cursor-pointer hover:shadow-md transition-shadow">
-      {/* Billede / Dato boks */}
-      <div className="w-20 h-20 shrink-0 bg-gray-100 rounded-lg overflow-hidden relative">
+      {/* Billede / Dato boks - NU 1:1 KVADRATISK */}
+      <div className="w-24 h-24 shrink-0 bg-gray-100 rounded-lg overflow-hidden relative aspect-square">
         {ev.image_url ? (
           <img src={ev.image_url} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-[#131921] text-white">
             <span className="text-xs font-bold uppercase">{new Date(ev.start_at).toLocaleString('da-DK', { month: 'short' })}</span>
-            <span className="text-xl font-black">{new Date(ev.start_at).getDate()}</span>
+            <span className="text-2xl font-black">{new Date(ev.start_at).getDate()}</span>
           </div>
         )}
       </div>
       
       <div className="flex-1 flex flex-col justify-center min-w-0">
-        <h4 className="font-bold text-[#131921] truncate mb-1">{ev.title}</h4>
+        <h4 className="font-bold text-[#131921] truncate mb-1 text-lg">{ev.title}</h4>
         <p className="text-xs text-gray-500 mb-2">
           {new Date(ev.start_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} 
           {ev.location && ` • ${ev.location}`}
