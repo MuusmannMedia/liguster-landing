@@ -14,6 +14,8 @@ type ThreadItem = {
   forening_id?: string;
   forening?: { navn: string };
   isDm?: boolean;
+  dmUserId?: string; // ID of the other user in DM
+  dmUserAvatar?: string | null; // Avatar of the other user in DM
 };
 
 type ChatMessage = {
@@ -84,6 +86,8 @@ function BeskederContent() {
       const myForeningIds = memberships?.map((m: any) => m.forening_id) || [];
 
       let initialThreads: ThreadItem[] = [];
+      
+      // Fetch Association Threads
       if (myForeningIds.length > 0) {
         const { data: threadData } = await supabase
           .from('forening_threads')
@@ -102,9 +106,61 @@ function BeskederContent() {
           }));
         }
       }
+
+      // Fetch Direct Message Threads
+      const { data: dmData } = await supabase
+        .from('messages')
+        .select('thread_id, sender_id, receiver_id, created_at')
+        .or(`sender_id.eq.${session.user.id},receiver_id.eq.${session.user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (dmData && dmData.length > 0) {
+        // Group by thread_id to get unique conversations
+        const uniqueThreads = new Map();
+        
+        // Collect all other user IDs to fetch their details
+        const otherUserIds = new Set<string>();
+
+        dmData.forEach((msg: any) => {
+            if (!uniqueThreads.has(msg.thread_id)) {
+                const otherId = msg.sender_id === session.user.id ? msg.receiver_id : msg.sender_id;
+                uniqueThreads.set(msg.thread_id, { ...msg, otherId });
+                otherUserIds.add(otherId);
+            }
+        });
+
+        // Fetch user details for DM partners
+        if (otherUserIds.size > 0) {
+            const { data: users } = await supabase
+                .from('users')
+                .select('id, name, avatar_url')
+                .in('id', Array.from(otherUserIds));
+
+            const userMap = new Map();
+            users?.forEach((u: any) => userMap.set(u.id, u));
+
+            // Create DM thread items
+            const dmThreads: ThreadItem[] = Array.from(uniqueThreads.values()).map((t: any) => {
+                const otherUser = userMap.get(t.otherId);
+                return {
+                    id: t.thread_id,
+                    title: otherUser?.name || 'Ukendt Bruger',
+                    created_at: t.created_at,
+                    isDm: true,
+                    dmUserId: t.otherId,
+                    dmUserAvatar: getAvatarUrl(otherUser?.avatar_url)
+                };
+            });
+             initialThreads = [...dmThreads, ...initialThreads];
+        }
+      }
+      
+      // Sort all threads by created_at desc
+      initialThreads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
       setThreads(initialThreads);
 
-      // DM Logic
+      // DM Logic for specific user param
       if (dmUserId) {
         const { data: targetUser } = await supabase.from('users').select('*').eq('id', dmUserId).single();
         if (targetUser) {
@@ -129,8 +185,15 @@ function BeskederContent() {
           setIsDirectMessage(false);
         }
       } else if (initialThreads.length > 0) {
-        setActiveThreadId(initialThreads[0].id);
-        setIsDirectMessage(false);
+        // Set first thread active
+        const first = initialThreads[0];
+        setActiveThreadId(first.id);
+        setIsDirectMessage(!!first.isDm);
+        if(first.isDm && first.dmUserId) {
+             // Need to set target user for DM context
+             const { data: tUser } = await supabase.from('users').select('*').eq('id', first.dmUserId).single();
+             if(tUser) setDmTargetUser(tUser);
+        }
       }
 
       setLoading(false);
@@ -153,7 +216,6 @@ function BeskederContent() {
         .eq('thread_id', activeThreadId)
         .order('created_at', { ascending: true });
       
-      // RETTELSE HER: Tilføjet "?? null" for at undgå undefined
       data = isDirectMessage 
         ? (res.data?.map((m: any) => ({ ...m, user_id: m.sender_id })) ?? null) 
         : res.data;
@@ -287,7 +349,8 @@ function BeskederContent() {
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               
-              {isDirectMessage && dmTargetUser && (
+              {/* If a new DM is started via URL param but not yet in the list, show it */}
+              {isDirectMessage && dmTargetUser && !threads.find(t => t.id === activeThreadId) && (
                 <button className="w-full text-left p-3 rounded-xl flex flex-col gap-1 bg-white shadow-sm ring-1 ring-[#131921] mb-2">
                   <span className="font-bold text-sm text-[#131921]">{dmTargetUser.name}</span>
                   <span className="text-[10px] text-blue-600 uppercase font-bold tracking-wide">Direkte Besked</span>
@@ -297,11 +360,22 @@ function BeskederContent() {
               {threads.map(t => (
                 <button 
                   key={t.id}
-                  onClick={() => { setActiveThreadId(t.id); setIsDirectMessage(false); }}
-                  className={`w-full text-left p-3 rounded-xl flex flex-col gap-1 transition-all ${activeThreadId === t.id && !isDirectMessage ? 'bg-white shadow-sm ring-1 ring-gray-100' : 'hover:bg-gray-100'}`}
+                  onClick={async () => { 
+                      setActiveThreadId(t.id); 
+                      setIsDirectMessage(!!t.isDm);
+                      if (t.isDm && t.dmUserId) {
+                          const { data: tUser } = await supabase.from('users').select('*').eq('id', t.dmUserId).single();
+                          if(tUser) setDmTargetUser(tUser);
+                      } else {
+                          setDmTargetUser(null);
+                      }
+                  }}
+                  className={`w-full text-left p-3 rounded-xl flex flex-col gap-1 transition-all ${activeThreadId === t.id ? 'bg-white shadow-sm ring-1 ring-gray-100' : 'hover:bg-gray-100'}`}
                 >
-                  <span className={`font-bold text-sm ${activeThreadId === t.id && !isDirectMessage ? 'text-[#131921]' : 'text-gray-700'}`}>{t.title}</span>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">{t.forening?.navn}</span>
+                  <span className={`font-bold text-sm ${activeThreadId === t.id ? 'text-[#131921]' : 'text-gray-700'}`}>{t.title}</span>
+                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">
+                      {t.isDm ? 'Direkte Besked' : t.forening?.navn}
+                  </span>
                 </button>
               ))}
             </div>
