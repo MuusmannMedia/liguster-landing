@@ -240,12 +240,12 @@ export default function ForeningPage() {
             {filtered.map(forening => (
               <div 
                 key={forening.id}
-                // RETTELSE: Naviger til detaljesiden
+                // Naviger til detaljesiden
                 onClick={() => router.push(`/forening/${forening.id}`)}
                 className="bg-white rounded-[24px] p-4 shadow-sm hover:shadow-lg transition-shadow cursor-pointer flex flex-col h-full transform hover:scale-[1.02] duration-200"
               >
-                {/* Billede eller Placeholder */}
-                <div className="w-full h-48 rounded-[18px] mb-3 overflow-hidden bg-[#E7EBF0] flex items-center justify-center relative">
+                {/* Billede eller Placeholder - NU 1:1 ASPECT RATIO */}
+                <div className="w-full aspect-square rounded-[18px] mb-3 overflow-hidden bg-[#E7EBF0] flex items-center justify-center relative">
                   {forening.billede_url ? (
                     <img src={forening.billede_url} alt={forening.navn} className="w-full h-full object-cover" />
                   ) : (
