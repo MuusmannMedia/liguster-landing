@@ -351,3 +351,18 @@ export default function LigusterLandingPage() {
             <p className="text-sm">&copy; 2025 Liguster Systemer ApS. Alle rettigheder forbeholdes.</p>
             
             <div className="flex gap-4 text-xs font-medium">
+              <Link href="/privatliv" className="text-gray-500 hover:text-white transition-colors">
+                Privatlivspolitik
+              </Link>
+              <span className="text-gray-700">•</span>
+              <Link href="/vilkaar" className="text-gray-500 hover:text-white transition-colors">
+                Brugervilkår
+              </Link>
+            </div>
+          </div>
+
+        </div>
+      </footer>
+    </div>
+  );
+}
