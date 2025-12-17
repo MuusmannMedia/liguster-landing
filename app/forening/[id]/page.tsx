@@ -42,7 +42,7 @@ const getDisplayName = (m: any) => {
   return email.includes("@") ? email.split("@")[0] : "Ukendt";
 };
 
-// NY HJÆLPER: Konverter avatar sti til URL
+// NY HJÆLPER: Konverter avatar sti til URL (Vigtigt!)
 const getAvatarUrl = (path: string | null | undefined) => {
   if (!path) return null;
   if (path.startsWith('http')) return path; 
