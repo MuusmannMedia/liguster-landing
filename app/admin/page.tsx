@@ -60,7 +60,7 @@ export default function AdminPage() {
   const fetchUsers = async () => {
     setLoading(true);
     // Vi henter brugere SAMT deres posts og foreninger (relationer)
-    // OBS: Dette kræver at foreign keys er sat korrekt op i Supabase
+    // OBS: Dette kræver at Foreign Keys er sat op i Supabase (Trin 2 i guiden)
     const { data, error } = await supabase
       .from('users')
       .select(`
@@ -72,7 +72,7 @@ export default function AdminPage() {
 
     if (error) {
       console.error("Fejl:", error);
-      alert("Kunne ikke hente data. Tjek konsollen.");
+      alert("Kunne ikke hente data. Tjek konsollen (F12) for detaljer.");
     } else {
       setUsers(data || []);
     }
