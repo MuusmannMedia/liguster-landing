@@ -2,12 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import Link from 'next/link'; // <--- Ny import til navigation
+import Link from 'next/link';
 
 export default function LigusterLandingPage() {
   // --- STATE ---
-  // (Login state er fjernet, da vi nu linker til en ny side)
-
+  
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
   const totalSlides = 10;
@@ -61,7 +60,7 @@ export default function LigusterLandingPage() {
   ];
 
   return (
-    <div className="font-sans text-gray-800 bg-gray-50 min-h-screen pb-20">
+    <div className="font-sans text-gray-800 bg-gray-50 min-h-screen pb-0">
       {/* FontAwesome */}
       <link
         rel="stylesheet"
@@ -117,7 +116,6 @@ export default function LigusterLandingPage() {
           </div>
 
           <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse">
-            {/* Ændret fra button til Link */}
             <Link
               href="/login"
               className="text-white bg-white/20 hover:bg-white/30 font-medium rounded-lg text-sm px-5 py-2.5 transition-all backdrop-blur-sm border border-white/40 flex items-center"
@@ -301,14 +299,25 @@ export default function LigusterLandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-950 text-gray-400 py-12 border-t border-gray-800 text-center mt-12">
+      <footer className="bg-gray-950 text-gray-400 py-12 border-t border-gray-800 text-center mt-auto">
         <div className="max-w-screen-xl mx-auto px-4">
+          
           <div className="flex justify-center mb-6">
             <div className="relative h-10 w-40 opacity-80">
               <Image src="/Liguster-logo-NEG.png" alt="Logo" fill className="object-contain" />
             </div>
           </div>
-          <p className="text-sm">&copy; 2025 Liguster. Alle rettigheder forbeholdes.</p>
+
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm">&copy; 2025 Liguster Systemer ApS. Alle rettigheder forbeholdes.</p>
+            
+            <div className="flex gap-4 text-xs font-medium">
+              <Link href="/privatliv" className="text-gray-500 hover:text-white transition-colors">
+                Privatlivspolitik
+              </Link>
+            </div>
+          </div>
+
         </div>
       </footer>
     </div>
