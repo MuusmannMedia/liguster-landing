@@ -7,29 +7,6 @@ import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
 import Image from 'next/image';
 
-// --- TYPER (Gør koden mere sikker og nemmere at arbejde med) ---
-type Post = {
-  id: string;
-  overskrift: string;
-  created_at: string;
-};
-
-type Forening = {
-  id: string;
-  navn: string;
-  created_at: string;
-};
-
-type UserData = {
-  id: string;
-  email: string;
-  name: string | null;
-  avatar_url: string | null;
-  created_at: string;
-  posts: Post[];
-  foreninger: Forening[];
-};
-
 // --- KONFIGURATION ---
 const ADMIN_EMAILS = ['kontakt@liguster-app.dk', 'morten.muusmann@gmail.com']; 
 
@@ -52,9 +29,13 @@ const fmtDate = (dateString: string) => {
 export default function AdminPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<UserData[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [inspectUser, setInspectUser] = useState<UserData | null>(null);
+  
+  // Modal state
+  const [inspectUser, setInspectUser] = useState<any | null>(null);
+  const [inspectLoading, setInspectLoading] = useState(false);
+  const [userContent, setUserContent] = useState<{posts: any[], foreninger: any[]}>({ posts: [], foreninger: [] });
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -67,7 +48,7 @@ export default function AdminPage() {
 
       const email = session.user.email || '';
       if (!ADMIN_EMAILS.includes(email)) {
-        alert("Adgang nægtet: Du har ikke administrator-rettigheder.");
+        alert("Adgang nægtet.");
         router.push('/'); 
         return;
       }
@@ -79,67 +60,66 @@ export default function AdminPage() {
     checkAccess();
   }, [router]);
 
+  // 1. HENT KUN BRUGERE (Simpelt og sikkert)
   const fetchUsers = async () => {
     setLoading(true);
-    // Hent brugere + relationer
-    // OBS: Hvis 'foreninger' fejler, tjek hvad relationen hedder i Supabase!
     const { data, error } = await supabase
       .from('users')
-      .select(`
-        *,
-        posts ( id, overskrift, created_at ),
-        foreninger ( id, navn, created_at )
-      `)
+      .select('*') // Vi henter IKKE relationer her for at undgå fejl
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error("Fejl ved hentning:", error);
-      alert(`Kunne ikke hente data: ${error.message}`);
+      console.error("Fejl:", error);
+      alert("Kunne ikke hente brugere: " + error.message);
     } else {
-      setUsers((data as any) || []);
+      setUsers(data || []);
     }
     setLoading(false);
+  };
+
+  // 2. HENT INDHOLD NÅR MAN KLIKKER (Separat kald)
+  const handleInspectClick = async (user: any) => {
+    setInspectUser(user);
+    setInspectLoading(true);
+    setUserContent({ posts: [], foreninger: [] }); // Nulstil
+
+    // Hent opslag
+    const { data: posts } = await supabase
+      .from('posts')
+      .select('id, overskrift, created_at')
+      .eq('user_id', user.id); // Vi søger manuelt i stedet for join
+
+    // Hent foreninger (Husk at tjekke om kolonnen hedder 'oprettet_af' eller 'user_id' i din database)
+    // Her gætter jeg på 'oprettet_af' baseret på tidligere kode, ret hvis det er forkert.
+    const { data: foreninger } = await supabase
+      .from('foreninger')
+      .select('id, navn, created_at')
+      .eq('oprettet_af', user.id); 
+
+    setUserContent({
+      posts: posts || [],
+      foreninger: foreninger || []
+    });
+    setInspectLoading(false);
   };
 
   // --- SLETTE FUNKTIONER ---
 
   const handleDeleteUser = async (userId: string) => {
-    if(!confirm("ER DU SIKKER? Dette sletter brugeren og ALT tilknyttet data permanent!")) return;
+    if(!confirm("ER DU SIKKER? Dette sletter brugeren permanent.")) return;
+    
+    // Slet brugeren
     const { error } = await supabase.from('users').delete().eq('id', userId);
-    if (error) alert("Fejl: " + error.message);
-    else {
+    
+    if (error) {
+      alert("Fejl ved sletning: " + error.message);
+    } else {
       setUsers(prev => prev.filter(u => u.id !== userId));
       setInspectUser(null);
     }
   };
 
-  const handleDeletePost = async (postId: string) => {
-    if(!confirm("Vil du slette dette opslag?")) return;
-    const { error } = await supabase.from('posts').delete().eq('id', postId);
-    if (error) alert("Fejl: " + error.message);
-    else {
-      setInspectUser((prev) => prev ? ({
-        ...prev,
-        posts: prev.posts.filter(p => p.id !== postId)
-      }) : null);
-      fetchUsers(); // Opdater hovedlisten for at rette tællere
-    }
-  };
-
-  const handleDeleteForening = async (foreningId: string) => {
-    if(!confirm("Vil du slette denne forening?")) return;
-    const { error } = await supabase.from('foreninger').delete().eq('id', foreningId);
-    if (error) alert("Fejl: " + error.message);
-    else {
-      setInspectUser((prev) => prev ? ({
-        ...prev,
-        foreninger: prev.foreninger.filter(f => f.id !== foreningId)
-      }) : null);
-      fetchUsers();
-    }
-  };
-
-  if (loading && users.length === 0) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center text-white">Indlæser admin panel...</div>;
+  if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center text-white">Indlæser brugere...</div>;
   if (!isAuthorized) return null;
 
   return (
@@ -152,7 +132,7 @@ export default function AdminPage() {
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-black text-[#131921]">Admin Oversigt</h1>
             <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-bold text-sm">
-              {users.length} Brugere
+              {users.length} Brugere fundet
             </div>
           </div>
 
@@ -163,16 +143,13 @@ export default function AdminPage() {
                   <th className="p-4">Bruger</th>
                   <th className="p-4">Email</th>
                   <th className="p-4">Oprettet</th>
-                  <th className="p-4">Indhold</th>
                   <th className="p-4 text-right">Handling</th>
                 </tr>
               </thead>
               <tbody className="text-sm text-gray-700">
                 {users.map((u) => {
                   const avatarSrc = getAvatarUrl(u.avatar_url) || `https://ui-avatars.com/api/?name=${u.name || '?'}&background=random`;
-                  const postCount = u.posts?.length || 0;
-                  const foreningCount = u.foreninger?.length || 0;
-
+                  
                   return (
                     <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                       <td className="p-4 flex items-center gap-3">
@@ -186,18 +163,9 @@ export default function AdminPage() {
                       </td>
                       <td className="p-4 text-gray-600">{u.email}</td>
                       <td className="p-4 whitespace-nowrap">{fmtDate(u.created_at)}</td>
-                      
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          {postCount > 0 && <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">{postCount} Opslag</span>}
-                          {foreningCount > 0 && <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">{foreningCount} Foren.</span>}
-                          {postCount === 0 && foreningCount === 0 && <span className="text-gray-400 text-xs">-</span>}
-                        </div>
-                      </td>
-
                       <td className="p-4 text-right space-x-2">
                         <button 
-                          onClick={() => setInspectUser(u)}
+                          onClick={() => handleInspectClick(u)}
                           className="bg-[#131921] text-white font-bold text-xs px-4 py-2 rounded-full hover:bg-gray-800 transition-colors"
                         >
                           INSPEKTÉR
@@ -225,11 +193,11 @@ export default function AdminPage() {
               ✕
             </button>
 
-            {/* Bruger Header */}
+            {/* Bruger Header i Modal */}
             <div className="flex items-center gap-4 border-b border-gray-100 pb-6 mb-6">
               <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden relative border-2 border-white shadow-md">
                 <Image 
-                  src={getAvatarUrl(inspectUser.avatar_url) || `https://ui-avatars.com/api/?name=${inspectUser.name || '?'}&background=random`} 
+                  src={getAvatarUrl(inspectUser.avatar_url) || `https://ui-avatars.com/api/?name=${inspectUser.name}&background=random`} 
                   alt="Avatar" 
                   fill 
                   className="object-cover" 
@@ -250,53 +218,47 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Opslag */}
-            <div className="mb-8">
-              <h3 className="text-lg font-bold text-[#131921] mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-pen-to-square"></i> Brugerens Opslag ({inspectUser.posts.length})
-              </h3>
-              <div className="bg-gray-50 rounded-xl p-2 space-y-2">
-                {inspectUser.posts.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Ingen opslag.</p>}
-                {inspectUser.posts.map(p => (
-                  <div key={p.id} className="bg-white p-3 rounded-lg shadow-sm flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-sm text-[#131921]">{p.overskrift || 'Uden overskrift'}</p>
-                      <p className="text-xs text-gray-400">{fmtDate(p.created_at)}</p>
-                    </div>
-                    <button 
-                      onClick={() => handleDeletePost(p.id)}
-                      className="text-red-500 hover:text-red-700 text-xs font-bold border border-red-100 bg-red-50 px-3 py-1 rounded-md"
-                    >
-                      Slet
-                    </button>
+            {inspectLoading ? (
+              <div className="text-center py-10 text-gray-500">Henter indhold...</div>
+            ) : (
+              <>
+                {/* --- LISTE OVER OPSLAG --- */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-bold text-[#131921] mb-3 flex items-center gap-2">
+                    <i className="fa-solid fa-pen-to-square"></i> Brugerens Opslag ({userContent.posts.length})
+                  </h3>
+                  <div className="bg-gray-50 rounded-xl p-2 space-y-2">
+                    {userContent.posts.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Ingen opslag fundet.</p>}
+                    {userContent.posts.map((p) => (
+                      <div key={p.id} className="bg-white p-3 rounded-lg shadow-sm flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-sm text-[#131921]">{p.overskrift || 'Uden overskrift'}</p>
+                          <p className="text-xs text-gray-400">{fmtDate(p.created_at)}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Foreninger */}
-            <div>
-              <h3 className="text-lg font-bold text-[#131921] mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-users"></i> Brugerens Foreninger ({inspectUser.foreninger.length})
-              </h3>
-              <div className="bg-gray-50 rounded-xl p-2 space-y-2">
-                {inspectUser.foreninger.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Ingen foreninger.</p>}
-                {inspectUser.foreninger.map(f => (
-                  <div key={f.id} className="bg-white p-3 rounded-lg shadow-sm flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-sm text-[#131921]">{f.navn || 'Uden navn'}</p>
-                      <p className="text-xs text-gray-400">{fmtDate(f.created_at)}</p>
-                    </div>
-                    <button 
-                      onClick={() => handleDeleteForening(f.id)}
-                      className="text-red-500 hover:text-red-700 text-xs font-bold border border-red-100 bg-red-50 px-3 py-1 rounded-md"
-                    >
-                      Slet
-                    </button>
+                {/* --- LISTE OVER FORENINGER --- */}
+                <div>
+                  <h3 className="text-lg font-bold text-[#131921] mb-3 flex items-center gap-2">
+                    <i className="fa-solid fa-users"></i> Brugerens Foreninger ({userContent.foreninger.length})
+                  </h3>
+                  <div className="bg-gray-50 rounded-xl p-2 space-y-2">
+                    {userContent.foreninger.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Ingen foreninger fundet.</p>}
+                    {userContent.foreninger.map((f) => (
+                      <div key={f.id} className="bg-white p-3 rounded-lg shadow-sm flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-sm text-[#131921]">{f.navn || 'Uden navn'}</p>
+                          <p className="text-xs text-gray-400">{fmtDate(f.created_at)}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
 
           </div>
         </div>
