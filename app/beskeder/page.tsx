@@ -63,7 +63,8 @@ function BeskederContent() {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // ÆNDRING 1: Ref til containeren i stedet for bunden
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // 1. Initialisering
   useEffect(() => {
@@ -115,10 +116,7 @@ function BeskederContent() {
         .order('created_at', { ascending: false });
 
       if (dmData && dmData.length > 0) {
-        // Group by thread_id to get unique conversations
         const uniqueThreads = new Map();
-        
-        // Collect all other user IDs to fetch their details
         const otherUserIds = new Set<string>();
 
         dmData.forEach((msg: any) => {
@@ -129,7 +127,6 @@ function BeskederContent() {
             }
         });
 
-        // Fetch user details for DM partners
         if (otherUserIds.size > 0) {
             const { data: users } = await supabase
                 .from('users')
@@ -139,7 +136,6 @@ function BeskederContent() {
             const userMap = new Map();
             users?.forEach((u: any) => userMap.set(u.id, u));
 
-            // Create DM thread items
             const dmThreads: ThreadItem[] = Array.from(uniqueThreads.values()).map((t: any) => {
                 const otherUser = userMap.get(t.otherId);
                 return {
@@ -155,7 +151,6 @@ function BeskederContent() {
         }
       }
       
-      // Sort all threads by created_at desc
       initialThreads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setThreads(initialThreads);
@@ -185,12 +180,10 @@ function BeskederContent() {
           setIsDirectMessage(false);
         }
       } else if (initialThreads.length > 0) {
-        // Set first thread active
         const first = initialThreads[0];
         setActiveThreadId(first.id);
         setIsDirectMessage(!!first.isDm);
         if(first.isDm && first.dmUserId) {
-             // Need to set target user for DM context
              const { data: tUser } = await supabase.from('users').select('*').eq('id', first.dmUserId).single();
              if(tUser) setDmTargetUser(tUser);
         }
@@ -205,7 +198,6 @@ function BeskederContent() {
   useEffect(() => {
     if (!activeThreadId) return;
     
-    // Initial fetch
     const fetchMessages = async () => {
       let data: any[] | null = null;
       const table = isDirectMessage ? 'messages' : 'forening_messages';
@@ -241,7 +233,6 @@ function BeskederContent() {
 
     fetchMessages();
 
-    // REALTIME SUBSCRIPTION
     const table = isDirectMessage ? 'messages' : 'forening_messages';
     const channel = supabase
       .channel(`chat:${activeThreadId}`)
@@ -274,8 +265,19 @@ function BeskederContent() {
 
   }, [activeThreadId, isDirectMessage]);
 
+  // ÆNDRING 2: Opdateret scroll funktion
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Vi bruger setTimeout for at sikre DOM'en er opdateret
+    setTimeout(() => {
+      if (scrollRef.current) {
+        const { scrollHeight, clientHeight } = scrollRef.current;
+        // Scroll kun containeren, ikke vinduet
+        scrollRef.current.scrollTo({
+          top: scrollHeight - clientHeight,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
   };
 
   const handleSend = async () => {
@@ -283,7 +285,6 @@ function BeskederContent() {
     const text = newMessage.trim();
     setNewMessage("");
 
-    // Optimistisk update
     const tempId = "temp-" + Date.now();
     const optimisticMsg = { 
       id: tempId,
@@ -349,7 +350,6 @@ function BeskederContent() {
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               
-              {/* If a new DM is started via URL param but not yet in the list, show it */}
               {isDirectMessage && dmTargetUser && !threads.find(t => t.id === activeThreadId) && (
                 <button className="w-full text-left p-3 rounded-xl flex flex-col gap-1 bg-white shadow-sm ring-1 ring-[#131921] mb-2">
                   <span className="font-bold text-sm text-[#131921]">{dmTargetUser.name}</span>
@@ -393,7 +393,8 @@ function BeskederContent() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F5F7FA]">
+                {/* ÆNDRING 3: Ref sat på container-div'en her */}
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F5F7FA]">
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-60">
                       <i className="fa-solid fa-comments text-4xl mb-2"></i>
@@ -422,7 +423,7 @@ function BeskederContent() {
                       );
                     })
                   )}
-                  <div ref={messagesEndRef} />
+                  {/* ÆNDRING 4: Fjernet empty div ref */}
                 </div>
 
                 <div className="p-4 bg-white border-t border-gray-100">
