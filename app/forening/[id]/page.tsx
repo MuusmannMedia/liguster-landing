@@ -65,17 +65,14 @@ const buildMonthGrid = (base: Date) => {
   const daysInMonth = last.getDate();
   const cells: Date[] = [];
   
-  // Fyld op med dage fra forrige måned
   for (let i = 0; i < firstWeekday; i++) {
     const d = new Date(first);
     d.setDate(first.getDate() - (firstWeekday - i));
     cells.push(d);
   }
-  // Dage i denne måned
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push(new Date(base.getFullYear(), base.getMonth(), d));
   }
-  // Fyld op til 42 celler (6 uger)
   while (cells.length < 42) {
     const lastCell = cells[cells.length - 1];
     const next = new Date(lastCell);
@@ -83,7 +80,6 @@ const buildMonthGrid = (base: Date) => {
     cells.push(next);
   }
   
-  // Opdel i uger
   const weeks: Date[][] = [];
   for (let i = 0; i < 6; i++) weeks.push(cells.slice(i * 7, i * 7 + 7));
   return weeks;
@@ -129,7 +125,6 @@ export default function ForeningDetaljePage() {
     init();
   }, [id]);
 
-  // Hent kalender events når måned skifter
   useEffect(() => {
     fetchCalendarEvents(monthCursor);
   }, [id, monthCursor]);
@@ -160,7 +155,6 @@ export default function ForeningDetaljePage() {
   const fetchCalendarEvents = async (base: Date) => {
     const first = startOfMonth(base);
     const last = endOfMonth(base);
-    // Hent lidt ekstra buffer
     const bufferStart = new Date(first); bufferStart.setDate(first.getDate() - 7);
     const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
 
@@ -183,11 +177,31 @@ export default function ForeningDetaljePage() {
     }
   };
 
+  // NY FUNKTION: Håndter anmodning om medlemskab
+  const handleJoin = async () => {
+    if (!userId) return alert("Du skal være logget ind for at blive medlem.");
+
+    const { error } = await supabase
+      .from('foreningsmedlemmer')
+      .insert([{ forening_id: id, user_id: userId, rolle: 'medlem', status: 'pending' }]);
+
+    if (error) {
+      alert('Fejl ved tilmelding: ' + error.message);
+    } else {
+      alert('Din anmodning er sendt! Du afventer nu godkendelse.');
+      // Opdater listen med det samme
+      fetchMedlemmer(); 
+    }
+  };
+
+  // Beregn status
   const approved = medlemmer.filter(m => m.status === "approved");
+  const pending = medlemmer.filter(m => m.status === "pending");
+  
   const isMember = approved.some(m => m.user_id === userId);
+  const isPending = pending.some(m => m.user_id === userId);
   const isOwner = forening?.oprettet_af === userId;
 
-  // Map datoer til events for hurtigt opslag
   const eventsByDate = useMemo(() => {
     const map = new Map<string, Event[]>();
     calendarEvents.forEach(e => {
@@ -229,10 +243,20 @@ export default function ForeningDetaljePage() {
             {forening.beskrivelse}
           </p>
 
+          {/* Knappen "Bliv medlem" eller status besked */}
           {!isMember && (
-            <button className="w-full py-3 bg-[#131921] text-white rounded-full font-bold shadow-md hover:bg-gray-900 transition-colors">
-              Bliv medlem
-            </button>
+            isPending ? (
+               <div className="w-full py-3 bg-gray-400 text-white rounded-full font-bold text-center cursor-default">
+                 Afventer godkendelse...
+               </div>
+            ) : (
+              <button 
+                onClick={handleJoin}
+                className="w-full py-3 bg-[#131921] text-white rounded-full font-bold shadow-md hover:bg-gray-900 transition-colors"
+              >
+                Bliv medlem
+              </button>
+            )
           )}
         </div>
 
@@ -312,7 +336,7 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* --- KALENDER SEKTION (NY!) --- */}
+        {/* --- KALENDER SEKTION --- */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
             KALENDER
