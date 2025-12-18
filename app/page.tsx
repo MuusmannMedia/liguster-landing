@@ -216,7 +216,7 @@ export default function LigusterLandingPage() {
         <div className="max-w-5xl mx-auto px-4">
           <div className="bg-liguster-gradient rounded-[2.5rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
             
-            {/* BACKGROUND LOGO REMOVED HERE */}
+            {/* BACKGROUND LOGO REMOVED */}
 
             <div className="relative z-10 flex flex-col items-center">
               {/* Logo i toppen - NU ENDNU STØRRE */}
@@ -233,8 +233,9 @@ export default function LigusterLandingPage() {
                 Det er gratis, enkelt og tager kun et øjeblik.
               </p>
 
+              {/* RETTET LINK TIL /opret HER */}
               <Link 
-                href="/hemmelig-opret" 
+                href="/opret" 
                 className="bg-white text-[#0b2b52] font-black text-lg px-10 py-4 rounded-full shadow-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 inline-flex items-center gap-2"
               >
                 <i className="fa-solid fa-user-plus"></i>
