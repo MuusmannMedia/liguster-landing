@@ -140,9 +140,13 @@ export default function LigusterLandingPage() {
             </h1>
 
             <p className="max-w-2xl mb-6 font-light text-gray-200 lg:mb-8 md:text-lg lg:text-xl">
-              Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med fokus på tryghed,
-              enkelhed og en grønnere hverdag.
-            </p>
+  Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med fokus på tryghed,
+  enkelhed og en grønnere hverdag.
+  <br className="hidden md:block" />
+  <span className="block mt-2 font-normal text-white">
+    🚀 Apps til iPhone og Android er på vej og lander snart!
+  </span>
+</p>
 
             <div className="flex flex-col md:flex-row gap-4">
               <a
