@@ -280,8 +280,8 @@ export default function ForeningDetaljePage() {
       alert("Fejl: " + error.message);
     } else {
       alert("Brugeren er nu administrator.");
-      fetchMedlemmer(); // Opdater listen
-      setSelectedMember(null); // Luk modal eller opdater den valgte
+      fetchMedlemmer(); 
+      setSelectedMember(null); 
       setShowMembers(false);
     }
   };
@@ -294,7 +294,7 @@ export default function ForeningDetaljePage() {
   const isMember = myMembership?.status === "approved";
   const isPending = myMembership?.status === "pending";
   const isOwner = forening?.oprettet_af === userId;
-  const isMeAdmin = isOwner || myMembership?.rolle === 'admin'; // Tjek om jeg er admin
+  const isMeAdmin = isOwner || myMembership?.rolle === 'admin'; 
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, Event[]>();
@@ -552,7 +552,7 @@ export default function ForeningDetaljePage() {
                 </div>
                 <h3 className="text-xl font-bold">{getDisplayName(selectedMember)}</h3>
                 <p className="text-[10px] uppercase font-bold text-[#131921] mb-1">{selectedMember.rolle || 'MEDLEM'}</p>
-                <p className="text-sm text-gray-500 mb-6">{selectedMember.users?.email}</p>
+                <p className="text-sm text-gray-500 mb-6 font-bold">{selectedMember.users?.email}</p> 
                 
                 <button 
                   onClick={() => router.push(`/beskeder?dmUser=${selectedMember.user_id}`)}
