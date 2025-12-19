@@ -96,7 +96,6 @@ export default function ForeningDetaljePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   
-  // Ref til fil-input
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Previews Data
@@ -183,7 +182,6 @@ export default function ForeningDetaljePage() {
 
   // --- HANDLINGS-FUNKTIONER ---
 
-  // 1. Bliv medlem
   const handleJoin = async () => {
     if (!userId) return alert("Du skal være logget ind for at blive medlem.");
     const { error } = await supabase
@@ -198,7 +196,6 @@ export default function ForeningDetaljePage() {
     }
   };
 
-  // 2. Forlad forening
   const handleLeave = async () => {
     if (!confirm("Er du sikker på, at du vil melde dig ud af foreningen?")) return;
     
@@ -212,11 +209,10 @@ export default function ForeningDetaljePage() {
       alert("Fejl: " + error.message);
     } else {
       alert("Du har forladt foreningen.");
-      fetchMedlemmer(); // Opdater UI
+      fetchMedlemmer(); 
     }
   };
 
-  // 3. Upload billede
   const triggerImageSelect = () => {
     fileInputRef.current?.click();
   };
@@ -224,13 +220,11 @@ export default function ForeningDetaljePage() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    
     setUploading(true);
     const fileName = `${id}_${Date.now()}`;
     
-    // Upload til Storage
     const { data, error: uploadError } = await supabase.storage
-      .from('foreningsbilleder') // Sørg for at denne bucket findes og er public
+      .from('foreningsbilleder') 
       .upload(fileName, file);
 
     if (uploadError) {
@@ -239,12 +233,10 @@ export default function ForeningDetaljePage() {
       return;
     }
 
-    // Hent public URL
     const { data: publicUrlData } = supabase.storage
       .from('foreningsbilleder')
       .getPublicUrl(fileName);
 
-    // Opdater forening i DB
     const { error: dbError } = await supabase
       .from('foreninger')
       .update({ billede_url: publicUrlData.publicUrl })
@@ -253,13 +245,11 @@ export default function ForeningDetaljePage() {
     if (dbError) {
       alert("Fejl ved opdatering af database: " + dbError.message);
     } else {
-      // Opdater visning
       fetchForening();
     }
     setUploading(false);
   };
 
-  // 4. Slet forening
   const handleDeleteForening = async () => {
     if (!confirm("ADVARSEL: Er du sikker på, at du vil slette denne forening permanent? Dette kan ikke fortrydes.")) return;
     
@@ -272,7 +262,27 @@ export default function ForeningDetaljePage() {
       alert("Kunne ikke slette forening: " + error.message);
     } else {
       alert("Foreningen er slettet.");
-      router.push('/opslag'); // Eller hvor du vil sende dem hen
+      router.push('/opslag'); 
+    }
+  };
+
+  // NY FUNKTION: Gør til admin
+  const promoteToAdmin = async (targetUserId: string) => {
+    if (!confirm("Er du sikker på, at du vil give denne person administrator-rettigheder?")) return;
+
+    const { error } = await supabase
+      .from('foreningsmedlemmer')
+      .update({ rolle: 'admin' })
+      .eq('forening_id', id)
+      .eq('user_id', targetUserId);
+
+    if (error) {
+      alert("Fejl: " + error.message);
+    } else {
+      alert("Brugeren er nu administrator.");
+      fetchMedlemmer(); // Opdater listen
+      setSelectedMember(null); // Luk modal eller opdater den valgte
+      setShowMembers(false);
     }
   };
 
@@ -280,9 +290,11 @@ export default function ForeningDetaljePage() {
   const approved = medlemmer.filter(m => m.status === "approved");
   const pending = medlemmer.filter(m => m.status === "pending");
   
-  const isMember = approved.some(m => m.user_id === userId);
-  const isPending = pending.some(m => m.user_id === userId);
+  const myMembership = medlemmer.find(m => m.user_id === userId);
+  const isMember = myMembership?.status === "approved";
+  const isPending = myMembership?.status === "pending";
   const isOwner = forening?.oprettet_af === userId;
+  const isMeAdmin = isOwner || myMembership?.rolle === 'admin'; // Tjek om jeg er admin
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, Event[]>();
@@ -308,7 +320,6 @@ export default function ForeningDetaljePage() {
 
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
         
-        {/* Skjult input til fil-upload */}
         <input 
           type="file" 
           accept="image/*" 
@@ -492,7 +503,7 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* --- BUND HANDLINGER (NU AKTIVE) --- */}
+        {/* --- BUND HANDLINGER --- */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm space-y-3 mb-10">
            {isMember && (
              <button 
@@ -549,6 +560,16 @@ export default function ForeningDetaljePage() {
                 >
                   Skriv til medlem
                 </button>
+
+                {/* VIS KUN HVIS: Jeg er admin, og den valgte person IKKE er admin */}
+                {isMeAdmin && selectedMember.rolle !== 'admin' && (
+                  <button 
+                    onClick={() => promoteToAdmin(selectedMember.user_id)}
+                    className="w-full py-3 bg-blue-100 text-blue-700 rounded-full font-bold mb-3 hover:bg-blue-200 transition-colors"
+                  >
+                    Gør til admin
+                  </button>
+                )}
 
                 <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 hover:text-black mt-2">← Tilbage til liste</button>
               </div>
