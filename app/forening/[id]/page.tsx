@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
@@ -61,7 +61,7 @@ const toKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 const buildMonthGrid = (base: Date) => {
   const first = startOfMonth(base);
   const last = endOfMonth(base);
-  const firstWeekday = (first.getDay() + 6) % 7; // Mandag = 0
+  const firstWeekday = (first.getDay() + 6) % 7; 
   const daysInMonth = last.getDate();
   const cells: Date[] = [];
   
@@ -94,7 +94,11 @@ export default function ForeningDetaljePage() {
   const [forening, setForening] = useState<Forening | null>(null);
   const [medlemmer, setMedlemmer] = useState<Medlem[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   
+  // Ref til fil-input
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Previews Data
   const [threads, setThreads] = useState<Thread[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -177,10 +181,11 @@ export default function ForeningDetaljePage() {
     }
   };
 
-  // NY FUNKTION: Håndter anmodning om medlemskab
+  // --- HANDLINGS-FUNKTIONER ---
+
+  // 1. Bliv medlem
   const handleJoin = async () => {
     if (!userId) return alert("Du skal være logget ind for at blive medlem.");
-
     const { error } = await supabase
       .from('foreningsmedlemmer')
       .insert([{ forening_id: id, user_id: userId, rolle: 'medlem', status: 'pending' }]);
@@ -189,8 +194,85 @@ export default function ForeningDetaljePage() {
       alert('Fejl ved tilmelding: ' + error.message);
     } else {
       alert('Din anmodning er sendt! Du afventer nu godkendelse.');
-      // Opdater listen med det samme
       fetchMedlemmer(); 
+    }
+  };
+
+  // 2. Forlad forening
+  const handleLeave = async () => {
+    if (!confirm("Er du sikker på, at du vil melde dig ud af foreningen?")) return;
+    
+    const { error } = await supabase
+      .from('foreningsmedlemmer')
+      .delete()
+      .eq('forening_id', id)
+      .eq('user_id', userId);
+
+    if (error) {
+      alert("Fejl: " + error.message);
+    } else {
+      alert("Du har forladt foreningen.");
+      fetchMedlemmer(); // Opdater UI
+    }
+  };
+
+  // 3. Upload billede
+  const triggerImageSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    setUploading(true);
+    const fileName = `${id}_${Date.now()}`;
+    
+    // Upload til Storage
+    const { data, error: uploadError } = await supabase.storage
+      .from('foreningsbilleder') // Sørg for at denne bucket findes og er public
+      .upload(fileName, file);
+
+    if (uploadError) {
+      alert("Kunne ikke uploade billede: " + uploadError.message);
+      setUploading(false);
+      return;
+    }
+
+    // Hent public URL
+    const { data: publicUrlData } = supabase.storage
+      .from('foreningsbilleder')
+      .getPublicUrl(fileName);
+
+    // Opdater forening i DB
+    const { error: dbError } = await supabase
+      .from('foreninger')
+      .update({ billede_url: publicUrlData.publicUrl })
+      .eq('id', id);
+
+    if (dbError) {
+      alert("Fejl ved opdatering af database: " + dbError.message);
+    } else {
+      // Opdater visning
+      fetchForening();
+    }
+    setUploading(false);
+  };
+
+  // 4. Slet forening
+  const handleDeleteForening = async () => {
+    if (!confirm("ADVARSEL: Er du sikker på, at du vil slette denne forening permanent? Dette kan ikke fortrydes.")) return;
+    
+    const { error } = await supabase
+      .from('foreninger')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert("Kunne ikke slette forening: " + error.message);
+    } else {
+      alert("Foreningen er slettet.");
+      router.push('/opslag'); // Eller hvor du vil sende dem hen
     }
   };
 
@@ -226,6 +308,15 @@ export default function ForeningDetaljePage() {
 
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
         
+        {/* Skjult input til fil-upload */}
+        <input 
+          type="file" 
+          accept="image/*" 
+          ref={fileInputRef} 
+          className="hidden" 
+          onChange={handleImageUpload}
+        />
+
         {/* --- FORENING INFO KORT --- */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100 mb-4">
@@ -243,7 +334,6 @@ export default function ForeningDetaljePage() {
             {forening.beskrivelse}
           </p>
 
-          {/* Knappen "Bliv medlem" eller status besked */}
           {!isMember && (
             isPending ? (
                <div className="w-full py-3 bg-gray-400 text-white rounded-full font-bold text-center cursor-default">
@@ -402,13 +492,32 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* --- BUND HANDLINGER --- */}
+        {/* --- BUND HANDLINGER (NU AKTIVE) --- */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm space-y-3 mb-10">
-           {isMember && <button className="w-full py-3 bg-gray-200 text-gray-600 rounded-full font-bold hover:bg-gray-300">Afslut medlemskab</button>}
+           {isMember && (
+             <button 
+               onClick={handleLeave}
+               className="w-full py-3 bg-gray-200 text-gray-600 rounded-full font-bold hover:bg-gray-300 transition-colors"
+             >
+               Afslut medlemskab
+             </button>
+           )}
            {isOwner && (
              <>
-               <button className="w-full py-3 bg-[#131921] text-white rounded-full font-bold hover:bg-gray-900">Upload foreningsbillede</button>
-               <button className="w-full py-3 bg-red-100 text-red-600 rounded-full font-bold hover:bg-red-200">Slet forening</button>
+               <button 
+                 onClick={triggerImageSelect}
+                 disabled={uploading}
+                 className="w-full py-3 bg-[#131921] text-white rounded-full font-bold hover:bg-gray-900 transition-colors disabled:opacity-50"
+               >
+                 {uploading ? "Uploader..." : "Upload foreningsbillede"}
+               </button>
+               
+               <button 
+                 onClick={handleDeleteForening}
+                 className="w-full py-3 bg-red-100 text-red-600 rounded-full font-bold hover:bg-red-200 transition-colors"
+               >
+                 Slet forening
+               </button>
              </>
            )}
         </div>
