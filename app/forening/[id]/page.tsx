@@ -550,7 +550,7 @@ export default function ForeningDetaljePage() {
                     return src ? <img src={src} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-200 flex items-center justify-center text-4xl">?</div>;
                   })()}
                 </div>
-                <h3 className="text-xl font-bold">{getDisplayName(selectedMember)}</h3>
+                <h3 className="text-xl font-bold text-[#131921]">{getDisplayName(selectedMember)}</h3>
                 <p className="text-[10px] uppercase font-bold text-[#131921] mb-1">{selectedMember.rolle || 'MEDLEM'}</p>
                 <p className="text-sm text-gray-500 mb-6 font-bold">{selectedMember.users?.email}</p> 
                 
