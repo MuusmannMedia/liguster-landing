@@ -12,6 +12,7 @@ import PostDetailModal from '../../components/PostDetailModal';
 type Post = {
   id: string;
   created_at: string;
+  expires_at: string; // Tilføjet expires_at til typen
   overskrift: string;
   text: string;
   image_url?: string;
@@ -40,7 +41,7 @@ export default function OpslagPage() {
   const [radius, setRadius] = useState(50); // Standard 50 km
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
-  const [isRadiusMenuOpen, setIsRadiusMenuOpen] = useState(false); // <--- NY STATE
+  const [isRadiusMenuOpen, setIsRadiusMenuOpen] = useState(false); 
 
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -66,9 +67,12 @@ export default function OpslagPage() {
 
   const fetchPosts = async () => {
     try {
+      const now = new Date().toISOString(); // Hent nuværende tidspunkt
+
       const { data, error } = await supabase
         .from('posts')
         .select('*')
+        .gt('expires_at', now) // FILTRER: expires_at SKAL være større end NU (dvs. i fremtiden)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
