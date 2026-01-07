@@ -142,27 +142,31 @@ export default function MigPage() {
     if (!error) setProfile({ ...profile, avatar_url: null });
   };
 
+  // --- RETTET FUNKTION: Bruger nu din interne API route ---
   const handleDeleteAccount = async () => {
     if (!confirm("ER DU SIKKER? Dette sletter din konto og alt data permanent!")) return;
     
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    // Vi genbruger 'saving' state for at vise feedback (valgfrit)
+    setSaving(true);
 
     try {
-      const res = await fetch('https://gizskyfynvyvhnaqcyax.functions.supabase.co/delete-account', {
-        method: 'POST',
-        headers: { 
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json' 
-        },
+      // Kalder /api/auth/delete-user i stedet for den eksterne URL
+      const res = await fetch('/api/auth/delete-user', {
+        method: 'DELETE',
       });
       
-      if (!res.ok) throw new Error("Kunne ikke slette konto");
+      if (!res.ok) {
+        // Forsøg at hente fejlbesked fra API'et
+        const data = await res.json();
+        throw new Error(data.error || "Kunne ikke slette konto");
+      }
       
+      // Log ud og send væk
       await supabase.auth.signOut();
       router.push('/login');
     } catch (err: any) {
       alert("Fejl: " + err.message);
+      setSaving(false);
     }
   };
 
@@ -182,7 +186,6 @@ export default function MigPage() {
         <div className="bg-white w-full rounded-[30px] p-8 shadow-xl flex flex-col items-center">
           
           {/* Avatar - NU KVADRATISK (1:1) og FULD BREDDE */}
-          {/* ÆNDRING: Fjernet max-w-[300px] så den fylder bredden af containeren */}
           <div className="relative w-full aspect-square rounded-[24px] overflow-hidden mb-6 bg-gray-100 shadow-inner">
             <Image 
               src={avatarUrl} 
@@ -253,11 +256,17 @@ export default function MigPage() {
               LOG UD
             </button>
 
+            {/* --- RETTET KNAP: type="button" og e.preventDefault() for at undgå Brave-fejl --- */}
             <button 
-              onClick={handleDeleteAccount}
+              type="button" 
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteAccount();
+              }}
+              disabled={saving}
               className="py-3 bg-[#131921] text-white rounded-full font-bold text-xs hover:bg-gray-900 transition-colors"
             >
-              SLET KONTO
+              {saving ? "SLETTER..." : "SLET KONTO"}
             </button>
           </div>
 
