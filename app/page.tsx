@@ -350,7 +350,7 @@ export default function LigusterLandingPage() {
           </div>
 
           <div className="flex flex-col items-center gap-3">
-            <p className="text-sm">&copy; 2025 Liguster Systemer ApS. Alle rettigheder forbeholdes.</p>
+            <p className="text-sm">&copy; 2026 Liguster Systemer. Alle rettigheder forbeholdes.</p>
             
             <div className="flex gap-4 text-xs font-medium">
               <Link href="/privatliv" className="text-gray-500 hover:text-white transition-colors">
