@@ -9,12 +9,54 @@ type Props = {
   onPostCreated: () => void;
 };
 
-// Konstante kategorier (samme som på forsiden)
+// Skal matche navnet på din bucket fra appen
+const BUCKET_NAME = 'opslagsbilleder';
+
 const KATEGORIER = [
   'Værktøj', 'Arbejde tilbydes', 'Affald', 'Mindre ting', 
   'Større ting', 'Hjælp søges', 'Hjælp tilbydes', 
   'Byttes', 'Udlejning', 'Sælges', 'Andet'
 ];
+
+// --- HJÆLPEFUNKTION: Robust Billed-komprimering ---
+async function resizeImage(file: File, maxWidth = 1200, quality = 0.8): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.src = objectUrl;
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const elem = document.createElement('canvas');
+      const scaleFactor = Math.min(1, maxWidth / img.width);
+      
+      elem.width = img.width * scaleFactor;
+      elem.height = img.height * scaleFactor;
+      
+      const ctx = elem.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Browseren kunne ikke behandle billedet'));
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0, elem.width, elem.height);
+      
+      ctx.canvas.toBlob((blob) => {
+        if (blob) {
+          console.log(`Billede komprimeret: Fra ${(file.size / 1024).toFixed(0)}KB til ${(blob.size / 1024).toFixed(0)}KB`);
+          resolve(blob);
+        } else {
+          reject(new Error('Fejl ved generering af blob'));
+        }
+      }, 'image/jpeg', quality);
+    };
+
+    img.onerror = (error) => {
+      URL.revokeObjectURL(objectUrl);
+      reject(error);
+    };
+  });
+}
 
 export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Props) {
   const [loading, setLoading] = useState(false);
@@ -24,33 +66,22 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
   const [text, setText] = useState('');
   const [kategori, setKategori] = useState(KATEGORIER[0]);
   const [omraade, setOmraade] = useState('');
-  
-  // Billeder
-  const [images, setImages] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  
-  // NYT: Lokation
+  const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // NYT: Lokation States
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-  // Nulstil alt når modal åbner
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Nulstil og hent GPS når modal åbner
   useEffect(() => {
     if (isOpen) {
-      setOverskrift('');
-      setText('');
-      setKategori(KATEGORIER[0]);
-      setOmraade('');
-      setImages([]);
-      setPreviewUrls([]);
-      setLocation(null);
-      setLocationStatus('idle');
-      
-      // Prøv automatisk at hente lokation når modal åbner
       getLocation();
     }
   }, [isOpen]);
 
-  // Funktion til at hente GPS
+  // NYT: GPS Funktion
   const getLocation = () => {
     if (!('geolocation' in navigator)) {
       setLocationStatus('error');
@@ -66,8 +97,6 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
           lng: position.coords.longitude
         });
         setLocationStatus('success');
-        // Vi kan evt. prøve at udfylde "Område" automatisk her, men det kræver et API-kald (Reverse Geocoding),
-        // så vi holder det simpelt og lader brugeren skrive bynavn selv indtil videre.
       },
       (error) => {
         console.warn("Kunne ikke hente position:", error);
@@ -76,219 +105,241 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
     );
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files);
-      setImages((prev) => [...prev, ...newFiles]);
-      
-      // Lav previews
-      const newPreviews = newFiles.map(file => URL.createObjectURL(file));
-      setPreviewUrls((prev) => [...prev, ...newPreviews]);
-    }
-  };
+  if (!isOpen) return null;
 
-  const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
-    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (!overskrift || !text) {
+      alert('Udfyld venligst overskrift og tekst');
+      return;
+    }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Ingen bruger fundet');
+      setLoading(true);
 
-      // 1. Upload billeder (hvis nogen)
-      const imageUrls: string[] = [];
-      
-      for (const file of images) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${user.id}/${fileName}`;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Ingen bruger logget ind');
+      const userId = session.user.id;
+
+      let imageUrl = null;
+
+      if (imageFile) {
+        console.log('Starter billedbehandling...');
+        // 1. Komprimer
+        const compressedBlob = await resizeImage(imageFile);
+        
+        // 2. Upload
+        const fileName = `post_${Date.now()}_${Math.floor(Math.random() * 1000)}.jpg`;
+        const filePath = `posts/${userId}/${fileName}`;
+
+        console.log('Uploader til:', BUCKET_NAME, filePath);
 
         const { error: uploadError } = await supabase.storage
-          .from('post-images')
-          .upload(filePath, file);
+          .from(BUCKET_NAME)
+          .upload(filePath, compressedBlob, {
+            contentType: 'image/jpeg',
+            upsert: true
+          });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error('Upload fejl:', uploadError);
+          throw uploadError;
+        }
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('post-images')
+        // 3. Hent public URL
+        const { data: urlData } = supabase.storage
+          .from(BUCKET_NAME)
           .getPublicUrl(filePath);
-
-        imageUrls.push(publicUrl);
+        
+        imageUrl = urlData.publicUrl;
+        console.log('Billede uploaded. URL:', imageUrl);
+      } else {
+        console.log('Intet billede valgt.');
       }
 
-      // 2. Opret opslag i databasen
-      const { error } = await supabase
+      // 4. Gem i databasen (Nu med GPS!)
+      const postData = {
+        overskrift,
+        text,
+        kategori,
+        omraade,
+        image_url: imageUrl,      
+        images: imageUrl ? [imageUrl] : null, 
+        user_id: userId,
+        // NYT: Koordinater
+        latitude: location?.lat || null,
+        longitude: location?.lng || null,
+        // Sikrer at opslaget ikke udløber med det samme (sætter til 30 dage)
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+
+      console.log('Gemmer post data:', postData);
+
+      const { error: dbError } = await supabase
         .from('posts')
-        .insert({
-          user_id: user.id,
-          overskrift,
-          text,
-          kategori,
-          omraade, // Bynavn som tekst
-          images: imageUrls,
-          image_url: imageUrls[0] || null, // Bagudkompatibilitet
-          // NYT: Gem GPS koordinater
-          latitude: location?.lat || null,
-          longitude: location?.lng || null,
-          // Sæt udløbsdato til 30 dage fra nu (standard)
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        });
+        .insert(postData);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
 
+      console.log('Opslag oprettet succesfuldt!');
+
+      // Nulstil og luk
+      setOverskrift('');
+      setText('');
+      setOmraade('');
+      setImageFile(null);
+      setLocation(null);
+      setLocationStatus('idle');
+      
       onPostCreated();
       onClose();
 
-    } catch (error) {
-      console.error('Fejl ved oprettelse:', error);
-      alert('Der skete en fejl. Prøv igen.');
+    } catch (error: any) {
+      console.error('CRITICAL ERROR:', error);
+      alert('Fejl ved oprettelse: ' + (error.message || 'Ukendt fejl'));
     } finally {
       setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-[#131921]">Opret opslag</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <i className="fa-solid fa-times text-2xl"></i>
+        {/* Header */}
+        <div className="bg-[#131921] px-6 py-4 flex justify-between items-center">
+          <h2 className="text-white text-lg font-bold uppercase tracking-wider">Opret Opslag</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+            <i className="fa-solid fa-xmark text-xl"></i>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          
-          {/* Titel */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Overskrift</label>
-            <input
-              type="text"
-              required
-              value={overskrift}
-              onChange={(e) => setOverskrift(e.target.value)}
-              className="w-full rounded-xl border-gray-200 bg-gray-50 p-3 focus:ring-2 focus:ring-[#131921] outline-none transition-all"
-              placeholder="Hvad handler det om?"
-            />
-          </div>
-
-          {/* Kategori */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Kategori</label>
-            <select
-              value={kategori}
-              onChange={(e) => setKategori(e.target.value)}
-              className="w-full rounded-xl border-gray-200 bg-gray-50 p-3 focus:ring-2 focus:ring-[#131921] outline-none"
-            >
-              {KATEGORIER.map(k => <option key={k} value={k}>{k}</option>)}
-            </select>
-          </div>
-
-          {/* Lokation (Område tekst + GPS Status) */}
-          <div className="grid grid-cols-2 gap-4">
+        {/* Form - Scrollable content */}
+        <div className="p-6 overflow-y-auto">
+          <form onSubmit={handleCreate} className="space-y-5">
+            
+            {/* Kategori Vælger */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">By / Område</label>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Kategori</label>
+              <div className="flex flex-wrap gap-2">
+                {KATEGORIER.map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setKategori(cat)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                      kategori === cat 
+                        ? 'bg-[#131921] text-white border-[#131921]' 
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Overskrift */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Overskrift</label>
               <input
                 type="text"
-                required
-                value={omraade}
-                onChange={(e) => setOmraade(e.target.value)}
-                className="w-full rounded-xl border-gray-200 bg-gray-50 p-3 focus:ring-2 focus:ring-[#131921] outline-none"
-                placeholder="F.eks. Lyngby"
+                className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] text-gray-900 placeholder-gray-500 font-medium shadow-sm"
+                placeholder="F.eks. Boremaskine udlejes..."
+                value={overskrift}
+                onChange={e => setOverskrift(e.target.value)}
               />
             </div>
-            
-            {/* GPS Indikator */}
-            <div>
-               <label className="block text-sm font-bold text-gray-700 mb-1">GPS Placering</label>
-               <div className={`w-full rounded-xl p-3 flex items-center gap-2 text-sm font-medium border ${
-                 locationStatus === 'success' ? 'bg-green-50 border-green-100 text-green-700' :
-                 locationStatus === 'error' ? 'bg-yellow-50 border-yellow-100 text-yellow-700' :
-                 'bg-gray-50 border-gray-100 text-gray-500'
-               }`}>
-                 {locationStatus === 'loading' && <i className="fa-solid fa-spinner animate-spin"></i>}
-                 {locationStatus === 'success' && <i className="fa-solid fa-check-circle"></i>}
-                 {locationStatus === 'error' && <i className="fa-solid fa-triangle-exclamation"></i>}
-                 {locationStatus === 'idle' && <i className="fa-solid fa-location-crosshairs"></i>}
-                 
-                 <span>
-                   {locationStatus === 'loading' && 'Henter...'}
-                   {locationStatus === 'success' && 'Position fundet'}
-                   {locationStatus === 'error' && 'Ingen GPS (vises kun lokalt)'}
+
+            {/* Område + GPS (Side om side) */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Område / By</label>
+                <input
+                  type="text"
+                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] text-gray-900 placeholder-gray-500 font-medium shadow-sm"
+                  placeholder="F.eks. Lyngby"
+                  value={omraade}
+                  onChange={e => setOmraade(e.target.value)}
+                />
+              </div>
+
+              <div>
+                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">GPS Placering</label>
+                 <div className={`w-full rounded-xl py-3 px-3 flex items-center justify-center gap-2 text-sm font-medium border ${
+                   locationStatus === 'success' ? 'bg-green-50 border-green-200 text-green-700' :
+                   locationStatus === 'error' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' :
+                   'bg-gray-50 border-gray-200 text-gray-500'
+                 }`}>
+                   {locationStatus === 'loading' && <><i className="fa-solid fa-spinner animate-spin"></i> Henter...</>}
+                   {locationStatus === 'success' && <><i className="fa-solid fa-check-circle"></i> Fundet</>}
+                   {locationStatus === 'error' && <><i className="fa-solid fa-triangle-exclamation"></i> Ingen GPS</>}
                    {locationStatus === 'idle' && 'Venter...'}
-                 </span>
-
-                 {/* Genopfrisk knap hvis det fejlede */}
-                 {locationStatus === 'error' && (
-                   <button type="button" onClick={getLocation} className="ml-auto text-[#131921] underline text-xs">
-                     Prøv igen
-                   </button>
-                 )}
-               </div>
+                 </div>
+              </div>
             </div>
-          </div>
 
-          {/* Tekst */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Beskrivelse</label>
-            <textarea
-              required
-              rows={4}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              className="w-full rounded-xl border-gray-200 bg-gray-50 p-3 focus:ring-2 focus:ring-[#131921] outline-none resize-none"
-              placeholder="Fortæl lidt mere..."
-            />
-          </div>
-
-          {/* Billeder */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Billeder</label>
-            
-            <div className="grid grid-cols-4 gap-2 mb-2">
-              {previewUrls.map((url, i) => (
-                <div key={i} className="relative aspect-square rounded-lg overflow-hidden group">
-                  <img src={url} className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(i)}
-                    className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <i className="fa-solid fa-times text-xs"></i>
-                  </button>
-                </div>
-              ))}
-              
-              <label className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-[#131921] hover:bg-gray-50 transition-colors text-gray-400 hover:text-[#131921]">
-                <i className="fa-solid fa-camera text-2xl mb-1"></i>
-                <span className="text-xs font-bold">Tilføj</span>
-                <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageChange} />
-              </label>
+            {/* Billede Upload */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Billede</label>
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors bg-white"
+              >
+                {imageFile ? (
+                  <div className="text-center">
+                    <p className="text-[#131921] font-bold mb-1">Fil valgt:</p>
+                    <p className="text-sm truncate max-w-[200px] text-gray-700">{imageFile.name}</p>
+                    <p className="text-xs text-green-600 mt-2 font-bold">Klik for at ændre</p>
+                  </div>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-camera text-3xl mb-2 text-gray-400"></i>
+                    <p className="text-sm font-medium text-gray-600">Klik for at vælge billede</p>
+                  </>
+                )}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={e => e.target.files?.[0] && setImageFile(e.target.files[0])}
+                  className="hidden" 
+                  accept="image/*"
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Submit Knap */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#131921] text-white font-bold py-4 rounded-xl shadow-lg hover:bg-gray-900 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <><i className="fa-solid fa-spinner animate-spin"></i> Opretter...</>
-            ) : (
-              'Opret Opslag'
-            )}
-          </button>
+            {/* Tekst */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Beskrivelse</label>
+              <textarea
+                className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 h-32 outline-none focus:ring-2 focus:ring-[#131921] resize-none text-gray-900 placeholder-gray-500 font-medium shadow-sm"
+                placeholder="Beskriv tingen eller opgaven..."
+                value={text}
+                onChange={e => setText(e.target.value)}
+              />
+            </div>
 
-        </form>
+            {/* Footer Buttons */}
+            <div className="pt-4 flex gap-3">
+              <button 
+                type="button" 
+                onClick={onClose}
+                className="flex-1 py-3 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors border border-gray-200"
+              >
+                Annuller
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="flex-[2] py-3 rounded-xl font-bold text-white bg-[#131921] hover:bg-gray-900 transition-colors disabled:opacity-70 flex items-center justify-center shadow-lg"
+              >
+                {loading ? <span className="animate-spin mr-2">⏳</span> : null}
+                {loading ? 'Opretter...' : 'OPRET OPSLAG'}
+              </button>
+            </div>
+
+          </form>
+        </div>
       </div>
     </div>
   );
