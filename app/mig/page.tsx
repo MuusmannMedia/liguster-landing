@@ -142,26 +142,34 @@ export default function MigPage() {
     if (!error) setProfile({ ...profile, avatar_url: null });
   };
 
-  // --- RETTET FUNKTION: Bruger nu din interne API route ---
+  // --- RETTET FUNKTION: Sender nu TOKEN med til serveren ---
   const handleDeleteAccount = async () => {
     if (!confirm("ER DU SIKKER? Dette sletter din konto og alt data permanent!")) return;
     
-    // Vi genbruger 'saving' state for at vise feedback (valgfrit)
     setSaving(true);
 
     try {
-      // Kalder /api/auth/delete-user i stedet for den eksterne URL
+      // 1. Hent den aktuelle session (dit adgangskort)
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Kunne ikke finde din session. Prøv at logge ud og ind igen.");
+      }
+
+      // 2. Kald serveren og vis adgangskortet i 'Authorization' headeren
       const res = await fetch('/api/auth/delete-user', {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`, // <--- HER ER MAGIEN
+        }
       });
       
       if (!res.ok) {
-        // Forsøg at hente fejlbesked fra API'et
         const data = await res.json();
         throw new Error(data.error || "Kunne ikke slette konto");
       }
       
-      // Log ud og send væk
+      // 3. Log ud og send væk
       await supabase.auth.signOut();
       router.push('/login');
     } catch (err: any) {
@@ -256,7 +264,7 @@ export default function MigPage() {
               LOG UD
             </button>
 
-            {/* --- RETTET KNAP: type="button" og e.preventDefault() for at undgå Brave-fejl --- */}
+            {/* --- KNAP: type="button" og e.preventDefault() --- */}
             <button 
               type="button" 
               onClick={(e) => {
