@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 type Post = {
@@ -8,8 +8,8 @@ type Post = {
   created_at: string;
   overskrift: string;
   text: string;
-  image_url?: string; // Enkelt billede (legacy)
-  images?: string[];  // Galleri (fremtid)
+  image_url?: string;
+  images?: string[];
   kategori?: string;
   omraade?: string;
   user_id: string;
@@ -26,6 +26,41 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
+  // --- SWIPE LOGIK ---
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Minimum swipe distance (i pixels)
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null); // Reset
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      // Swipe til venstre -> Næste billede
+      setActiveImageIndex(prev => (prev + 1) % images.length);
+    } 
+    
+    if (isRightSwipe) {
+       // Swipe til højre -> Forrige billede
+       setActiveImageIndex(prev => (prev === 0 ? images.length - 1 : prev - 1));
+    }
+  };
+  // -------------------
+
   // Nulstil når modal åbnes med nyt opslag
   useEffect(() => {
     if (isOpen) {
@@ -36,7 +71,7 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
 
   if (!isOpen || !post) return null;
 
-  // 1. Normaliser billeder (så vi håndterer både array og enkelt streng)
+  // 1. Normaliser billeder
   const images: string[] = [];
   if (post.images && post.images.length > 0) {
     post.images.forEach(img => images.push(img));
@@ -48,7 +83,6 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/opslag?id=${post.id}` : '';
 
   // --- Handlinger ---
-
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -76,13 +110,12 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
 
   const handleContact = () => {
     if (isOwnPost) return;
-    // Her ville vi navigere til chatten
     alert("Chat-funktionen kommer snart!");
   };
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 z-50">
-      {/* 1. Backdrop (klik for at lukke) */}
+      {/* 1. Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
@@ -91,7 +124,7 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
       {/* 2. Selve Kortet */}
       <div className="relative bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Luk Knap (Absolut placeret) */}
+        {/* Luk Knap */}
         <button 
           onClick={onClose}
           className="absolute top-4 right-4 z-10 bg-black/20 hover:bg-black/40 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-colors"
@@ -102,15 +135,21 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
         {/* Scrollbart indhold */}
         <div className="overflow-y-auto flex-1 bg-white">
           
-          {/* A. Billed-sektion */}
-          <div className="relative bg-gray-100 w-full aspect-[4/3] group">
+          {/* A. Billed-sektion (NU MED SWIPE) */}
+          <div 
+            className="relative bg-gray-100 w-full aspect-[4/3] group select-none"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
             {images.length > 0 ? (
               <>
                 <img 
                   src={images[activeImageIndex]} 
                   alt={post.overskrift}
-                  className="w-full h-full object-cover cursor-zoom-in"
+                  className="w-full h-full object-cover cursor-zoom-in pointer-events-none md:pointer-events-auto" // pointer-events-none på mobil for at swipe virker bedst
                   onClick={() => setLightboxOpen(true)}
+                  draggable="false" // Vigtigt for ikke at trække billedet i stedet for swipe
                 />
                 
                 {/* Dots til galleri */}
@@ -126,11 +165,11 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
                   </div>
                 )}
                 
-                {/* Pile til galleri */}
+                {/* Pile til galleri (Kun synlige på desktop via group-hover) */}
                 {images.length > 1 && (
                   <>
                     <button 
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 text-white w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 text-white w-8 h-8 rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
                         setActiveImageIndex(prev => (prev === 0 ? images.length - 1 : prev - 1));
@@ -139,7 +178,7 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
                       ‹
                     </button>
                     <button 
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 text-white w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 text-white w-8 h-8 rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
                         setActiveImageIndex(prev => (prev + 1) % images.length);
@@ -185,10 +224,8 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
           </div>
         </div>
 
-        {/* C. Footer (Knapper) */}
+        {/* C. Footer */}
         <div className="p-4 border-t border-gray-100 bg-white flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shrink-0">
-          
-          {/* Venstre side: Kopiér & Del */}
           <div className="flex gap-2">
             <button 
               onClick={handleCopyLink}
@@ -204,7 +241,6 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
             </button>
           </div>
 
-          {/* Højre side: Kontakt / Ejer */}
           {isOwnPost ? (
             <div className="px-4 py-2.5 bg-gray-50 border border-gray-200 text-gray-500 text-xs font-bold rounded-xl text-center uppercase tracking-wide cursor-default">
               Det er dit opslag
@@ -222,7 +258,12 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
 
       {/* --- LIGHTBOX (Fuldskærm) --- */}
       {lightboxOpen && images.length > 0 && (
-        <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center animate-in fade-in duration-200">
+        <div 
+          className="fixed inset-0 z-[200] bg-black flex items-center justify-center animate-in fade-in duration-200"
+          onTouchStart={onTouchStart} // Swipe også her
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           <button 
             onClick={() => setLightboxOpen(false)}
             className="absolute top-6 right-6 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-colors"
@@ -233,18 +274,19 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
           <img 
             src={images[activeImageIndex]} 
             alt="Fuldskærm" 
-            className="max-w-full max-h-full object-contain p-4"
+            className="max-w-full max-h-full object-contain p-4 select-none"
+            draggable="false"
           />
 
-           {/* Pile i Lightbox */}
+           {/* Pile i Lightbox (synlige på desktop) */}
            {images.length > 1 && (
               <>
                 <button 
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4"
+                  className="hidden md:block absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4"
                   onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === 0 ? images.length - 1 : prev - 1)); }}
                 >‹</button>
                 <button 
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4"
+                  className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4"
                   onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev + 1) % images.length); }}
                 >›</button>
               </>
