@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useState, useEffect } from 'react';
 
 type Post = {
   id: string;
@@ -25,41 +24,6 @@ type Props = {
 export default function PostDetailModal({ isOpen, post, onClose, currentUserId }: Props) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-
-  // --- SWIPE LOGIK ---
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
-
-  // Minimum swipe distance (i pixels)
-  const minSwipeDistance = 50;
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null); // Reset
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe) {
-      // Swipe til venstre -> Næste billede
-      setActiveImageIndex(prev => (prev + 1) % images.length);
-    } 
-    
-    if (isRightSwipe) {
-       // Swipe til højre -> Forrige billede
-       setActiveImageIndex(prev => (prev === 0 ? images.length - 1 : prev - 1));
-    }
-  };
-  // -------------------
 
   // Nulstil når modal åbnes med nyt opslag
   useEffect(() => {
@@ -113,6 +77,17 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
     alert("Chat-funktionen kommer snart!");
   };
 
+  // Navigations-funktioner (Brugt både i kort og lightbox)
+  const nextImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setActiveImageIndex(prev => (prev + 1) % images.length);
+  };
+
+  const prevImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setActiveImageIndex(prev => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 z-50">
       {/* 1. Backdrop */}
@@ -135,54 +110,43 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
         {/* Scrollbart indhold */}
         <div className="overflow-y-auto flex-1 bg-white">
           
-          {/* A. Billed-sektion (NU MED SWIPE) */}
-          <div 
-            className="relative bg-gray-100 w-full aspect-[4/3] group select-none"
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-          >
+          {/* A. Billed-sektion */}
+          <div className="relative bg-gray-100 w-full aspect-[4/3] group select-none">
             {images.length > 0 ? (
               <>
                 <img 
                   src={images[activeImageIndex]} 
                   alt={post.overskrift}
-                  className="w-full h-full object-cover cursor-zoom-in pointer-events-none md:pointer-events-auto" // pointer-events-none på mobil for at swipe virker bedst
+                  className="w-full h-full object-cover cursor-zoom-in"
                   onClick={() => setLightboxOpen(true)}
-                  draggable="false" // Vigtigt for ikke at trække billedet i stedet for swipe
+                  draggable="false"
                 />
                 
                 {/* Dots til galleri */}
                 {images.length > 1 && (
-                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
                     {images.map((_, idx) => (
                       <button
                         key={idx}
                         onClick={(e) => { e.stopPropagation(); setActiveImageIndex(idx); }}
-                        className={`w-2 h-2 rounded-full transition-all ${idx === activeImageIndex ? 'bg-white w-4' : 'bg-white/50'}`}
+                        className={`w-2 h-2 rounded-full transition-all shadow-sm ${idx === activeImageIndex ? 'bg-white w-4' : 'bg-white/50'}`}
                       />
                     ))}
                   </div>
                 )}
                 
-                {/* Pile til galleri (Kun synlige på desktop via group-hover) */}
+                {/* PILE TIL GALLERI - Nu synlige på mobil! */}
                 {images.length > 1 && (
                   <>
                     <button 
-                      className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 text-white w-8 h-8 rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveImageIndex(prev => (prev === 0 ? images.length - 1 : prev - 1));
-                      }}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/60 transition-colors z-10"
+                      onClick={prevImage}
                     >
                       ‹
                     </button>
                     <button 
-                      className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 text-white w-8 h-8 rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveImageIndex(prev => (prev + 1) % images.length);
-                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/60 transition-colors z-10"
+                      onClick={nextImage}
                     >
                       ›
                     </button>
@@ -258,15 +222,10 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
 
       {/* --- LIGHTBOX (Fuldskærm) --- */}
       {lightboxOpen && images.length > 0 && (
-        <div 
-          className="fixed inset-0 z-[200] bg-black flex items-center justify-center animate-in fade-in duration-200"
-          onTouchStart={onTouchStart} // Swipe også her
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-        >
+        <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center animate-in fade-in duration-200">
           <button 
             onClick={() => setLightboxOpen(false)}
-            className="absolute top-6 right-6 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-colors"
+            className="absolute top-6 right-6 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-colors z-20"
           >
             <i className="fa-solid fa-xmark text-xl"></i>
           </button>
@@ -278,16 +237,16 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
             draggable="false"
           />
 
-           {/* Pile i Lightbox (synlige på desktop) */}
+           {/* Pile i Lightbox */}
            {images.length > 1 && (
               <>
                 <button 
-                  className="hidden md:block absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4"
-                  onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === 0 ? images.length - 1 : prev - 1)); }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4 z-20"
+                  onClick={prevImage}
                 >‹</button>
                 <button 
-                  className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4"
-                  onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev + 1) % images.length); }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4 z-20"
+                  onClick={nextImage}
                 >›</button>
               </>
             )}
