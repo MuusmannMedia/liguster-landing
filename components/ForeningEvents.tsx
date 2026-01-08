@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-// import Image from 'next/image'; // Vi bruger <img> for sikkerheds skyld (failsafe)
+import { useRouter } from 'next/navigation'; // ✅ Vigtigt: Til navigation
 
 // --- TYPER ---
 type EventRow = {
@@ -51,7 +51,7 @@ const fmtRange = (sISO: string, eISO: string) => {
     : `${fmtDate(s)} ${fmtTime(s)} - ${fmtDate(e)} ${fmtTime(e)}`;
 };
 
-// Billed-komprimering (Genbrug)
+// Billed-komprimering
 async function resizeImage(file: File, maxWidth = 1200, quality = 0.8): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = document.createElement('img');
@@ -73,6 +73,7 @@ async function resizeImage(file: File, maxWidth = 1200, quality = 0.8): Promise<
 }
 
 export default function ForeningEvents({ foreningId, userId, isUserAdmin, isApprovedMember }: Props) {
+  const router = useRouter(); // ✅ Init router
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [regCounts, setRegCounts] = useState<Record<string, number>>({});
@@ -92,7 +93,7 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
   const [price, setPrice] = useState("");
   const [capacity, setCapacity] = useState("");
   const [allowReg, setAllowReg] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null); // ✅ Til upload
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
 
   // Push Stats
@@ -113,7 +114,6 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
     
     if (data) {
       setEvents(data);
-      // Hent counts
       const counts: Record<string, number> = {};
       for (const ev of data) {
         const { count } = await supabase
@@ -137,11 +137,8 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
   };
 
   const checkPushStatus = async (eventId: string) => {
-    // Tjek om push allerede er sendt
     const { data } = await supabase.from("event_push_broadcasts").select("id").eq("event_id", eventId).maybeSingle();
     setHasPushed(!!data);
-
-    // Hent stats
     const { data: stats } = await supabase.from("v_forening_push_stats").select("*").eq("forening_id", foreningId).maybeSingle();
     if (stats) setPushStats({ active: stats.active_push_members, total: stats.total_members });
   };
@@ -168,7 +165,6 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
     setTitle(ev.title);
     setDescription(ev.description || "");
     setLocation(ev.location || "");
-    // Formater dato til input datetime-local (YYYY-MM-DDTHH:MM)
     setStartAt(new Date(ev.start_at).toISOString().slice(0, 16));
     setEndAt(new Date(ev.end_at).toISOString().slice(0, 16));
     setPrice(ev.price?.toString() || "");
@@ -186,7 +182,6 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
     try {
       let imageUrl = activeEvent?.image_url || null;
 
-      // ✅ UPLOAD BILLEDE HVIS VALGT
       if (imageFile) {
         const compressed = await resizeImage(imageFile);
         const path = `events/${foreningId}/ev_${Date.now()}.jpg`;
@@ -206,7 +201,7 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
         price: price ? parseFloat(price) : null,
         capacity: capacity ? parseInt(capacity) : null,
         allow_registration: allowReg,
-        image_url: imageUrl, // ✅ Gem URL
+        image_url: imageUrl,
         created_by: userId, 
       };
 
@@ -252,7 +247,7 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
         if (error) throw error;
       }
       await fetchAttendees(activeEvent.id);
-      await fetchEvents(); // Update counts
+      await fetchEvents();
     } catch (err: any) {
       alert("Fejl: " + err.message);
     } finally {
@@ -275,8 +270,6 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
       });
 
       if (error) throw error;
-      
-      // Trigger worker
       await supabase.functions.invoke("push-worker", { body: { source: "event", eventId: activeEvent.id } });
       
       alert(`Push sendt til ${data} medlemmer!`);
@@ -320,7 +313,6 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Upcoming */}
           {upcoming.length > 0 && (
             <div>
               <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Kommende</h4>
@@ -329,8 +321,6 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
               </div>
             </div>
           )}
-          
-          {/* Past */}
           {past.length > 0 && (
             <div>
               <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 opacity-70">Afsluttede</h4>
@@ -379,7 +369,7 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
                     <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{activeEvent.description}</p>
                   </div>
 
-                  {/* Tilmelding Boks */}
+                  {/* Tilmelding Boks (Stiplet linje som i appen kan vi ikke lave nemt, men vi bruger solid border) */}
                   {activeEvent.allow_registration && (
                     <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
                       <div className="flex justify-between items-center mb-3">
@@ -418,24 +408,49 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
                     </div>
                   )}
 
-                  {/* Admin Tools */}
-                  {canEdit && (
-                    <div className="pt-4 border-t border-gray-100 flex flex-col gap-2">
-                      <div className="flex gap-2">
-                        <button onClick={() => setModalMode('edit')} className="flex-1 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg text-sm">Rediger</button>
-                        <button onClick={handleDelete} disabled={loadingAction} className="flex-1 py-2 bg-red-50 text-red-600 font-bold rounded-lg text-sm">Slet</button>
-                      </div>
-                      
-                      {/* Push Button */}
-                      <button 
-                        onClick={handleSendPush} 
-                        disabled={loadingAction || hasPushed}
-                        className={`w-full py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${hasPushed ? 'bg-green-50 text-green-700 cursor-default' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
-                      >
-                        {hasPushed ? <><i className="fa-solid fa-check"></i> Push sendt til appen</> : <><i className="fa-solid fa-bell"></i> Send push til app ({pushStats?.active || 0} modtagere)</>}
-                      </button>
-                    </div>
-                  )}
+                  {/* ✅ HANDLINGS-KNAPPER (Stack 1:1 med app) */}
+                  <div className="flex flex-col gap-3 mt-2">
+                    
+                    {/* 1. BILLEDER (Sort) */}
+                    <button 
+                      onClick={() => router.push(`/forening/${foreningId}/images`)}
+                      className="w-full py-3.5 bg-[#131921] text-white rounded-xl font-bold hover:bg-gray-900 transition-colors shadow-sm flex items-center justify-center gap-2"
+                    >
+                      Billeder
+                    </button>
+
+                    {/* Admin Tools */}
+                    {canEdit && (
+                      <>
+                        {/* 2. SEND PUSH (Sort) */}
+                        <button 
+                          onClick={handleSendPush} 
+                          disabled={loadingAction || hasPushed}
+                          className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition-colors ${hasPushed ? 'bg-green-600 text-white cursor-default' : 'bg-[#131921] text-white hover:bg-gray-900'}`}
+                        >
+                          {hasPushed ? "Push sendt" : "Send push"}
+                        </button>
+
+                        {/* 3. REDIGER (Sort) */}
+                        <button 
+                          onClick={() => setModalMode('edit')} 
+                          className="w-full py-3.5 bg-[#131921] text-white rounded-xl font-bold hover:bg-gray-900 transition-colors shadow-sm flex items-center justify-center gap-2"
+                        >
+                          Rediger
+                        </button>
+
+                        {/* 4. SLET (Rød) */}
+                        <button 
+                          onClick={handleDelete} 
+                          disabled={loadingAction} 
+                          className="w-full py-3.5 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+                        >
+                          Slet
+                        </button>
+                      </>
+                    )}
+                  </div>
+
                 </div>
               )}
 
@@ -467,7 +482,6 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
                     <span className="font-bold text-gray-700 text-sm">Tillad tilmelding</span>
                   </label>
 
-                  {/* ✅ BILLED UPLOAD */}
                   <div className="p-3 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-center cursor-pointer relative hover:bg-gray-100 transition-colors">
                     <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
                     <span className="text-sm font-bold text-gray-500">
@@ -493,7 +507,6 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
 function EventCard({ ev, count, onClick }: { ev: EventRow, count: number, onClick: () => void }) {
   return (
     <div onClick={onClick} className="bg-white border border-gray-100 rounded-xl p-3 flex gap-4 cursor-pointer hover:shadow-md transition-shadow">
-      {/* Billede / Dato boks - NU 1:1 KVADRATISK */}
       <div className="w-24 h-24 shrink-0 bg-gray-100 rounded-lg overflow-hidden relative aspect-square">
         {ev.image_url ? (
           <img src={ev.image_url} className="w-full h-full object-cover" />
