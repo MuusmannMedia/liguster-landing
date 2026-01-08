@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
-import Image from 'next/image';
+import Image from 'next/image'; // ✅ Vigtigt import
 
 // --- TYPER ---
 type Forening = {
@@ -349,7 +349,7 @@ export default function ForeningDetaljePage() {
         />
 
         {/* --- FORENING INFO KORT --- */}
-        {/* ✅ RETTET LAYOUT: Fjernet mb-6 fra børn, bruger flex-col og gap-4 for jævn afstand */}
+        {/* ✅ RETTET LAYOUT: bruger flex-col og gap-4 */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
@@ -364,14 +364,14 @@ export default function ForeningDetaljePage() {
             <p className="text-gray-700 font-bold">{forening.sted}</p>
           </div>
           
-          {/* ✅ BESKRIVELSE MED REDIGERINGS-MULIGHED */}
+          {/* ✅ BESKRIVELSE MED REDIGERINGS-MULIGHED (OG SORT TEKST) */}
           <div className="w-full">
             {isEditing ? (
               <div className="flex flex-col gap-3">
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  // ✅ RETTET: style={{color:'black'}} gennemtvinger sort tekst. Placeholder-gray-500.
+                  // ✅ style={{color:'black'}} gennemtvinger sort tekst.
                   style={{ color: '#000000' }}
                   className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm text-gray-900 placeholder-gray-500 bg-white"
                   placeholder="Skriv foreningens beskrivelse her..."
@@ -556,10 +556,17 @@ export default function ForeningDetaljePage() {
             BILLEDER
           </div>
           {images.length === 0 ? <p className="text-sm text-gray-400">Ingen billeder endnu.</p> : (
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-2 overflow-x-auto pb-2 scrollbar-hide">
               {images.map(img => (
-                <div key={img.id} className="w-24 h-24 rounded-[14px] overflow-hidden bg-gray-100 relative">
-                  <Image src={img.image_url} alt="" fill className="object-cover" />
+                // ✅ RETTET: Tilføjet flex-shrink-0 og Next.js Image
+                <div key={img.id} className="w-24 h-24 flex-shrink-0 rounded-[14px] overflow-hidden bg-gray-100 relative">
+                  <Image 
+                    src={img.image_url} 
+                    alt="" 
+                    fill 
+                    className="object-cover" 
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  />
                 </div>
               ))}
             </div>
