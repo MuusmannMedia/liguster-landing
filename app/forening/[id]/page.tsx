@@ -96,6 +96,10 @@ export default function ForeningDetaljePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   
+  // ✅ NY STATE TIL REDIGERING
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDescription, setEditDescription] = useState("");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Previews Data
@@ -135,6 +139,8 @@ export default function ForeningDetaljePage() {
   const fetchForening = async () => {
     const { data } = await supabase.from("foreninger").select("*").eq("id", id).single();
     setForening(data);
+    // ✅ Opdater redigerings-teksten når data hentes
+    if (data) setEditDescription(data.beskrivelse || "");
   };
 
   const fetchMedlemmer = async () => {
@@ -181,6 +187,24 @@ export default function ForeningDetaljePage() {
   };
 
   // --- HANDLINGS-FUNKTIONER ---
+
+  // ✅ NY FUNKTION: Gem beskrivelse
+  const handleSaveDescription = async () => {
+    if (!forening) return;
+    
+    // Optimistisk UI opdatering eller loading state her hvis ønsket
+    const { error } = await supabase
+      .from('foreninger')
+      .update({ beskrivelse: editDescription })
+      .eq('id', id);
+
+    if (error) {
+      alert("Fejl ved opdatering: " + error.message);
+    } else {
+      setForening({ ...forening, beskrivelse: editDescription });
+      setIsEditing(false);
+    }
+  };
 
   const handleJoin = async () => {
     if (!userId) return alert("Du skal være logget ind for at blive medlem.");
@@ -266,7 +290,6 @@ export default function ForeningDetaljePage() {
     }
   };
 
-  // NY FUNKTION: Gør til admin
   const promoteToAdmin = async (targetUserId: string) => {
     if (!confirm("Er du sikker på, at du vil give denne person administrator-rettigheder?")) return;
 
@@ -341,9 +364,47 @@ export default function ForeningDetaljePage() {
           <h1 className="text-2xl font-black text-[#131921] mb-1 underline decoration-gray-300">{forening.navn}</h1>
           <p className="text-gray-700 font-bold mb-4">{forening.sted}</p>
           
-          <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap mb-4">
-            {forening.beskrivelse}
-          </p>
+          {/* ✅ BESKRIVELSE MED REDIGERINGS-MULIGHED */}
+          <div className="mb-6">
+            {isEditing ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm"
+                  placeholder="Skriv foreningens beskrivelse her..."
+                />
+                <div className="flex gap-2 justify-end">
+                  <button 
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 text-gray-600 bg-gray-100 rounded-full text-xs font-bold hover:bg-gray-200"
+                  >
+                    ANNULLER
+                  </button>
+                  <button 
+                    onClick={handleSaveDescription}
+                    className="px-4 py-2 text-white bg-[#131921] rounded-full text-xs font-bold hover:bg-gray-900"
+                  >
+                    GEM ÆNDRINGER
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap mb-2">
+                  {forening.beskrivelse}
+                </p>
+                {isMeAdmin && (
+                  <button 
+                    onClick={() => setIsEditing(true)}
+                    className="px-4 py-2 bg-[#131921] text-white text-[10px] font-bold rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors"
+                  >
+                    Rediger tekst
+                  </button>
+                )}
+              </>
+            )}
+          </div>
 
           {!isMember && (
             isPending ? (
