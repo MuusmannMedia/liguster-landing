@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
-import Image from 'next/image';
+// Vi behøver ikke next/image, når vi bruger standard <img> tag som failsafe
+// import Image from 'next/image'; 
 
 // --- TYPER ---
 type Forening = {
@@ -185,32 +186,38 @@ export default function ForeningDetaljePage() {
     if (data) setCalendarEvents(data);
   };
 
-  // ✅ OPDATERET BILLEDE HENTNING: Finder de seneste 5 billeder uanset event
+  // ✅ OPDATERET BILLEDE HENTNING: Finder de seneste 4 billeder
   const fetchImages = async () => {
     try {
-      // 1. Find alle event ID'er for denne forening
       const { data: allEvents, error: evErr } = await supabase
         .from("forening_events")
         .select("id")
         .eq("forening_id", id);
 
-      if (evErr || !allEvents || allEvents.length === 0) return;
+      if (evErr || !allEvents || allEvents.length === 0) {
+        setImages([]);
+        return;
+      }
 
       const eventIds = allEvents.map(e => e.id);
 
-      // 2. Hent de 5 nyeste billeder, der hører til disse events
       const { data: latestImages, error: imgErr } = await supabase
         .from("event_images")
-        .select("id, image_url")
+        .select("id, image_url, created_at")
         .in("event_id", eventIds)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(4); // ✅ Begrænset til 4
 
-      if (!imgErr && latestImages) {
-        setImages(latestImages);
+      if (imgErr) {
+        console.error("Fejl ved hentning af billeder:", imgErr);
+        setImages([]);
+        return;
       }
+
+      setImages((latestImages || []) as any);
     } catch (err) {
       console.error("Fejl ved hentning af billeder:", err);
+      setImages([]);
     }
   };
 
@@ -585,17 +592,15 @@ export default function ForeningDetaljePage() {
           {images.length === 0 ? <p className="text-sm text-gray-400">Ingen billeder endnu.</p> : (
             <div className="flex gap-2 mt-2 overflow-x-auto pb-2 scrollbar-hide">
               {images.map(img => {
-                // ✅ BRUG HELPER til URL
                 const src = getEventImageUrl(img.image_url);
                 return (
+                  // ✅ Brugt standard <img> tag som "failsafe" løsning
                   <div key={img.id} className="w-24 h-24 flex-shrink-0 rounded-[14px] overflow-hidden bg-gray-100 relative">
                     {src ? (
-                      <Image 
+                      <img 
                         src={src} 
                         alt="" 
-                        fill 
-                        className="object-cover" 
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        className="w-full h-full object-cover" 
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold">?</div>
