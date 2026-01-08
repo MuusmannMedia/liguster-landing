@@ -96,7 +96,7 @@ export default function ForeningDetaljePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   
-  // ✅ NY STATE TIL REDIGERING
+  // ✅ STATE TIL REDIGERING
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState("");
 
@@ -139,7 +139,6 @@ export default function ForeningDetaljePage() {
   const fetchForening = async () => {
     const { data } = await supabase.from("foreninger").select("*").eq("id", id).single();
     setForening(data);
-    // ✅ Opdater redigerings-teksten når data hentes
     if (data) setEditDescription(data.beskrivelse || "");
   };
 
@@ -188,11 +187,9 @@ export default function ForeningDetaljePage() {
 
   // --- HANDLINGS-FUNKTIONER ---
 
-  // ✅ NY FUNKTION: Gem beskrivelse
   const handleSaveDescription = async () => {
     if (!forening) return;
     
-    // Optimistisk UI opdatering eller loading state her hvis ønsket
     const { error } = await supabase
       .from('foreninger')
       .update({ beskrivelse: editDescription })
@@ -352,8 +349,9 @@ export default function ForeningDetaljePage() {
         />
 
         {/* --- FORENING INFO KORT --- */}
-        <div className="bg-white rounded-[24px] p-5 shadow-md mt-6">
-          <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100 mb-4">
+        {/* ✅ RETTET LAYOUT: Fjernet mb-6 fra børn, bruger flex-col og gap-4 for jævn afstand */}
+        <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
+          <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
               <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
             ) : (
@@ -361,48 +359,52 @@ export default function ForeningDetaljePage() {
             )}
           </div>
 
-          <h1 className="text-2xl font-black text-[#131921] mb-1 underline decoration-gray-300">{forening.navn}</h1>
-          <p className="text-gray-700 font-bold mb-4">{forening.sted}</p>
+          <div>
+            <h1 className="text-2xl font-black text-[#131921] mb-1 underline decoration-gray-300">{forening.navn}</h1>
+            <p className="text-gray-700 font-bold">{forening.sted}</p>
+          </div>
           
           {/* ✅ BESKRIVELSE MED REDIGERINGS-MULIGHED */}
-          <div className="mb-6">
+          <div className="w-full">
             {isEditing ? (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm"
+                  // ✅ RETTET: style={{color:'black'}} gennemtvinger sort tekst. Placeholder-gray-500.
+                  style={{ color: '#000000' }}
+                  className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm text-gray-900 placeholder-gray-500 bg-white"
                   placeholder="Skriv foreningens beskrivelse her..."
                 />
                 <div className="flex gap-2 justify-end">
                   <button 
                     onClick={() => setIsEditing(false)}
-                    className="px-4 py-2 text-gray-600 bg-gray-100 rounded-full text-xs font-bold hover:bg-gray-200"
+                    className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-full text-xs font-bold hover:bg-gray-200 transition-colors"
                   >
                     ANNULLER
                   </button>
                   <button 
                     onClick={handleSaveDescription}
-                    className="px-4 py-2 text-white bg-[#131921] rounded-full text-xs font-bold hover:bg-gray-900"
+                    className="px-4 py-2.5 bg-[#131921] text-white rounded-full text-xs font-bold hover:bg-gray-900 transition-colors"
                   >
                     GEM ÆNDRINGER
                   </button>
                 </div>
               </div>
             ) : (
-              <>
-                <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap mb-2">
+              <div className="flex flex-col gap-2">
+                <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap">
                   {forening.beskrivelse}
                 </p>
                 {isMeAdmin && (
                   <button 
                     onClick={() => setIsEditing(true)}
-                    className="px-4 py-2 bg-[#131921] text-white text-[10px] font-bold rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors"
+                    className="self-start px-4 py-2 bg-[#131921] text-white text-[10px] font-bold rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors"
                   >
                     Rediger tekst
                   </button>
                 )}
-              </>
+              </div>
             )}
           </div>
 
