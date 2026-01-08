@@ -186,7 +186,7 @@ export default function ForeningDetaljePage() {
     if (data) setCalendarEvents(data);
   };
 
-  // ✅ OPDATERET BILLEDE HENTNING: Finder de seneste 4 billeder
+  // ✅ OPDATERET BILLEDE HENTNING: Finder de seneste 8 billeder
   const fetchImages = async () => {
     try {
       const { data: allEvents, error: evErr } = await supabase
@@ -206,7 +206,7 @@ export default function ForeningDetaljePage() {
         .select("id, image_url, created_at")
         .in("event_id", eventIds)
         .order("created_at", { ascending: false })
-        .limit(4); // ✅ Begrænset til 4
+        .limit(8); // ✅ Hent 8 billeder (viser færre på mobil)
 
       if (imgErr) {
         console.error("Fejl ved hentning af billeder:", imgErr);
@@ -590,12 +590,16 @@ export default function ForeningDetaljePage() {
             BILLEDER
           </div>
           {images.length === 0 ? <p className="text-sm text-gray-400">Ingen billeder endnu.</p> : (
-            <div className="flex gap-2 mt-2 overflow-x-auto pb-2 scrollbar-hide">
-              {images.map(img => {
+            // ✅ RETTET LAYOUT: Flex wrap med responsiv visning
+            <div className="flex gap-2 mt-2 overflow-x-auto pb-2 scrollbar-hide md:flex-wrap md:overflow-visible">
+              {images.map((img, index) => {
                 const src = getEventImageUrl(img.image_url);
                 return (
-                  // ✅ Brugt standard <img> tag som "failsafe" løsning
-                  <div key={img.id} className="w-24 h-24 flex-shrink-0 rounded-[14px] overflow-hidden bg-gray-100 relative">
+                  // ✅ Vis kun de første 4 på mobil, men alle 8 på desktop (md:block)
+                  <div 
+                    key={img.id} 
+                    className={`w-24 h-24 flex-shrink-0 rounded-[14px] overflow-hidden bg-gray-100 relative ${index >= 4 ? 'hidden md:block' : ''}`}
+                  >
                     {src ? (
                       <img 
                         src={src} 
