@@ -2,61 +2,61 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../lib/supabaseClient'; // Sørg for at stien passer til din struktur
+import { supabase } from '../../lib/supabaseClient';
+import SiteHeader from '../../components/SiteHeader';
+import SiteFooter from '../../components/SiteFooter';
+import Link from 'next/link';
 
 type Step = 'email' | 'code' | 'password';
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
 
+  // State
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // Til øje-ikonet
 
   const normalizedEmail = email.trim().toLowerCase();
 
+  // Håndter "Tilbage" knappen i toppen
   const goBack = () => {
+    setErrorMsg('');
     if (step === 'code') {
       setStep('email');
       setCode('');
-      setErrorMsg('');
       return;
     }
     if (step === 'password') {
       setStep('code');
       setNewPassword('');
       setConfirmPassword('');
-      setErrorMsg('');
       return;
     }
-    router.back();
+    router.back(); // Eller router.push('/login')
   };
 
-  // TRIN 1 – SEND KODE TIL MAIL
+  // --- LOGIK (Samme som før) ---
+
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!normalizedEmail) {
-      setErrorMsg('Indtast din e-mailadresse.');
-      return;
-    }
+    if (!normalizedEmail) return setErrorMsg('Indtast din e-mailadresse.');
     if (loading) return;
 
     try {
       setLoading(true);
       setErrorMsg('');
-
       const { error } = await supabase.auth.signInWithOtp({
         email: normalizedEmail,
         options: { shouldCreateUser: false },
       });
-
       if (error) throw error;
-
-      alert('Vi har sendt en 6-cifret kode til din e-mail. Tjek din indbakke (og evt. spam).');
       setStep('code');
     } catch (e: any) {
       setErrorMsg(e?.message || 'Der opstod en fejl. Prøv igen.');
@@ -65,29 +65,21 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  // TRIN 2 – VERIFICÉR KODE
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedCode = code.trim();
-
-    if (!trimmedCode || trimmedCode.length < 6) {
-      setErrorMsg('Indtast den 6-cifrede kode.');
-      return;
-    }
+    if (!trimmedCode || trimmedCode.length < 6) return setErrorMsg('Indtast den 6-cifrede kode.');
     if (loading) return;
 
     try {
       setLoading(true);
       setErrorMsg('');
-
       const { error } = await supabase.auth.verifyOtp({
         email: normalizedEmail,
         token: trimmedCode,
         type: 'email',
       });
-
       if (error) throw error;
-
       setStep('password');
     } catch (e: any) {
       setErrorMsg('Koden kunne ikke godkendes. Prøv igen.');
@@ -96,161 +88,193 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  // TRIN 3 – GEM NYT PASSWORD
   const handleSaveNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPassword || newPassword.length < 8) {
-      setErrorMsg('Dit password skal som minimum være 8 tegn.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setErrorMsg('De to passwords skal være ens.');
-      return;
-    }
+    if (newPassword.length < 8) return setErrorMsg('Password skal være min. 8 tegn.');
+    if (newPassword !== confirmPassword) return setErrorMsg('De to passwords er ikke ens.');
     if (loading) return;
 
     try {
       setLoading(true);
       setErrorMsg('');
-
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-
-      alert('Dit password er ændret. Du bliver nu sendt videre.');
+      
+      // Succes!
       router.replace('/opslag');
     } catch (e: any) {
-      setErrorMsg(e?.message || 'Kunne ikke opdatere password. Prøv igen.');
+      setErrorMsg(e?.message || 'Kunne ikke opdatere password.');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#869FB9] flex flex-col relative">
-      
-      {/* Tilbage Knap */}
-      <button 
-        onClick={goBack}
-        className="absolute top-6 left-6 text-white w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors z-20"
-      >
-        <i className="fa-solid fa-chevron-left text-2xl"></i>
-      </button>
-
-      {/* Indhold */}
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm flex flex-col items-center">
-          
-          {/* TRIN 1: EMAIL */}
-          {step === 'email' && (
-            <form onSubmit={handleSendCode} className="flex flex-col items-center w-full">
-              <h1 className="text-white text-3xl font-bold mb-2">Glemt kodeord</h1>
-              <p className="text-[#E0E7FF] text-center mb-8 px-4 text-sm leading-relaxed">
-                Indtast din e-mailadresse, så sender vi en 6-cifret kode, du kan logge ind med.
-              </p>
-
-              <input
-                type="email"
-                placeholder="Din e-mail"
-                className="w-full bg-white text-[#131921] px-6 py-4 rounded-full mb-3 outline-none focus:ring-4 focus:ring-blue-300 placeholder-gray-400 font-medium transition-shadow"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoFocus
-              />
-
-              <button 
-                type="submit" 
+  // --- RENDER CONTENT BASERET PÅ TRIN ---
+  const renderStepContent = () => {
+    switch (step) {
+      case 'email':
+        return (
+          <>
+            <p className="text-gray-500 text-sm text-center mb-8">
+              Indtast din e-mailadresse, så sender vi en 6-cifret kode til dig.
+            </p>
+            <form onSubmit={handleSendCode} className="w-full flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase ml-4 mb-1">Email</label>
+                <input
+                  type="email"
+                  placeholder="din@email.dk"
+                  className="w-full h-12 rounded-full px-6 bg-gray-50 border border-gray-200 text-black outline-none focus:border-[#131921] transition-colors"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
                 disabled={loading}
-                className="w-full bg-[#131921] text-white font-bold py-4 rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors disabled:opacity-70 mt-2"
+                className="w-full h-14 rounded-full mt-2 font-bold text-base tracking-wide transition-all shadow-md flex items-center justify-center gap-2 bg-[#131921] text-white hover:bg-black hover:scale-[1.02] disabled:opacity-70"
               >
-                {loading ? "Sender..." : "SEND KODE"}
+                {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'SEND KODE'}
               </button>
             </form>
-          )}
+          </>
+        );
 
-          {/* TRIN 2: KODE */}
-          {step === 'code' && (
-            <form onSubmit={handleVerifyCode} className="flex flex-col items-center w-full">
-              <h1 className="text-white text-3xl font-bold mb-2">Indtast kode</h1>
-              <p className="text-[#E0E7FF] text-center mb-8 px-4 text-sm leading-relaxed">
-                Vi har sendt en 6-cifret kode til <br/>
-                <span className="font-bold text-white">{normalizedEmail}</span>
-              </p>
-
-              <input
-                type="text"
-                placeholder="6-cifret kode"
-                className="w-full bg-white text-[#131921] px-6 py-4 rounded-full mb-3 outline-none focus:ring-4 focus:ring-blue-300 placeholder-gray-400 font-medium text-center tracking-widest text-lg"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                maxLength={6}
-                autoFocus
-              />
-
-              <button 
-                type="submit" 
+      case 'code':
+        return (
+          <>
+            <p className="text-gray-500 text-sm text-center mb-8">
+              Vi har sendt en kode til <span className="font-bold text-black">{normalizedEmail}</span>
+            </p>
+            <form onSubmit={handleVerifyCode} className="w-full flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase ml-4 mb-1">6-cifret kode</label>
+                <input
+                  type="text"
+                  placeholder="123456"
+                  className="w-full h-12 rounded-full px-6 bg-gray-50 border border-gray-200 text-black outline-none focus:border-[#131921] text-center tracking-widest font-bold text-lg transition-colors"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  maxLength={6}
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
                 disabled={loading}
-                className="w-full bg-[#131921] text-white font-bold py-4 rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors disabled:opacity-70 mt-2"
+                className="w-full h-14 rounded-full mt-2 font-bold text-base tracking-wide transition-all shadow-md flex items-center justify-center gap-2 bg-[#131921] text-white hover:bg-black hover:scale-[1.02] disabled:opacity-70"
               >
-                {loading ? "Tjekker..." : "BEKRÆFT KODE"}
+                {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'BEKRÆFT KODE'}
               </button>
-
-              <button 
-                type="button"
-                onClick={() => setStep('email')}
-                className="mt-6 text-[#131921] font-bold text-sm hover:underline"
-              >
+            </form>
+            <div className="mt-6 text-center">
+              <button onClick={() => setStep('email')} className="text-sm text-gray-500 hover:text-[#131921] hover:underline">
                 Ændr e-mailadresse
               </button>
-            </form>
-          )}
+            </div>
+          </>
+        );
 
-          {/* TRIN 3: NYT PASSWORD */}
-          {step === 'password' && (
-            <form onSubmit={handleSaveNewPassword} className="flex flex-col items-center w-full">
-              <h1 className="text-white text-3xl font-bold mb-2">Vælg nyt password</h1>
-              <p className="text-[#E0E7FF] text-center mb-8 px-4 text-sm leading-relaxed">
-                Du er nu logget ind via koden. Vælg et nyt password til din konto.
-              </p>
+      case 'password':
+        return (
+          <>
+            <p className="text-gray-500 text-sm text-center mb-8">
+              Du er nu verificeret. Vælg et nyt kodeord.
+            </p>
+            <form onSubmit={handleSaveNewPassword} className="w-full flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase ml-4 mb-1">Nyt password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Min. 8 tegn"
+                    className="w-full h-12 rounded-full px-6 pr-12 bg-gray-50 border border-gray-200 text-black outline-none focus:border-[#131921] transition-colors"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black p-2"
+                  >
+                    <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                  </button>
+                </div>
+              </div>
 
-              <input
-                type="password"
-                placeholder="Nyt password"
-                className="w-full bg-white text-[#131921] px-6 py-4 rounded-full mb-3 outline-none focus:ring-4 focus:ring-blue-300 placeholder-gray-400 font-medium"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoFocus
-              />
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase ml-4 mb-1">Gentag password</label>
+                <input
+                  type="password"
+                  placeholder="Gentag password"
+                  className="w-full h-12 rounded-full px-6 bg-gray-50 border border-gray-200 text-black outline-none focus:border-[#131921] transition-colors"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
 
-              <input
-                type="password"
-                placeholder="Gentag nyt password"
-                className="w-full bg-white text-[#131921] px-6 py-4 rounded-full mb-3 outline-none focus:ring-4 focus:ring-blue-300 placeholder-gray-400 font-medium mt-3"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={loading}
-                className="w-full bg-[#131921] text-white font-bold py-4 rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors disabled:opacity-70 mt-5"
+                className="w-full h-14 rounded-full mt-2 font-bold text-base tracking-wide transition-all shadow-md flex items-center justify-center gap-2 bg-[#131921] text-white hover:bg-black hover:scale-[1.02] disabled:opacity-70"
               >
-                {loading ? "Gemmer..." : "GEM NYT PASSWORD"}
+                {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'GEM NYT PASSWORD'}
               </button>
             </form>
-          )}
+          </>
+        );
+    }
+  };
 
-          {/* FEJLBESKED */}
-          {errorMsg && (
-            <div className="mt-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative w-full text-center text-sm font-bold animate-in fade-in slide-in-from-bottom-2">
-              {errorMsg}
+  return (
+    <div className="min-h-screen flex flex-col bg-[#869FB9]">
+      <SiteHeader />
+
+      <main className="flex-1 flex items-center justify-center p-4 py-20">
+        <div className="bg-white w-full max-w-md rounded-[30px] shadow-2xl p-8 md:p-10 relative">
+          
+          {/* Tilbage knap */}
+          <button 
+            onClick={goBack} 
+            className="absolute top-6 left-6 text-gray-400 hover:text-black transition-colors"
+          >
+            <i className="fa-solid fa-arrow-left text-xl"></i>
+          </button>
+
+          <div className="flex flex-col items-center">
+            {/* Titel ændres baseret på step */}
+            <h1 className="text-3xl font-black text-[#131921] mb-2 mt-4">
+              {step === 'email' ? 'Glemt kodeord' : step === 'code' ? 'Indtast kode' : 'Nyt kodeord'}
+            </h1>
+
+            {/* Fejlbesked boks */}
+            {errorMsg && (
+              <div className="w-full bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-6 text-center border border-red-100 flex items-center justify-center gap-2 animate-in fade-in slide-in-from-top-2">
+                <i className="fa-solid fa-circle-exclamation"></i>
+                {errorMsg}
+              </div>
+            )}
+
+            {/* Dynamisk indhold */}
+            {renderStepContent()}
+
+            {/* Footer Links (Privacy etc - for at matche login siden) */}
+            <div className="mt-8 flex gap-4 text-xs text-gray-400">
+              <Link href="/privacy" className="hover:text-gray-600 transition-colors">
+                Privacy Policy
+              </Link>
+              <span>•</span>
+              <Link href="/disclaimer" className="hover:text-gray-600 transition-colors">
+                Ansvarsfraskrivelse
+              </Link>
             </div>
-          )}
 
+          </div>
         </div>
-      </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 }
