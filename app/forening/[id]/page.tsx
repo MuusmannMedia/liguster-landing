@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
-import Image from 'next/image'; // ✅ Vigtigt import
+import Image from 'next/image';
 
 // --- TYPER ---
 type Forening = {
@@ -46,6 +46,15 @@ const getAvatarUrl = (path: string | null | undefined) => {
   if (!path) return null;
   if (path.startsWith('http')) return path; 
   const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+  return data.publicUrl;
+};
+
+// ✅ NY HJÆLPER: Sikrer at vi får en gyldig URL til event-billeder
+const getEventImageUrl = (path: string | null | undefined) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  // Her antager vi at bucket hedder 'event_images'. Hvis din bucket hedder noget andet (fx 'events'), ret her:
+  const { data } = supabase.storage.from('event_images').getPublicUrl(path);
   return data.publicUrl;
 };
 
@@ -96,7 +105,7 @@ export default function ForeningDetaljePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   
-  // ✅ STATE TIL REDIGERING
+  // STATE TIL REDIGERING
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState("");
 
@@ -176,11 +185,20 @@ export default function ForeningDetaljePage() {
     if (data) setCalendarEvents(data);
   };
 
+  // ✅ OPDATERET FETCH: Henter fra flere events for at finde billeder
   const fetchImages = async () => {
-    const { data: evs } = await supabase.from("forening_events").select("id").eq("forening_id", id).limit(5);
+    // Vi henter lidt flere events (20) for at være sikre på at finde nogle med billeder
+    const { data: evs } = await supabase.from("forening_events").select("id").eq("forening_id", id).order('start_at', { ascending: false }).limit(20);
+    
     if (evs && evs.length > 0) {
       const ids = evs.map(e => e.id);
-      const { data } = await supabase.from("event_images").select("id, image_url").in("event_id", ids).order("created_at", { ascending: false }).limit(3);
+      const { data } = await supabase
+        .from("event_images")
+        .select("id, image_url")
+        .in("event_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(5); // Henter de seneste 5 billeder på tværs af events
+        
       if (data) setImages(data);
     }
   };
@@ -349,7 +367,6 @@ export default function ForeningDetaljePage() {
         />
 
         {/* --- FORENING INFO KORT --- */}
-        {/* ✅ RETTET LAYOUT: bruger flex-col og gap-4 */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
@@ -364,14 +381,13 @@ export default function ForeningDetaljePage() {
             <p className="text-gray-700 font-bold">{forening.sted}</p>
           </div>
           
-          {/* ✅ BESKRIVELSE MED REDIGERINGS-MULIGHED (OG SORT TEKST) */}
+          {/* BESKRIVELSE */}
           <div className="w-full">
             {isEditing ? (
               <div className="flex flex-col gap-3">
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  // ✅ style={{color:'black'}} gennemtvinger sort tekst.
                   style={{ color: '#000000' }}
                   className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm text-gray-900 placeholder-gray-500 bg-white"
                   placeholder="Skriv foreningens beskrivelse her..."
@@ -557,18 +573,24 @@ export default function ForeningDetaljePage() {
           </div>
           {images.length === 0 ? <p className="text-sm text-gray-400">Ingen billeder endnu.</p> : (
             <div className="flex gap-2 mt-2 overflow-x-auto pb-2 scrollbar-hide">
-              {images.map(img => (
-                // ✅ RETTET: Tilføjet flex-shrink-0 og Next.js Image
-                <div key={img.id} className="w-24 h-24 flex-shrink-0 rounded-[14px] overflow-hidden bg-gray-100 relative">
-                  <Image 
-                    src={img.image_url} 
-                    alt="" 
-                    fill 
-                    className="object-cover" 
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  />
-                </div>
-              ))}
+              {images.map(img => {
+                const src = getEventImageUrl(img.image_url);
+                return (
+                  <div key={img.id} className="w-24 h-24 flex-shrink-0 rounded-[14px] overflow-hidden bg-gray-100 relative">
+                    {src ? (
+                      <Image 
+                        src={src} 
+                        alt="" 
+                        fill 
+                        className="object-cover" 
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold">?</div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
