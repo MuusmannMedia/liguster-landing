@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
-import Image from 'next/image'; // Sørg for at denne er importeret
 
 // --- TYPER ---
 type Forening = {
@@ -67,6 +66,7 @@ function CreateForeningModal({ isOpen, onClose, userId, onCreated }: { isOpen: b
       setNavn(""); setSted(""); setBeskrivelse("");
       onCreated();
       onClose();
+      // Her kunne vi navigere til den nye forening, men vi opdaterer bare listen for nu
 
     } catch (error: any) {
       alert("Fejl ved oprettelse: " + error.message);
@@ -147,7 +147,8 @@ export default function ForeningPage() {
         if (error) throw error;
         data = res;
       } else {
-        // Hent mine foreninger
+        // Hent mine foreninger (lidt mere tricky query i Supabase)
+        // Vi bruger en inner join til at finde dem jeg er medlem af
         const { data: res, error } = await supabase
           .from("foreninger")
           .select("*, foreningsmedlemmer!inner(user_id)")
@@ -239,19 +240,14 @@ export default function ForeningPage() {
             {filtered.map(forening => (
               <div 
                 key={forening.id}
+                // Naviger til detaljesiden
                 onClick={() => router.push(`/forening/${forening.id}`)}
                 className="bg-white rounded-[24px] p-4 shadow-sm hover:shadow-lg transition-shadow cursor-pointer flex flex-col h-full transform hover:scale-[1.02] duration-200"
               >
-                {/* Billede eller Placeholder - NU 1:1 ASPECT RATIO MED NEXT/IMAGE */}
+                {/* Billede eller Placeholder - NU 1:1 ASPECT RATIO */}
                 <div className="w-full aspect-square rounded-[18px] mb-3 overflow-hidden bg-[#E7EBF0] flex items-center justify-center relative">
                   {forening.billede_url ? (
-                    <Image 
-                      src={forening.billede_url} 
-                      alt={forening.navn} 
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    />
+                    <img src={forening.billede_url} alt={forening.navn} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-[#536071] font-bold text-xl px-4 text-center line-clamp-2">
                       {forening.navn}
