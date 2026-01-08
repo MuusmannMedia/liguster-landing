@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import Image from 'next/image';
+// import Image from 'next/image'; // Vi bruger <img> for sikkerheds skyld (failsafe)
 
 // --- TYPER ---
 type EventRow = {
@@ -92,7 +92,7 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
   const [price, setPrice] = useState("");
   const [capacity, setCapacity] = useState("");
   const [allowReg, setAllowReg] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null); // ✅ Til upload
   const [loadingAction, setLoadingAction] = useState(false);
 
   // Push Stats
@@ -186,7 +186,7 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
     try {
       let imageUrl = activeEvent?.image_url || null;
 
-      // Upload nyt billede?
+      // ✅ UPLOAD BILLEDE HVIS VALGT
       if (imageFile) {
         const compressed = await resizeImage(imageFile);
         const path = `events/${foreningId}/ev_${Date.now()}.jpg`;
@@ -206,8 +206,8 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
         price: price ? parseFloat(price) : null,
         capacity: capacity ? parseInt(capacity) : null,
         allow_registration: allowReg,
-        image_url: imageUrl,
-        created_by: userId, // Ignoreres ved update pga RLS normalt, men fint at have med
+        image_url: imageUrl, // ✅ Gem URL
+        created_by: userId, 
       };
 
       if (modalMode === 'create') {
@@ -363,13 +363,13 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
                       <img src={activeEvent.image_url} alt="" className="w-full h-full object-cover" />
                     </div>
                   )}
-                  
+                
                   <div>
                     <h2 className="text-2xl font-black text-[#131921] mb-1">{activeEvent.title}</h2>
                     <p className="text-[#254890] font-bold text-sm mb-4">
                       {fmtRange(activeEvent.start_at, activeEvent.end_at)}
                     </p>
-                    
+                  
                     <div className="flex flex-wrap gap-2 mb-4">
                       {activeEvent.location && <span className="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-600">📍 {activeEvent.location}</span>}
                       {activeEvent.price && <span className="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-600">💰 {activeEvent.price} kr.</span>}
@@ -445,7 +445,7 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
                   <input required placeholder="Overskrift" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-[#131921] outline-none text-[#131921] placeholder-gray-500 font-medium" value={title} onChange={e => setTitle(e.target.value)} />
                   <textarea placeholder="Beskrivelse" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 h-24 resize-none outline-none text-[#131921] placeholder-gray-500 font-medium" value={description} onChange={e => setDescription(e.target.value)} />
                   <input placeholder="Sted (f.eks. Klubhus)" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-[#131921] placeholder-gray-500 font-medium" value={location} onChange={e => setLocation(e.target.value)} />
-                  
+                
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-bold text-gray-500 ml-1">Start</label>
@@ -467,7 +467,8 @@ export default function ForeningEvents({ foreningId, userId, isUserAdmin, isAppr
                     <span className="font-bold text-gray-700 text-sm">Tillad tilmelding</span>
                   </label>
 
-                  <div className="p-3 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-center cursor-pointer relative hover:bg-gray-100">
+                  {/* ✅ BILLED UPLOAD */}
+                  <div className="p-3 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-center cursor-pointer relative hover:bg-gray-100 transition-colors">
                     <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
                     <span className="text-sm font-bold text-gray-500">
                       {imageFile ? `Valgt: ${imageFile.name}` : activeEvent?.image_url && modalMode === 'edit' ? "Skift billede (valgfrit)" : "+ Vælg billede"}
