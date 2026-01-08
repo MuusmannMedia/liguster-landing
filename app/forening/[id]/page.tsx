@@ -49,11 +49,11 @@ const getAvatarUrl = (path: string | null | undefined) => {
   return data.publicUrl;
 };
 
-// ✅ NY HJÆLPER: Sikrer at vi får en gyldig URL til event-billeder
+// ✅ HJÆLPER: Sikrer korrekt URL til event-billeder
 const getEventImageUrl = (path: string | null | undefined) => {
   if (!path) return null;
   if (path.startsWith('http')) return path;
-  // Her antager vi at bucket hedder 'event_images'. Hvis din bucket hedder noget andet (fx 'events'), ret her:
+  // Henter public URL fra din bucket (ret 'event_images' hvis din bucket hedder noget andet)
   const { data } = supabase.storage.from('event_images').getPublicUrl(path);
   return data.publicUrl;
 };
@@ -185,21 +185,32 @@ export default function ForeningDetaljePage() {
     if (data) setCalendarEvents(data);
   };
 
-  // ✅ OPDATERET FETCH: Henter fra flere events for at finde billeder
+  // ✅ OPDATERET BILLEDE HENTNING: Finder de seneste 5 billeder uanset event
   const fetchImages = async () => {
-    // Vi henter lidt flere events (20) for at være sikre på at finde nogle med billeder
-    const { data: evs } = await supabase.from("forening_events").select("id").eq("forening_id", id).order('start_at', { ascending: false }).limit(20);
-    
-    if (evs && evs.length > 0) {
-      const ids = evs.map(e => e.id);
-      const { data } = await supabase
+    try {
+      // 1. Find alle event ID'er for denne forening
+      const { data: allEvents, error: evErr } = await supabase
+        .from("forening_events")
+        .select("id")
+        .eq("forening_id", id);
+
+      if (evErr || !allEvents || allEvents.length === 0) return;
+
+      const eventIds = allEvents.map(e => e.id);
+
+      // 2. Hent de 5 nyeste billeder, der hører til disse events
+      const { data: latestImages, error: imgErr } = await supabase
         .from("event_images")
         .select("id, image_url")
-        .in("event_id", ids)
+        .in("event_id", eventIds)
         .order("created_at", { ascending: false })
-        .limit(5); // Henter de seneste 5 billeder på tværs af events
-        
-      if (data) setImages(data);
+        .limit(5);
+
+      if (!imgErr && latestImages) {
+        setImages(latestImages);
+      }
+    } catch (err) {
+      console.error("Fejl ved hentning af billeder:", err);
     }
   };
 
@@ -574,6 +585,7 @@ export default function ForeningDetaljePage() {
           {images.length === 0 ? <p className="text-sm text-gray-400">Ingen billeder endnu.</p> : (
             <div className="flex gap-2 mt-2 overflow-x-auto pb-2 scrollbar-hide">
               {images.map(img => {
+                // ✅ BRUG HELPER til URL
                 const src = getEventImageUrl(img.image_url);
                 return (
                   <div key={img.id} className="w-24 h-24 flex-shrink-0 rounded-[14px] overflow-hidden bg-gray-100 relative">
