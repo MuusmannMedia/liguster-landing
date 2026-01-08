@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../lib/supabaseClient'; // Tjek din sti
+import { supabase } from '../../lib/supabaseClient'; 
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
-import Image from 'next/image';
+// Fjerner next/image for at bruge <img>
+// import Image from 'next/image';
 
 // --- TYPER ---
 type Forening = {
@@ -14,7 +15,7 @@ type Forening = {
   sted: string;
   beskrivelse: string;
   billede_url?: string;
-  slug?: string; // ✅ NYT FELT
+  slug?: string;
   oprettet_af?: string;
 };
 
@@ -23,14 +24,14 @@ const generateSlug = (text: string) => {
   return text
     .toString()
     .toLowerCase()
-    .replace(/\s+/g, '-')           // Erstat mellemrum med -
-    .replace(/[æ]/g, 'ae')          // Erstat æ
-    .replace(/[ø]/g, 'oe')          // Erstat ø
-    .replace(/[å]/g, 'aa')          // Erstat å
-    .replace(/[^\w\-]+/g, '')       // Fjern specialtegn
-    .replace(/\-\-+/g, '-')         // Fjern dobbelte -
-    .replace(/^-+/, '')             // Trim start
-    .replace(/-+$/, '');            // Trim slut
+    .replace(/\s+/g, '-')           
+    .replace(/[æ]/g, 'ae')          
+    .replace(/[ø]/g, 'oe')          
+    .replace(/[å]/g, 'aa')          
+    .replace(/[^\w\-]+/g, '')       
+    .replace(/\-\-+/g, '-')         
+    .replace(/^-+/, '')             
+    .replace(/-+$/, '');            
 };
 
 // --- KOMPONENT: OPRET FORENING MODAL ---
@@ -52,18 +53,16 @@ function CreateForeningModal({ isOpen, onClose, userId, onCreated }: { isOpen: b
     try {
       setLoading(true);
 
-      // ✅ GENERER SLUG
       const rawSlug = `${navn}-${sted}`;
-      const slug = generateSlug(rawSlug) + '-' + Date.now().toString().slice(-4); // Tilføjer lidt random tal for at sikre unikhed
+      const slug = generateSlug(rawSlug) + '-' + Date.now().toString().slice(-4);
 
-      // 1. Opret foreningen
       const { data: foreningData, error: foreningError } = await supabase
         .from("foreninger")
         .insert([{ 
           navn: navn.trim(), 
           sted: sted.trim(), 
           beskrivelse: beskrivelse.trim(), 
-          slug: slug, // ✅ INDSÆT SLUG
+          slug: slug,
           oprettet_af: userId 
         }])
         .select("id")
@@ -71,7 +70,6 @@ function CreateForeningModal({ isOpen, onClose, userId, onCreated }: { isOpen: b
 
       if (foreningError) throw foreningError;
 
-      // 2. Gør brugeren til admin
       if (foreningData?.id) {
         await supabase.from("foreningsmedlemmer").insert([{ 
             forening_id: foreningData.id, 
@@ -156,7 +154,7 @@ export default function ForeningPage() {
       if (mode === "alle") {
         const { data: res, error } = await supabase
           .from("foreninger")
-          .select("*") // Henter også slug nu
+          .select("*")
           .order("navn", { ascending: true });
         if (error) throw error;
         data = res;
@@ -223,8 +221,9 @@ export default function ForeningPage() {
                 className="bg-white rounded-[24px] p-4 shadow-sm hover:shadow-lg transition-shadow cursor-pointer flex flex-col h-full transform hover:scale-[1.02] duration-200"
               >
                 <div className="w-full aspect-square rounded-[18px] mb-3 overflow-hidden bg-[#E7EBF0] flex items-center justify-center relative">
+                  {/* ✅ BRUG <img> SÅ BILLEDET VISES UDEN NEXT.CONFIG ÆNDRINGER */}
                   {forening.billede_url ? (
-                    <Image src={forening.billede_url} alt={forening.navn} fill className="object-cover" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" />
+                    <img src={forening.billede_url} alt={forening.navn} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-[#536071] font-bold text-xl px-4 text-center line-clamp-2">{forening.navn}</span>
                   )}
