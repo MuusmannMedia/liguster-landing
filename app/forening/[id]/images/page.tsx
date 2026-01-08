@@ -1,5 +1,5 @@
 'use client';
-import { useParams, useRouter } from 'next/navigation'; // ✅ Tilføjet useRouter
+import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../../lib/supabaseClient';
 import SiteHeader from '../../../../components/SiteHeader';
@@ -7,7 +7,7 @@ import ForeningImages from '../../../../components/ForeningImages';
 
 export default function ImagesPage() {
   const { id } = useParams();
-  const router = useRouter(); // ✅ Init router
+  const router = useRouter();
 
   const [userId, setUserId] = useState<string|null>(null);
   const [isMember, setIsMember] = useState(false);
@@ -26,7 +26,6 @@ export default function ImagesPage() {
     });
   }, [id]);
 
-  // ✅ Funktion til at gå tilbage
   const handleClose = () => {
     router.push(`/forening/${id}`);
   };
@@ -36,13 +35,14 @@ export default function ImagesPage() {
       <SiteHeader />
       <main className="max-w-4xl mx-auto p-4 bg-white min-h-screen mt-4 rounded-t-3xl">
         
-        {/* ✅ Header med titel og luk-knap */}
+        {/* Header med titel og luk-knap */}
         <div className="flex items-center justify-between mb-6 px-2 pt-2">
           <h1 className="text-2xl font-black text-[#131921]">Billeder</h1>
           
           <button 
             onClick={handleClose}
-            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 hover:text-black transition-colors"
+            // ✅ RETTET: text-[#131921] (Sort) i stedet for grå, så den er tydelig
+            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full text-[#131921] transition-colors"
           >
             <i className="fa-solid fa-xmark text-lg"></i>
           </button>
