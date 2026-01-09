@@ -33,7 +33,19 @@ type Medlem = {
 };
 
 type Thread = { id: string; title: string; created_at: string; created_by: string };
-type Event = { id: string; title: string; start_at: string; end_at: string; location?: string; price?: number };
+
+// Opdateret Event type med beskrivelse og billede til kalenderen
+type Event = { 
+  id: string; 
+  title: string; 
+  start_at: string; 
+  end_at: string; 
+  location?: string; 
+  price?: number;
+  description?: string;
+  image_url?: string; 
+};
+
 type ImagePreview = { id: number; image_url: string };
 
 // --- HJÆLPERE ---
@@ -59,7 +71,7 @@ const getEventImageUrl = (path: string | null | undefined) => {
   return data.publicUrl;
 };
 
-const fmtDate = (d: any) => new Date(d).toLocaleDateString("da-DK", { day: 'numeric', month: 'short' });
+const fmtDate = (d: any) => new Date(d).toLocaleDateString("da-DK", { day: 'numeric', month: 'long' });
 const fmtTime = (d: any) => new Date(d).toLocaleTimeString("da-DK", { hour: '2-digit', minute: '2-digit' });
 
 const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
@@ -178,7 +190,13 @@ export default function ForeningDetaljePage() {
           const last = endOfMonth(today);
           const bufferStart = new Date(first); bufferStart.setDate(first.getDate() - 7);
           const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
-          const p4 = supabase.from("forening_events").select("id, title, start_at, end_at, location, price").eq("forening_id", fId).gte("start_at", bufferStart.toISOString()).lte("start_at", bufferEnd.toISOString());
+          
+          // ✅ HENT ALLE DETALJER TIL KALENDEREN (Beskrivelse, billede osv.)
+          const p4 = supabase.from("forening_events")
+            .select("id, title, start_at, end_at, location, price, description, image_url")
+            .eq("forening_id", fId)
+            .gte("start_at", bufferStart.toISOString())
+            .lte("start_at", bufferEnd.toISOString());
 
           const { data: allEvents } = await supabase.from("forening_events").select("id").eq("forening_id", fId);
           let p5: any = Promise.resolve({ data: [] });
@@ -207,6 +225,7 @@ export default function ForeningDetaljePage() {
     loadAllData();
   }, [idOrSlug]);
 
+  // Kalender helpers
   useEffect(() => {
     if (realForeningId && userId) {
         const fetchCal = async () => {
@@ -214,7 +233,11 @@ export default function ForeningDetaljePage() {
             const last = endOfMonth(monthCursor);
             const bufferStart = new Date(first); bufferStart.setDate(first.getDate() - 7);
             const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
-            const { data } = await supabase.from("forening_events").select("id, title, start_at, end_at, location, price").eq("forening_id", realForeningId).gte("start_at", bufferStart.toISOString()).lte("start_at", bufferEnd.toISOString());
+            const { data } = await supabase.from("forening_events")
+                .select("id, title, start_at, end_at, location, price, description, image_url")
+                .eq("forening_id", realForeningId)
+                .gte("start_at", bufferStart.toISOString())
+                .lte("start_at", bufferEnd.toISOString());
             if(data) setCalendarEvents(data);
         };
         fetchCal();
@@ -222,6 +245,7 @@ export default function ForeningDetaljePage() {
   }, [monthCursor, realForeningId, userId]);
 
 
+  // --- ACTIONS ---
   const handleShareForening = async () => {
     if (!forening) return;
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -319,7 +343,6 @@ export default function ForeningDetaljePage() {
     return (
       <div className="min-h-screen flex flex-col bg-[#869FB9]">
         <SiteHeader />
-        
         <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
           <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
             <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
@@ -332,39 +355,32 @@ export default function ForeningDetaljePage() {
                  Offentlig visning
               </div>
             </div>
-
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
               <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
               <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap">{forening.beskrivelse}</p>
             </div>
           </div>
-
           <div className="bg-[#0D253F] rounded-[24px] p-8 md:p-10 text-center shadow-lg relative overflow-hidden">
             <div className="flex flex-col items-center mb-6">
                <div className="relative w-48 h-16">
                   <Image src="/Liguster-logo-NEG.png" alt="Liguster" fill className="object-contain" />
                </div>
             </div>
-
             <h2 className="text-white text-2xl md:text-3xl font-bold mb-4">Klar til at gøre en forskel lokalt?</h2>
-            
             <p className="text-white/80 text-sm md:text-base leading-relaxed mb-8 max-w-lg mx-auto">
               Opret en bruger i dag for at se aktiviteter, beskeder og medlemmer i <strong>{forening.navn}</strong>. 
               Det er gratis, enkelt og tager kun et øjeblik.
             </p>
-
             <Link href="/opret" className="inline-flex items-center gap-2 bg-white text-[#0D253F] px-8 py-4 rounded-full font-bold text-sm shadow-md hover:bg-gray-100 transition-colors">
               <i className="fa-solid fa-user-plus"></i> Opret bruger nu
             </Link>
-            
             <div className="mt-4">
                 <Link href="/login" className="text-white/60 text-xs hover:text-white underline">
                     Har du allerede en bruger? Log ind her
                 </Link>
             </div>
           </div>
-
         </main>
         <SiteFooter />
       </div>
@@ -497,35 +513,35 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* ✅ OPSTRAMMET KALENDER */}
+        {/* ✅ OPSTRAMMET KALENDER DESIGN */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
           
           <div className="flex items-center justify-between mb-4 px-2">
             <button 
               onClick={() => changeMonth(-1)} 
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-[#131921] font-bold border border-gray-200"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200 hover:border-[#131921] transition-all"
             >
-              ‹
+              <i className="fa-solid fa-chevron-left"></i>
             </button>
-            <h3 className="font-black text-[#131921] text-lg capitalize tracking-tight">
+            <h3 className="font-black text-[#131921] text-xl capitalize tracking-tight">
               {monthCursor.toLocaleDateString("da-DK", { month: 'long', year: 'numeric' })}
             </h3>
             <button 
               onClick={() => changeMonth(1)} 
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-[#131921] font-bold border border-gray-200"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200 hover:border-[#131921] transition-all"
             >
-              ›
+              <i className="fa-solid fa-chevron-right"></i>
             </button>
           </div>
 
           <div className="grid grid-cols-7 text-center mb-2">
             {['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'].map(d => (
-              <span key={d} className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{d}</span>
+              <span key={d} className="text-xs font-black text-gray-400 uppercase tracking-widest">{d}</span>
             ))}
           </div>
           
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-1.5">
             {buildMonthGrid(monthCursor).map((week, wIdx) => week.map((day, dIdx) => {
                 const isCurrentMonth = day.getMonth() === monthCursor.getMonth();
                 const key = toKey(day);
@@ -537,19 +553,17 @@ export default function ForeningDetaljePage() {
                     key={`${wIdx}-${dIdx}`} 
                     onClick={() => hasEvents && setSelectedDateEvents({ date: key, events: dayEvents })} 
                     className={`
-                      aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative cursor-pointer transition-colors
-                      ${!isCurrentMonth ? 'text-gray-300 bg-gray-50/50' : 'text-gray-800'}
-                      ${hasEvents ? 'bg-[#131921] text-white hover:bg-black font-bold shadow-md transform scale-[0.95]' : 'hover:bg-gray-50'}
+                      aspect-square flex flex-col items-center justify-center rounded-xl text-sm relative cursor-pointer transition-all duration-200
+                      ${!isCurrentMonth ? 'text-gray-300' : 'text-gray-800'}
+                      ${hasEvents 
+                        ? 'bg-[#131921] text-white shadow-lg transform hover:scale-105 font-bold border-2 border-[#131921]' // Markant mørk
+                        : 'hover:bg-gray-100 hover:font-bold'
+                      }
                     `}
                   >
                     {day.getDate()}
-                    {/* Event prikker */}
                     {hasEvents && (
-                      <div className="flex gap-0.5 mt-0.5">
-                        {dayEvents.slice(0, 3).map((_, i) => (
-                          <div key={i} className="w-1 h-1 rounded-full bg-white opacity-80"></div>
-                        ))}
-                      </div>
+                      <div className="w-1.5 h-1.5 bg-white rounded-full mt-1"></div>
                     )}
                   </div>
                 );
@@ -589,7 +603,7 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* MODALER FOR MEDLEMMER OG EVENTS ... (Samme kode som før) */}
+      {/* MEDLEM MODAL */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
@@ -627,20 +641,54 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
+      {/* ✅ DETALJERET EVENT MODAL (Når man klikker i kalenderen) */}
       {selectedDateEvents && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
-            <button onClick={() => setSelectedDateEvents(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black text-xl">✕</button>
-            <h3 className="font-black text-[#131921] mb-1 capitalize">{new Date(selectedDateEvents.date).toLocaleDateString("da-DK", { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
-            <p className="text-xs text-gray-500 mb-4">{selectedDateEvents.events.length} aktiviteter</p>
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto">
-              {selectedDateEvents.events.map(e => (
-                <div key={e.id} className="bg-gray-50 p-3 rounded-xl">
-                  <h4 className="font-bold text-[#131921]">{e.title}</h4>
-                  <p className="text-xs text-gray-600 mt-1">{fmtTime(e.start_at)} {e.end_at ? `- ${fmtTime(e.end_at)}` : ''}</p>
-                  {e.location && <p className="text-xs text-gray-500 mt-0.5">📍 {e.location}</p>}
-                </div>
-              ))}
+          <div className="bg-white w-full max-w-xl rounded-[24px] shadow-2xl relative overflow-hidden max-h-[85vh] overflow-y-auto">
+            <button onClick={() => setSelectedDateEvents(null)} className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center bg-white/80 rounded-full text-black hover:bg-white shadow-sm">✕</button>
+            
+            <div className="p-6">
+              <h3 className="font-black text-[#131921] text-2xl mb-1 capitalize border-b border-gray-100 pb-4">
+                {new Date(selectedDateEvents.date).toLocaleDateString("da-DK", { weekday: 'long', day: 'numeric', month: 'long' })}
+              </h3>
+              
+              <div className="space-y-6 mt-6">
+                {selectedDateEvents.events.map(e => (
+                  <div key={e.id} className="flex flex-col gap-3">
+                    
+                    {/* Billede (hvis det findes) */}
+                    {e.image_url && (
+                      <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-100 relative shadow-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={getEventImageUrl(e.image_url)} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <h4 className="font-bold text-[#131921] text-xl">{e.title}</h4>
+                        {e.price && e.price > 0 && <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">{e.price} kr.</span>}
+                      </div>
+                      
+                      <div className="flex gap-4 mt-2 mb-3">
+                        <p className="text-sm font-bold text-[#131921] bg-gray-100 px-3 py-1 rounded-lg flex items-center gap-2">
+                          <i className="fa-regular fa-clock"></i> 
+                          {fmtTime(e.start_at)} {e.end_at ? `- ${fmtTime(e.end_at)}` : ''}
+                        </p>
+                        {e.location && (
+                          <p className="text-sm font-bold text-gray-500 bg-gray-50 px-3 py-1 rounded-lg flex items-center gap-2">
+                            <i className="fa-solid fa-location-dot"></i> {e.location}
+                          </p>
+                        )}
+                      </div>
+
+                      {e.description && (
+                        <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{e.description}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
