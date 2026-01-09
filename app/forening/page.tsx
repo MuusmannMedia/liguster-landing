@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient'; 
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
-// Fjerner next/image for at bruge <img>
-// import Image from 'next/image';
 
 // --- TYPER ---
 type Forening = {
@@ -21,20 +19,10 @@ type Forening = {
 
 // --- HJÆLPER: GENERER SLUG ---
 const generateSlug = (text: string) => {
-  return text
-    .toString()
-    .toLowerCase()
-    .replace(/\s+/g, '-')           
-    .replace(/[æ]/g, 'ae')          
-    .replace(/[ø]/g, 'oe')          
-    .replace(/[å]/g, 'aa')          
-    .replace(/[^\w\-]+/g, '')       
-    .replace(/\-\-+/g, '-')         
-    .replace(/^-+/, '')             
-    .replace(/-+$/, '');            
+  return text.toString().toLowerCase().replace(/\s+/g, '-').replace(/[æ]/g, 'ae').replace(/[ø]/g, 'oe').replace(/[å]/g, 'aa').replace(/[^\w\-]+/g, '').replace(/\-\-+/g, '-').replace(/^-+/, '').replace(/-+$/, '');            
 };
 
-// --- KOMPONENT: OPRET FORENING MODAL ---
+// --- KOMPONENT: OPRET FORENING MODAL (Beholdes) ---
 function CreateForeningModal({ isOpen, onClose, userId, onCreated }: { isOpen: boolean; onClose: () => void; userId: string; onCreated: () => void }) {
   const [loading, setLoading] = useState(false);
   const [navn, setNavn] = useState("");
@@ -45,84 +33,39 @@ function CreateForeningModal({ isOpen, onClose, userId, onCreated }: { isOpen: b
 
   const handleOpret = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!navn || !sted || !beskrivelse) {
-      alert("Udfyld venligst alle felter");
-      return;
-    }
+    if (!navn || !sted || !beskrivelse) return alert("Udfyld alle felter");
 
     try {
       setLoading(true);
-
       const rawSlug = `${navn}-${sted}`;
       const slug = generateSlug(rawSlug) + '-' + Date.now().toString().slice(-4);
 
-      const { data: foreningData, error: foreningError } = await supabase
-        .from("foreninger")
-        .insert([{ 
-          navn: navn.trim(), 
-          sted: sted.trim(), 
-          beskrivelse: beskrivelse.trim(), 
-          slug: slug,
-          oprettet_af: userId 
-        }])
-        .select("id")
-        .single();
-
-      if (foreningError) throw foreningError;
+      const { data: foreningData, error } = await supabase.from("foreninger").insert([{ navn, sted, beskrivelse, slug, oprettet_af: userId, is_public: false }]).select("id").single();
+      if (error) throw error;
 
       if (foreningData?.id) {
-        await supabase.from("foreningsmedlemmer").insert([{ 
-            forening_id: foreningData.id, 
-            user_id: userId, 
-            rolle: "admin", 
-            status: "approved" 
-        }]);
+        await supabase.from("foreningsmedlemmer").insert([{ forening_id: foreningData.id, user_id: userId, rolle: "admin", status: "approved" }]);
       }
-
-      setNavn(""); setSted(""); setBeskrivelse("");
-      onCreated();
-      onClose();
-
-    } catch (error: any) {
-      alert("Fejl ved oprettelse: " + error.message);
-    } finally {
-      setLoading(false);
-    }
+      setNavn(""); setSted(""); setBeskrivelse(""); onCreated(); onClose();
+    } catch (error: any) { alert("Fejl: " + error.message); } finally { setLoading(false); }
   };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-        <div className="bg-[#131921] px-6 py-4 flex justify-between items-center">
-          <h2 className="text-white text-lg font-bold uppercase tracking-wider">Opret Forening</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
-        </div>
+        <div className="bg-[#131921] px-6 py-4 flex justify-between items-center"><h2 className="text-white text-lg font-bold uppercase tracking-wider">Opret Forening</h2><button onClick={onClose} className="text-gray-400 hover:text-white">✕</button></div>
         <form onSubmit={handleOpret} className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Navn</label>
-            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] text-[#131921]" placeholder="Foreningens navn" value={navn} onChange={e => setNavn(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Sted</label>
-            <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] text-[#131921]" placeholder="F.eks. København" value={sted} onChange={e => setSted(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Beskrivelse</label>
-            <textarea className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 h-24 outline-none focus:ring-2 focus:ring-[#131921] text-[#131921] resize-none" placeholder="Kort beskrivelse..." value={beskrivelse} onChange={e => setBeskrivelse(e.target.value)} />
-          </div>
-          <div className="pt-2 flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200">Annuller</button>
-            <button type="submit" disabled={loading} className="flex-[2] py-3 rounded-xl font-bold text-white bg-[#131921] hover:bg-gray-900 flex items-center justify-center">
-              {loading ? <span className="animate-spin mr-2">⏳</span> : null} Opret
-            </button>
-          </div>
+          <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none" placeholder="Foreningens navn" value={navn} onChange={e => setNavn(e.target.value)} />
+          <input type="text" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none" placeholder="Sted" value={sted} onChange={e => setSted(e.target.value)} />
+          <textarea className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 h-24 outline-none resize-none" placeholder="Beskrivelse" value={beskrivelse} onChange={e => setBeskrivelse(e.target.value)} />
+          <button type="submit" disabled={loading} className="w-full py-3 rounded-xl font-bold text-white bg-[#131921] hover:bg-gray-900">{loading ? "..." : "Opret"}</button>
         </form>
       </div>
     </div>
   );
 }
 
-// --- MAIN PAGE ---
+// --- MAIN PAGE (KUN FOR MEDLEMMER) ---
 export default function ForeningPage() {
   const router = useRouter();
   const [visning, setVisning] = useState<"mine" | "alle">("mine");
@@ -135,9 +78,12 @@ export default function ForeningPage() {
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace('/login'); return; }
+      if (!session) { 
+        router.replace('/login'); 
+        return; 
+      }
       setUserId(session.user.id);
-      fetchData(session.user.id, visning);
+      fetchData(session.user.id, "mine");
     };
     init();
   }, [router]);
@@ -150,38 +96,20 @@ export default function ForeningPage() {
     setLoading(true);
     try {
       let data: any[] | null = [];
-      
       if (mode === "alle") {
-        const { data: res, error } = await supabase
-          .from("foreninger")
-          .select("*")
-          .order("navn", { ascending: true });
-        if (error) throw error;
+        const { data: res } = await supabase.from("foreninger").select("*").order("navn", { ascending: true });
         data = res;
       } else {
-        const { data: res, error } = await supabase
-          .from("foreninger")
-          .select("*, foreningsmedlemmer!inner(user_id)")
-          .eq("foreningsmedlemmer.user_id", uid);
-        if (error) throw error;
+        const { data: res } = await supabase.from("foreninger").select("*, foreningsmedlemmer!inner(user_id)").eq("foreningsmedlemmer.user_id", uid);
         data = res;
       }
       setForeninger(data || []);
-    } catch (err) {
-      console.error("Fejl:", err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  const filtered = foreninger.filter(f => {
-    const s = search.toLowerCase();
-    return (
-      f.navn.toLowerCase().includes(s) ||
-      f.sted.toLowerCase().includes(s) ||
-      f.beskrivelse.toLowerCase().includes(s)
-    );
-  });
+  const filtered = foreninger.filter(f => f.navn.toLowerCase().includes(search.toLowerCase()) || f.sted.toLowerCase().includes(search.toLowerCase()));
+
+  if (!userId) return null; // Skjuler indhold mens vi tjekker login
 
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
@@ -193,9 +121,7 @@ export default function ForeningPage() {
                <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#254890]"></i>
                <input type="text" className="w-full h-12 rounded-full pl-12 pr-4 bg-white text-[#222] placeholder-gray-400 outline-none shadow-sm focus:ring-2 focus:ring-[#131921]" placeholder="Søg i foreninger..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <button onClick={() => setIsCreateOpen(true)} className="h-12 w-12 rounded-full bg-[#131921] flex items-center justify-center text-white shadow-md hover:bg-gray-900 transition-colors">
-              <i className="fa-solid fa-plus text-xl"></i>
-            </button>
+            <button onClick={() => setIsCreateOpen(true)} className="h-12 w-12 rounded-full bg-[#131921] flex items-center justify-center text-white shadow-md hover:bg-gray-900 transition-colors"><i className="fa-solid fa-plus text-xl"></i></button>
           </div>
           <div className="flex bg-white/10 p-1 rounded-full backdrop-blur-sm gap-1">
             <button onClick={() => setVisning("mine")} className={`flex-1 py-3 rounded-full text-xs font-bold tracking-wider transition-all ${visning === "mine" ? "bg-[#131921] text-white shadow-md" : "bg-white text-[#131921] hover:bg-gray-50"}`}>MINE FORENINGER</button>
@@ -216,17 +142,11 @@ export default function ForeningPage() {
             {filtered.map(forening => (
               <div 
                 key={forening.id}
-                // ✅ BRUG SLUG TIL NAVIGATION HVIS DEN FINDES
                 onClick={() => router.push(`/forening/${forening.slug || forening.id}`)}
                 className="bg-white rounded-[24px] p-4 shadow-sm hover:shadow-lg transition-shadow cursor-pointer flex flex-col h-full transform hover:scale-[1.02] duration-200"
               >
                 <div className="w-full aspect-square rounded-[18px] mb-3 overflow-hidden bg-[#E7EBF0] flex items-center justify-center relative">
-                  {/* ✅ BRUG <img> SÅ BILLEDET VISES UDEN NEXT.CONFIG ÆNDRINGER */}
-                  {forening.billede_url ? (
-                    <img src={forening.billede_url} alt={forening.navn} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[#536071] font-bold text-xl px-4 text-center line-clamp-2">{forening.navn}</span>
-                  )}
+                  {forening.billede_url ? <img src={forening.billede_url} alt={forening.navn} className="w-full h-full object-cover" /> : <span className="text-[#536071] font-bold text-xl px-4 text-center line-clamp-2">{forening.navn}</span>}
                 </div>
                 <h3 className="font-bold text-lg text-[#131921] mb-1 underline decoration-gray-300 truncate">{forening.navn}</h3>
                 <p className="text-[#222] text-sm font-semibold mb-2 truncate">{forening.sted}</p>
@@ -237,9 +157,7 @@ export default function ForeningPage() {
         )}
       </main>
       <SiteFooter />
-      {userId && (
-        <CreateForeningModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} userId={userId} onCreated={() => fetchData(userId, visning)}/>
-      )}
+      {userId && <CreateForeningModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} userId={userId} onCreated={() => fetchData(userId, visning)}/>}
     </div>
   );
 }
