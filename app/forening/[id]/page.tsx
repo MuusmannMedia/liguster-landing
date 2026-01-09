@@ -5,8 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
-// Vi bruger <img> i stedet for Image for at undgå white-list problemer
-// import Image from 'next/image';
+import Link from 'next/link';
 
 // --- TYPER ---
 type Forening = {
@@ -17,7 +16,7 @@ type Forening = {
   billede_url?: string;
   oprettet_af?: string;
   slug?: string;
-  is_public?: boolean; // ✅ NYT FELT: Styrer om den vises på den offentlige liste
+  is_public?: boolean;
 };
 
 type Medlem = {
@@ -96,10 +95,7 @@ export default function ForeningDetaljePage() {
   const params = useParams();
   const router = useRouter();
   
-  // ✅ 1. Hent ID eller Slug fra URL'en
   const idOrSlug = params.id as string;
-  
-  // ✅ 2. State til at gemme det RIGTIGE ID (UUID)
   const [realForeningId, setRealForeningId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -108,12 +104,12 @@ export default function ForeningDetaljePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   
-  // ✅ Edit States
+  // Edit States
   const [isEditing, setIsEditing] = useState(false);
   const [editNavn, setEditNavn] = useState("");
   const [editSted, setEditSted] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editIsPublic, setEditIsPublic] = useState(false); // ✅ NY STATE: Public status
+  const [editIsPublic, setEditIsPublic] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -128,134 +124,126 @@ export default function ForeningDetaljePage() {
   const [showMembers, setShowMembers] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Medlem | null>(null);
   
+  // --- SAMLET DATA LOADER (Løser loading-problemet) ---
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setUserId(session.user.id);
-    });
-  }, []);
-
-  // ✅ 3. Find Foreningen (via Slug eller ID)
-  useEffect(() => {
-    const fetchMainData = async () => {
-      if (!idOrSlug) return;
-
-      // Tjek om URL'en ligner et ID (gammelt link) eller en Slug
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-
-      let query = supabase.from("foreninger").select("*");
+    async function loadAllData() {
+      setLoading(true);
       
-      if (isUuid) {
-        query = query.eq("id", idOrSlug);
-      } else {
-        query = query.eq("slug", idOrSlug); // Søg efter sluggen
-      }
+      try {
+        // 1. Hent Session
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUserId = session?.user?.id || null;
+        setUserId(currentUserId);
 
-      const { data } = await query.single();
-
-      if (data) {
-        setForening(data);
-        setRealForeningId(data.id); // Gem det rigtige UUID
+        // 2. Hent Forening
+        if (!idOrSlug) return;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+        let query = supabase.from("foreninger").select("*");
+        if (isUuid) query = query.eq("id", idOrSlug);
+        else query = query.eq("slug", idOrSlug);
         
-        // Sæt edit felter
-        setEditNavn(data.navn || "");
-        setEditSted(data.sted || "");
-        setEditDescription(data.beskrivelse || "");
-        setEditIsPublic(data.is_public || false); // ✅ Hent nuværende status fra DB
-      } else {
-        setLoading(false); // Fandt intet
-      }
-    };
+        const { data: foreningData, error } = await query.single();
 
-    fetchMainData();
+        if (error || !foreningData) {
+          console.error("Forening ikke fundet:", error);
+          setForening(null);
+          setLoading(false);
+          return;
+        }
+
+        setForening(foreningData);
+        setRealForeningId(foreningData.id);
+        setEditNavn(foreningData.navn || "");
+        setEditSted(foreningData.sted || "");
+        setEditDescription(foreningData.beskrivelse || "");
+        setEditIsPublic(foreningData.is_public || false);
+
+        // 3. Tjek Adgang
+        if (!currentUserId) {
+          // GÆST: Hvis den er public -> Stop loading (Vis teaser). Hvis privat -> Login.
+          if (foreningData.is_public) {
+            setLoading(false);
+            return;
+          } else {
+            router.replace('/login');
+            return;
+          }
+        }
+
+        // 4. MEDLEM: Hent resten af data
+        if (currentUserId) {
+          const fId = foreningData.id;
+          
+          const p1 = supabase.from("foreningsmedlemmer").select("user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (name, username, avatar_url, email)").eq("forening_id", fId);
+          const p2 = supabase.from("forening_threads").select("*").eq("forening_id", fId).order("created_at", { ascending: false }).limit(3);
+          const p3 = supabase.from("forening_events").select("*").eq("forening_id", fId).order("start_at", { ascending: false }).limit(3);
+          
+          // Fetch calendar events
+          const today = new Date();
+          const first = startOfMonth(today);
+          const last = endOfMonth(today);
+          const bufferStart = new Date(first); bufferStart.setDate(first.getDate() - 7);
+          const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
+          const p4 = supabase.from("forening_events").select("id, title, start_at, end_at, location, price").eq("forening_id", fId).gte("start_at", bufferStart.toISOString()).lte("start_at", bufferEnd.toISOString());
+
+          // Fetch images
+          const { data: allEvents } = await supabase.from("forening_events").select("id").eq("forening_id", fId);
+          let p5 = Promise.resolve({ data: [] } as any);
+          if (allEvents && allEvents.length > 0) {
+             const eventIds = allEvents.map(e => e.id);
+             p5 = supabase.from("event_images").select("id, image_url").in("event_id", eventIds).order("created_at", { ascending: false }).limit(8);
+          }
+
+          const [res1, res2, res3, res4, res5] = await Promise.all([p1, p2, p3, p4, p5]);
+
+          if (res1.data) setMedlemmer(res1.data as unknown as Medlem[]);
+          if (res2.data) setThreads(res2.data);
+          if (res3.data) setEvents(res3.data);
+          if (res4.data) setCalendarEvents(res4.data);
+          if (res5.data) setImages(res5.data);
+          
+          setLoading(false);
+        }
+
+      } catch (err) {
+        console.error("Critical error loading page:", err);
+        setLoading(false);
+      }
+    }
+
+    loadAllData();
   }, [idOrSlug]);
 
-  // ✅ 4. Hent resten af data NÅR vi har det rigtige ID
+  // Kalender helpers (opdaterer kun kalenderen når man bladrer)
   useEffect(() => {
     if (realForeningId && userId) {
-      Promise.all([
-        fetchMedlemmer(),
-        fetchThreads(),
-        fetchEvents(),
-        fetchImages()
-      ]).then(() => setLoading(false));
+        const fetchCal = async () => {
+            const first = startOfMonth(monthCursor);
+            const last = endOfMonth(monthCursor);
+            const bufferStart = new Date(first); bufferStart.setDate(first.getDate() - 7);
+            const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
+            const { data } = await supabase.from("forening_events").select("id, title, start_at, end_at, location, price").eq("forening_id", realForeningId).gte("start_at", bufferStart.toISOString()).lte("start_at", bufferEnd.toISOString());
+            if(data) setCalendarEvents(data);
+        };
+        fetchCal();
     }
-  }, [realForeningId, userId]);
+  }, [monthCursor, realForeningId, userId]);
 
-  useEffect(() => {
-    if (realForeningId) fetchCalendarEvents(monthCursor);
-  }, [realForeningId, monthCursor]);
-
-  const fetchMedlemmer = async () => {
-    if (!realForeningId) return;
-    const { data } = await supabase.from("foreningsmedlemmer").select("user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (name, username, avatar_url, email)").eq("forening_id", realForeningId);
-    if (data) setMedlemmer(data as unknown as Medlem[]);
-  };
-
-  const fetchThreads = async () => {
-    if (!realForeningId) return;
-    const { data } = await supabase.from("forening_threads").select("*").eq("forening_id", realForeningId).order("created_at", { ascending: false }).limit(3);
-    if (data) setThreads(data);
-  };
-
-  const fetchEvents = async () => {
-    if (!realForeningId) return;
-    const { data } = await supabase.from("forening_events").select("*").eq("forening_id", realForeningId).order("start_at", { ascending: false }).limit(3);
-    if (data) setEvents(data);
-  };
-
-  const fetchCalendarEvents = async (base: Date) => {
-    if (!realForeningId) return;
-    const first = startOfMonth(base);
-    const last = endOfMonth(base);
-    const bufferStart = new Date(first); bufferStart.setDate(first.getDate() - 7);
-    const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
-    const { data } = await supabase.from("forening_events").select("id, title, start_at, end_at, location, price").eq("forening_id", realForeningId).gte("start_at", bufferStart.toISOString()).lte("start_at", bufferEnd.toISOString());
-    if (data) setCalendarEvents(data);
-  };
-
-  const fetchImages = async () => {
-    if (!realForeningId) return;
-    try {
-      const { data: allEvents } = await supabase.from("forening_events").select("id").eq("forening_id", realForeningId);
-      if (!allEvents || allEvents.length === 0) { setImages([]); return; }
-      const eventIds = allEvents.map(e => e.id);
-      const { data: latestImages } = await supabase.from("event_images").select("id, image_url").in("event_id", eventIds).order("created_at", { ascending: false }).limit(8);
-      if (latestImages) setImages(latestImages);
-    } catch (err) { setImages([]); }
-  };
 
   // --- ACTIONS ---
-
-  // ✅ DEL: Kopiér Link (Separat knap)
-  const handleCopyLink = async () => {
-    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      alert("Link kopieret til udklipsholder!");
-    } catch (err) {
-      alert("Kunne ikke kopiere link.");
-    }
-  };
-
-  // ✅ DEL: Share Sheet (Separat knap)
   const handleShareForening = async () => {
     if (!forening) return;
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
-
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: forening.navn,
-          text: `Tjek ${forening.navn} på Liguster!`,
-          url: shareUrl,
-        });
-      } catch (err) {
-        // Bruger annullerede
-      }
+      try { await navigator.share({ title: forening.navn, text: `Tjek ${forening.navn} på Liguster!`, url: shareUrl }); } catch (err) {}
     } else {
-      // Fallback hvis share API ikke findes (desktop)
       handleCopyLink();
     }
+  };
+
+  const handleCopyLink = async () => {
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    try { await navigator.clipboard.writeText(shareUrl); alert("Link kopieret!"); } catch (err) { alert("Kunne ikke kopiere link."); }
   };
 
   const handleSaveInfo = async () => {
@@ -264,28 +252,30 @@ export default function ForeningDetaljePage() {
         navn: editNavn, 
         sted: editSted, 
         beskrivelse: editDescription,
-        is_public: editIsPublic // ✅ GEM STATUS I DB
+        is_public: editIsPublic 
     }).eq('id', realForeningId);
 
     if (error) {
       alert("Fejl: " + error.message);
     } else {
-      // Opdater lokal state
       setForening(prev => prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription, is_public: editIsPublic } : null);
       setIsEditing(false);
     }
   };
 
   const handleJoin = async () => {
-    if (!userId || !realForeningId) return alert("Du skal være logget ind.");
+    if (!userId || !realForeningId) {
+        router.push('/opret');
+        return;
+    }
     const { error } = await supabase.from('foreningsmedlemmer').insert([{ forening_id: realForeningId, user_id: userId, rolle: 'medlem', status: 'pending' }]);
-    if (!error) { alert('Anmodning sendt!'); fetchMedlemmer(); }
+    if (!error) { alert('Anmodning sendt!'); window.location.reload(); } // Reload for at opdatere state nemt
   };
 
   const handleLeave = async () => {
     if (!userId || !realForeningId || !confirm("Er du sikker?")) return;
     const { error } = await supabase.from('foreningsmedlemmer').delete().eq('forening_id', realForeningId).eq('user_id', userId);
-    if (!error) { alert("Udmeldt."); fetchMedlemmer(); }
+    if (!error) { alert("Udmeldt."); window.location.reload(); }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -312,7 +302,7 @@ export default function ForeningDetaljePage() {
   const promoteToAdmin = async (targetUserId: string) => {
     if (!realForeningId || !confirm("Er du sikker?")) return;
     const { error } = await supabase.from('foreningsmedlemmer').update({ rolle: 'admin' }).eq('forening_id', realForeningId).eq('user_id', targetUserId);
-    if (!error) { alert("Opdateret."); fetchMedlemmer(); setSelectedMember(null); setShowMembers(false); }
+    if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
   const triggerImageSelect = () => { fileInputRef.current?.click(); };
@@ -334,6 +324,69 @@ export default function ForeningDetaljePage() {
   if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>;
   if (!forening) return <div className="min-h-screen bg-[#869FB9] p-10 text-center text-white">Forening ikke fundet</div>;
 
+  // --- 🔴 PUBLIC TEASER VIEW (Hvis man ikke er logget ind) 🔴 ---
+  if (!userId) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#869FB9]">
+        <SiteHeader />
+        
+        <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
+          
+          {/* Forening Info Kort (Kun Top) */}
+          <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
+            <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
+              {forening.billede_url ? (
+                <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">Intet billede</div>
+              )}
+              {/* Public Badge */}
+              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-[#131921] text-xs font-black px-3 py-1.5 rounded-full shadow-sm uppercase tracking-wider">
+                 Offentlig visning
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
+              <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
+              <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap">{forening.beskrivelse}</p>
+            </div>
+          </div>
+
+          {/* 🟦 CALL TO ACTION BOKS (Lånt fra Landing Page) */}
+          <div className="bg-[#0D253F] rounded-[24px] p-8 md:p-10 text-center shadow-lg relative overflow-hidden">
+            {/* Logo */}
+            <div className="flex flex-col items-center mb-6">
+               <div className="text-white text-4xl mb-1"><i className="fa-solid fa-wheat-awn"></i></div>
+               <div className="text-white text-xs font-bold tracking-[0.2em] uppercase">LIGUSTER</div>
+               <div className="text-white/60 text-[8px]">Opslag • Forening • Fællesskab</div>
+            </div>
+
+            <h2 className="text-white text-2xl md:text-3xl font-bold mb-4">Klar til at gøre en forskel lokalt?</h2>
+            
+            <p className="text-white/80 text-sm md:text-base leading-relaxed mb-8 max-w-lg mx-auto">
+              Opret en bruger i dag for at se aktiviteter, beskeder og medlemmer i <strong>{forening.navn}</strong>. 
+              Det er gratis, enkelt og tager kun et øjeblik.
+            </p>
+
+            <Link href="/opret" className="inline-flex items-center gap-2 bg-white text-[#0D253F] px-8 py-4 rounded-full font-bold text-sm shadow-md hover:bg-gray-100 transition-colors">
+              <i className="fa-solid fa-user-plus"></i> Opret bruger nu
+            </Link>
+            
+            <div className="mt-4">
+                <Link href="/login" className="text-white/60 text-xs hover:text-white underline">
+                    Har du allerede en bruger? Log ind her
+                </Link>
+            </div>
+          </div>
+
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  // --- 🟢 LOGGED IN VIEW (Standard - Alt indhold) 🟢 ---
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
@@ -345,7 +398,6 @@ export default function ForeningDetaljePage() {
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
-              // ✅ Brug <img> for at sikre visning
               <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-400">Intet billede</div>
@@ -359,7 +411,7 @@ export default function ForeningDetaljePage() {
                 <input value={editSted} onChange={(e) => setEditSted(e.target.value)} style={{ color: '#000000' }} className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] font-bold text-gray-700 bg-white" placeholder="Sted" />
                 <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ color: '#000000' }} className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm text-gray-900 placeholder-gray-500 bg-white" placeholder="Beskrivelse..." />
                 
-                {/* ✅ CHECKBOX: GØR OFFENTLIG (KUN SYNLIG VED REDIGERING) */}
+                {/* CHECKBOX */}
                 <div className="flex items-center gap-3 px-1 border-t border-gray-100 pt-3 mt-1">
                   <input 
                     type="checkbox" 
@@ -385,7 +437,6 @@ export default function ForeningDetaljePage() {
               <div className="flex flex-col gap-1">
                 <div className="flex justify-between items-start">
                    <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
-                   {/* ✅ VIS STATUS HVIS OFFENTLIG (Så admin ved det) */}
                    {forening.is_public && (
                      <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide border border-green-200">
                        Offentlig
@@ -395,33 +446,13 @@ export default function ForeningDetaljePage() {
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
                 <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap">{forening.beskrivelse}</p>
                 
-                {/* ✅ KNAPPER (KOPIER, DEL, REDIGER) */}
                 <div className="flex flex-wrap gap-2 mt-4">
-                  <button 
-                    onClick={handleCopyLink}
-                    className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
-                  >
-                    <i className="fa-solid fa-link"></i> Kopiér
-                  </button>
-
-                  <button 
-                    onClick={handleShareForening}
-                    className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
-                  >
-                    <i className="fa-solid fa-share-nodes"></i> Del
-                  </button>
-
-                  {/* Rediger Knap (Kun admin) */}
+                  <button onClick={handleCopyLink} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-link"></i> Kopiér</button>
+                  <button onClick={handleShareForening} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-share-nodes"></i> Del</button>
                   {isMeAdmin && (
-                    <button 
-                      onClick={() => setIsEditing(true)} 
-                      className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
-                    >
-                      <i className="fa-solid fa-pen-to-square"></i> Rediger
-                    </button>
+                    <button onClick={() => setIsEditing(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-pen-to-square"></i> Rediger</button>
                   )}
                 </div>
-
               </div>
             )}
           </div>
@@ -540,7 +571,7 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* MODALER FOR MEDLEMMER OG EVENTS BEHOLDES HER... (Samme kode som før) */}
+      {/* MODALER FOR MEDLEMMER OG EVENTS ... (Samme kode som før) */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
