@@ -67,8 +67,11 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
   const [kategori, setKategori] = useState(KATEGORIER[0]);
   const [omraade, setOmraade] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
+  
+  // NYT: Offentlig tilstand
+  const [isPublic, setIsPublic] = useState(false);
 
-  // NYT: Lokation States
+  // Lokation States
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
@@ -81,7 +84,6 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
     }
   }, [isOpen]);
 
-  // NYT: GPS Funktion
   const getLocation = () => {
     if (!('geolocation' in navigator)) {
       setLocationStatus('error');
@@ -157,7 +159,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
         console.log('Intet billede valgt.');
       }
 
-      // 4. Gem i databasen (Nu med GPS!)
+      // 4. Gem i databasen
       const postData = {
         overskrift,
         text,
@@ -166,11 +168,10 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
         image_url: imageUrl,      
         images: imageUrl ? [imageUrl] : null, 
         user_id: userId,
-        // NYT: Koordinater
         latitude: location?.lat || null,
         longitude: location?.lng || null,
-        // Sikrer at opslaget ikke udløber med det samme (sætter til 30 dage)
         expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        is_public: isPublic // ✅ GEM STATUS
       };
 
       console.log('Gemmer post data:', postData);
@@ -190,6 +191,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
       setImageFile(null);
       setLocation(null);
       setLocationStatus('idle');
+      setIsPublic(false); // Reset checkbox
       
       onPostCreated();
       onClose();
@@ -319,8 +321,27 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Prop
               />
             </div>
 
+            {/* ✅ CHECKBOX: GØR OFFENTLIG */}
+            <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <input 
+                type="checkbox" 
+                id="publicCheck"
+                checked={isPublic} 
+                onChange={(e) => setIsPublic(e.target.checked)}
+                className="w-5 h-5 accent-[#131921] cursor-pointer"
+              />
+              <div>
+                <label htmlFor="publicCheck" className="text-sm font-bold text-[#131921] cursor-pointer select-none">
+                  Gør opslaget offentligt
+                </label>
+                <p className="text-[10px] text-gray-500">
+                  Hvis markeret, kan opslaget ses af alle (også dem uden bruger) på forsiden.
+                </p>
+              </div>
+            </div>
+
             {/* Footer Buttons */}
-            <div className="pt-4 flex gap-3">
+            <div className="pt-2 flex gap-3">
               <button 
                 type="button" 
                 onClick={onClose}

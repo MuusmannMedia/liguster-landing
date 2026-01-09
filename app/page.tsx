@@ -115,12 +115,20 @@ export default function LigusterLandingPage() {
             </div>
           </div>
 
-          <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse">
+          <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse items-center">
             
-            {/* ✅ NY KNAP: FORENINGER */}
+            {/* ✅ NY KNAP: OPSLAG */}
+            <Link
+              href="/offentlige-opslag"
+              className="text-white hover:text-white/80 font-bold text-sm px-3 py-2.5 transition-all flex items-center"
+            >
+              Opslag
+            </Link>
+
+            {/* KNAP: FORENINGER */}
             <Link
               href="/offentlige-foreninger"
-              className="text-white hover:text-white/80 font-bold text-sm px-4 py-2.5 transition-all flex items-center mr-2"
+              className="text-white hover:text-white/80 font-bold text-sm px-3 py-2.5 transition-all flex items-center mr-2"
             >
               Foreninger
             </Link>
