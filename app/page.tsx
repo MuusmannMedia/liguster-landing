@@ -267,8 +267,8 @@ export default function LigusterLandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-16 md:py-24 bg-gray-50">
+      {/* Features Section - MED MØRKERE BAGGRUND (bg-gray-100) */}
+      <section id="features" className="py-16 md:py-24 bg-gray-100">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -281,7 +281,7 @@ export default function LigusterLandingPage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* 1 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-6 text-2xl">
                 <i className="fa-solid fa-pen-to-square"></i>
               </div>
@@ -293,7 +293,7 @@ export default function LigusterLandingPage() {
             </div>
 
             {/* 2 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-6 text-2xl">
                 <i className="fa-solid fa-people-group"></i>
               </div>
@@ -305,7 +305,7 @@ export default function LigusterLandingPage() {
             </div>
 
             {/* 3 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-sky-100 rounded-xl flex items-center justify-center text-sky-600 mb-6 text-2xl">
                 <i className="fa-solid fa-screwdriver-wrench"></i>
               </div>
@@ -317,7 +317,7 @@ export default function LigusterLandingPage() {
             </div>
 
             {/* 4 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-6 text-2xl">
                 <i className="fa-solid fa-handshake-angle"></i>
               </div>
@@ -329,7 +329,7 @@ export default function LigusterLandingPage() {
             </div>
 
             {/* 5 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 mb-6 text-2xl">
                 <i className="fa-solid fa-calendar-check"></i>
               </div>
@@ -341,7 +341,7 @@ export default function LigusterLandingPage() {
             </div>
 
             {/* 6 */}
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-rose-100 rounded-xl flex items-center justify-center text-rose-600 mb-6 text-2xl">
                 <i className="fa-solid fa-shield-halved"></i>
               </div>
