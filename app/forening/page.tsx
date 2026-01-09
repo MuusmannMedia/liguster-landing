@@ -117,11 +117,15 @@ function CreateForeningModal({ isOpen, onClose, userId, onCreated }: { isOpen: b
               onChange={e => setNavn(e.target.value)} 
               autoFocus
             />
-            {/* ⚠️ ADVARSEL OM LINK */}
-            <p className="text-[10px] text-gray-400 mt-1.5 ml-1 leading-tight">
-              <i className="fa-solid fa-circle-info mr-1"></i>
-              Navnet bestemmer foreningens permanente link (URL). Selvom du kan rette navnet senere, vil linket forblive det samme.
-            </p>
+            
+            {/* ⚠️ NY TYDELIG ADVARSEL OM LINK */}
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-3 items-start">
+              <i className="fa-solid fa-circle-exclamation text-amber-600 mt-0.5 text-sm"></i>
+              <p className="text-xs text-amber-900 leading-relaxed font-medium">
+                <strong>Vigtigt:</strong> Navnet bestemmer foreningens permanente link (URL). 
+                Selvom du kan rette navnet senere, vil linket forblive det samme.
+              </p>
+            </div>
           </div>
 
           {/* Sted Felt */}
