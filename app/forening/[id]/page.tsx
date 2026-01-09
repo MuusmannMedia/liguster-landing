@@ -17,6 +17,7 @@ type Forening = {
   billede_url?: string;
   oprettet_af?: string;
   slug?: string;
+  is_public?: boolean; // ✅ NYT FELT: Styrer om den vises på den offentlige liste
 };
 
 type Medlem = {
@@ -112,6 +113,7 @@ export default function ForeningDetaljePage() {
   const [editNavn, setEditNavn] = useState("");
   const [editSted, setEditSted] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editIsPublic, setEditIsPublic] = useState(false); // ✅ NY STATE: Public status
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -137,25 +139,30 @@ export default function ForeningDetaljePage() {
     const fetchMainData = async () => {
       if (!idOrSlug) return;
 
+      // Tjek om URL'en ligner et ID (gammelt link) eller en Slug
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+
       let query = supabase.from("foreninger").select("*");
       
       if (isUuid) {
         query = query.eq("id", idOrSlug);
       } else {
-        query = query.eq("slug", idOrSlug);
+        query = query.eq("slug", idOrSlug); // Søg efter sluggen
       }
 
       const { data } = await query.single();
 
       if (data) {
         setForening(data);
-        setRealForeningId(data.id);
+        setRealForeningId(data.id); // Gem det rigtige UUID
+        
+        // Sæt edit felter
         setEditNavn(data.navn || "");
         setEditSted(data.sted || "");
         setEditDescription(data.beskrivelse || "");
+        setEditIsPublic(data.is_public || false); // ✅ Hent nuværende status fra DB
       } else {
-        setLoading(false);
+        setLoading(false); // Fandt intet
       }
     };
 
@@ -253,11 +260,18 @@ export default function ForeningDetaljePage() {
 
   const handleSaveInfo = async () => {
     if (!realForeningId) return;
-    const { error } = await supabase.from('foreninger').update({ navn: editNavn, sted: editSted, beskrivelse: editDescription }).eq('id', realForeningId);
+    const { error } = await supabase.from('foreninger').update({ 
+        navn: editNavn, 
+        sted: editSted, 
+        beskrivelse: editDescription,
+        is_public: editIsPublic // ✅ GEM STATUS I DB
+    }).eq('id', realForeningId);
+
     if (error) {
       alert("Fejl: " + error.message);
     } else {
-      setForening(prev => prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription } : null);
+      // Opdater lokal state
+      setForening(prev => prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription, is_public: editIsPublic } : null);
       setIsEditing(false);
     }
   };
@@ -331,6 +345,7 @@ export default function ForeningDetaljePage() {
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
+              // ✅ Brug <img> for at sikre visning
               <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-400">Intet billede</div>
@@ -343,20 +358,45 @@ export default function ForeningDetaljePage() {
                 <input value={editNavn} onChange={(e) => setEditNavn(e.target.value)} style={{ color: '#000000' }} className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] font-black text-xl text-gray-900 bg-white" placeholder="Foreningens navn" />
                 <input value={editSted} onChange={(e) => setEditSted(e.target.value)} style={{ color: '#000000' }} className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] font-bold text-gray-700 bg-white" placeholder="Sted" />
                 <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ color: '#000000' }} className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm text-gray-900 placeholder-gray-500 bg-white" placeholder="Beskrivelse..." />
-                <div className="flex gap-2 justify-end">
+                
+                {/* ✅ CHECKBOX: GØR OFFENTLIG (KUN SYNLIG VED REDIGERING) */}
+                <div className="flex items-center gap-3 px-1 border-t border-gray-100 pt-3 mt-1">
+                  <input 
+                    type="checkbox" 
+                    id="isPublicCheck"
+                    checked={editIsPublic} 
+                    onChange={(e) => setEditIsPublic(e.target.checked)}
+                    className="w-5 h-5 accent-[#131921] cursor-pointer"
+                  />
+                  <div>
+                    <label htmlFor="isPublicCheck" className="text-sm font-bold text-[#131921] cursor-pointer select-none">
+                      Gør foreningssiden offentlig
+                    </label>
+                    <p className="text-xs text-gray-500 mt-0.5">Hvis markeret, vises foreningen på den offentlige liste.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 justify-end pt-2">
                   <button onClick={() => setIsEditing(false)} className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-full text-xs font-bold hover:bg-gray-200">ANNULLER</button>
                   <button onClick={handleSaveInfo} className="px-4 py-2.5 bg-[#131921] text-white rounded-full text-xs font-bold hover:bg-gray-900">GEM ÆNDRINGER</button>
                 </div>
               </div>
             ) : (
               <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
+                <div className="flex justify-between items-start">
+                   <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
+                   {/* ✅ VIS STATUS HVIS OFFENTLIG (Så admin ved det) */}
+                   {forening.is_public && (
+                     <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide border border-green-200">
+                       Offentlig
+                     </span>
+                   )}
+                </div>
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
                 <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap">{forening.beskrivelse}</p>
                 
-                {/* ✅ KNAPPER (KOPIER, DEL, REDIGER) - STYLET SOM I PostDetailModal */}
+                {/* ✅ KNAPPER (KOPIER, DEL, REDIGER) */}
                 <div className="flex flex-wrap gap-2 mt-4">
-                  {/* Kopier Knap */}
                   <button 
                     onClick={handleCopyLink}
                     className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
@@ -364,7 +404,6 @@ export default function ForeningDetaljePage() {
                     <i className="fa-solid fa-link"></i> Kopiér
                   </button>
 
-                  {/* Del Knap */}
                   <button 
                     onClick={handleShareForening}
                     className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
@@ -501,7 +540,7 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* MODALER... (Samme som før) */}
+      {/* MODALER FOR MEDLEMMER OG EVENTS BEHOLDES HER... (Samme kode som før) */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
