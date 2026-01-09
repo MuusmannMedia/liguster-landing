@@ -20,7 +20,7 @@ type Post = {
   images?: string[] | null;
   created_at: string;
   expires_at?: string | null;
-  is_public?: boolean; // ✅ NYT FELT
+  is_public?: boolean;
 };
 
 // --- HJÆLPERE ---
@@ -51,7 +51,7 @@ const getPrimaryImage = (p: Post) => {
   return null;
 };
 
-// --- REDIGER MODAL (Nu med is_public checkbox) ---
+// --- REDIGER MODAL ---
 function EditPostModal({ isOpen, onClose, post, onSaved }: { isOpen: boolean, onClose: () => void, post: Post | null, onSaved: () => void }) {
   const [text, setText] = useState("");
   const [isPublic, setIsPublic] = useState(false);
@@ -99,14 +99,15 @@ function EditPostModal({ isOpen, onClose, post, onSaved }: { isOpen: boolean, on
         <form onSubmit={handleUpdate} className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Beskrivelse</label>
+            {/* ✅ RETTET HER: Tilføjet 'text-[#131921]' så teksten bliver mørk */}
             <textarea 
-              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 h-32 outline-none focus:ring-2 focus:ring-[#131921] resize-none" 
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 h-32 outline-none focus:ring-2 focus:ring-[#131921] resize-none text-[#131921] placeholder-gray-500 font-medium" 
               value={text} 
               onChange={e => setText(e.target.value)} 
             />
           </div>
 
-          {/* ✅ CHECKBOX: GØR OFFENTLIG */}
+          {/* CHECKBOX: GØR OFFENTLIG */}
           <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
             <input 
               type="checkbox" 
@@ -239,7 +240,7 @@ export default function MineOpslagPage() {
                       <span className="text-[#536071] font-bold text-sm">Ingen billede</span>
                     )}
                     
-                    {/* ✅ PUBLIC BADGE */}
+                    {/* PUBLIC BADGE */}
                     {post.is_public && (
                       <div className="absolute top-3 right-3 bg-green-500 text-white text-[10px] font-black px-2 py-1 rounded-full shadow-sm uppercase tracking-wider">
                         Offentlig
@@ -270,7 +271,7 @@ export default function MineOpslagPage() {
                     <p className="text-sm font-semibold text-[#222] mb-2 truncate">{post.omraade}</p>
                     <p className="text-sm text-[#444] line-clamp-2 mb-4 flex-1">{post.text}</p>
 
-                    {/* ✅ KNAPPER (Stylet som forenings-siden) */}
+                    {/* KNAPPER */}
                     <div className="flex flex-wrap gap-2 mt-auto pt-3 border-t border-gray-100">
                       
                       {/* Forlæng Knap */}
