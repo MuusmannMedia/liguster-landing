@@ -223,6 +223,31 @@ export default function ForeningDetaljePage() {
 
   // --- ACTIONS ---
 
+  // ✅ DEL FORENING FUNKTION
+  const handleShareForening = async () => {
+    if (!forening) return;
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: forening.navn,
+          text: `Tjek ${forening.navn} på Liguster!`,
+          url: shareUrl,
+        });
+      } catch (err) {
+        // Bruger annullerede
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert("Link kopieret til udklipsholder!");
+      } catch (err) {
+        alert("Kunne ikke kopiere link.");
+      }
+    }
+  };
+
   const handleSaveInfo = async () => {
     if (!realForeningId) return;
     const { error } = await supabase.from('foreninger').update({ navn: editNavn, sted: editSted, beskrivelse: editDescription }).eq('id', realForeningId);
@@ -326,7 +351,27 @@ export default function ForeningDetaljePage() {
                 <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
                 <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap">{forening.beskrivelse}</p>
-                {isMeAdmin && <button onClick={() => setIsEditing(true)} className="self-start mt-3 px-4 py-2 bg-[#131921] text-white text-[10px] font-bold rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors">Rediger oplysninger</button>}
+                
+                {/* ✅ KNAPPER TIL ADMIN/DELING */}
+                <div className="flex gap-2 mt-4">
+                  {isMeAdmin && (
+                    <button 
+                      onClick={() => setIsEditing(true)} 
+                      className="px-4 py-2 bg-gray-100 text-gray-700 text-[10px] font-bold rounded-full uppercase tracking-wider hover:bg-gray-200 transition-colors"
+                    >
+                      Rediger oplysninger
+                    </button>
+                  )}
+                  
+                  {/* DEL KNAP */}
+                  <button 
+                    onClick={handleShareForening}
+                    className="px-4 py-2 bg-[#131921] text-white text-[10px] font-bold rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors flex items-center gap-2"
+                  >
+                    <i className="fa-solid fa-share-nodes"></i> Del forening
+                  </button>
+                </div>
+
               </div>
             )}
           </div>
