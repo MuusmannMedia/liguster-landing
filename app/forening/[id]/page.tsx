@@ -124,7 +124,7 @@ export default function ForeningDetaljePage() {
   const [showMembers, setShowMembers] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Medlem | null>(null);
   
-  // --- SAMLET DATA LOADER (Løser loading-problemet) ---
+  // --- SAMLET DATA LOADER ---
   useEffect(() => {
     async function loadAllData() {
       setLoading(true);
@@ -160,7 +160,6 @@ export default function ForeningDetaljePage() {
 
         // 3. Tjek Adgang
         if (!currentUserId) {
-          // GÆST: Hvis den er public -> Stop loading (Vis teaser). Hvis privat -> Login.
           if (foreningData.is_public) {
             setLoading(false);
             return;
@@ -188,7 +187,10 @@ export default function ForeningDetaljePage() {
 
           // Fetch images
           const { data: allEvents } = await supabase.from("forening_events").select("id").eq("forening_id", fId);
-          let p5 = Promise.resolve({ data: [] } as any);
+          
+          // ✅ FIX: Brug 'any' for at undgå TypeScript fejl når vi mixer Promise.resolve og Supabase Query
+          let p5: any = Promise.resolve({ data: [] });
+          
           if (allEvents && allEvents.length > 0) {
              const eventIds = allEvents.map(e => e.id);
              p5 = supabase.from("event_images").select("id, image_url").in("event_id", eventIds).order("created_at", { ascending: false }).limit(8);
@@ -214,7 +216,7 @@ export default function ForeningDetaljePage() {
     loadAllData();
   }, [idOrSlug]);
 
-  // Kalender helpers (opdaterer kun kalenderen når man bladrer)
+  // Kalender helpers
   useEffect(() => {
     if (realForeningId && userId) {
         const fetchCal = async () => {
@@ -269,7 +271,7 @@ export default function ForeningDetaljePage() {
         return;
     }
     const { error } = await supabase.from('foreningsmedlemmer').insert([{ forening_id: realForeningId, user_id: userId, rolle: 'medlem', status: 'pending' }]);
-    if (!error) { alert('Anmodning sendt!'); window.location.reload(); } // Reload for at opdatere state nemt
+    if (!error) { alert('Anmodning sendt!'); window.location.reload(); }
   };
 
   const handleLeave = async () => {
@@ -324,15 +326,13 @@ export default function ForeningDetaljePage() {
   if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>;
   if (!forening) return <div className="min-h-screen bg-[#869FB9] p-10 text-center text-white">Forening ikke fundet</div>;
 
-  // --- 🔴 PUBLIC TEASER VIEW (Hvis man ikke er logget ind) 🔴 ---
+  // --- 🔴 PUBLIC TEASER VIEW ---
   if (!userId) {
     return (
       <div className="min-h-screen flex flex-col bg-[#869FB9]">
         <SiteHeader />
         
         <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
-          
-          {/* Forening Info Kort (Kun Top) */}
           <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
             <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
               {forening.billede_url ? (
@@ -340,7 +340,6 @@ export default function ForeningDetaljePage() {
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">Intet billede</div>
               )}
-              {/* Public Badge */}
               <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-[#131921] text-xs font-black px-3 py-1.5 rounded-full shadow-sm uppercase tracking-wider">
                  Offentlig visning
               </div>
@@ -353,9 +352,7 @@ export default function ForeningDetaljePage() {
             </div>
           </div>
 
-          {/* 🟦 CALL TO ACTION BOKS (Lånt fra Landing Page) */}
           <div className="bg-[#0D253F] rounded-[24px] p-8 md:p-10 text-center shadow-lg relative overflow-hidden">
-            {/* Logo */}
             <div className="flex flex-col items-center mb-6">
                <div className="text-white text-4xl mb-1"><i className="fa-solid fa-wheat-awn"></i></div>
                <div className="text-white text-xs font-bold tracking-[0.2em] uppercase">LIGUSTER</div>
@@ -386,7 +383,7 @@ export default function ForeningDetaljePage() {
     );
   }
 
-  // --- 🟢 LOGGED IN VIEW (Standard - Alt indhold) 🟢 ---
+  // --- 🟢 LOGGED IN VIEW ---
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
@@ -394,7 +391,6 @@ export default function ForeningDetaljePage() {
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
         <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
 
-        {/* --- FORENING INFO --- */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
@@ -411,7 +407,6 @@ export default function ForeningDetaljePage() {
                 <input value={editSted} onChange={(e) => setEditSted(e.target.value)} style={{ color: '#000000' }} className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] font-bold text-gray-700 bg-white" placeholder="Sted" />
                 <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ color: '#000000' }} className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm text-gray-900 placeholder-gray-500 bg-white" placeholder="Beskrivelse..." />
                 
-                {/* CHECKBOX */}
                 <div className="flex items-center gap-3 px-1 border-t border-gray-100 pt-3 mt-1">
                   <input 
                     type="checkbox" 
@@ -463,7 +458,6 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* --- KNAPPER OG PREVIEWS --- */}
         <button onClick={() => router.push(`/beskeder?id=${realForeningId}`)} className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors">
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">BESKEDER</div>
         </button>
@@ -571,7 +565,7 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* MODALER FOR MEDLEMMER OG EVENTS ... (Samme kode som før) */}
+      {/* MODALER... */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
