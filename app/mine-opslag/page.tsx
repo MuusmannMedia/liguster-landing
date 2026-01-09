@@ -20,6 +20,7 @@ type Post = {
   images?: string[] | null;
   created_at: string;
   expires_at?: string | null;
+  is_public?: boolean; // ✅ NYT FELT
 };
 
 // --- HJÆLPERE ---
@@ -50,13 +51,17 @@ const getPrimaryImage = (p: Post) => {
   return null;
 };
 
-// --- SIMPEL EDIT MODAL (Kun til redigering, indtil CreatePostModal understøtter det) ---
+// --- REDIGER MODAL (Nu med is_public checkbox) ---
 function EditPostModal({ isOpen, onClose, post, onSaved }: { isOpen: boolean, onClose: () => void, post: Post | null, onSaved: () => void }) {
   const [text, setText] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (post) setText(post.text || "");
+    if (post) {
+      setText(post.text || "");
+      setIsPublic(post.is_public || false);
+    }
   }, [post]);
 
   if (!isOpen || !post) return null;
@@ -64,7 +69,14 @@ function EditPostModal({ isOpen, onClose, post, onSaved }: { isOpen: boolean, on
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.from("posts").update({ text }).eq("id", post.id);
+    const { error } = await supabase
+      .from("posts")
+      .update({ 
+        text: text,
+        is_public: isPublic 
+      })
+      .eq("id", post.id);
+      
     setLoading(false);
     if (!error) {
       onSaved();
@@ -75,14 +87,47 @@ function EditPostModal({ isOpen, onClose, post, onSaved }: { isOpen: boolean, on
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-md rounded-2xl p-6">
-        <h2 className="font-bold text-lg mb-4">Rediger beskrivelse</h2>
-        <form onSubmit={handleUpdate}>
-          <textarea className="w-full border p-2 rounded-xl h-32 mb-4" value={text} onChange={e => setText(e.target.value)} />
-          <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg font-bold">Annuller</button>
-            <button type="submit" disabled={loading} className="flex-1 py-2 bg-[#131921] text-white rounded-lg font-bold">Gem</button>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="bg-[#131921] px-6 py-4 flex justify-between items-center">
+          <h2 className="text-white text-lg font-bold uppercase tracking-wider">Rediger Opslag</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+            <i className="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
+        
+        <form onSubmit={handleUpdate} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Beskrivelse</label>
+            <textarea 
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 h-32 outline-none focus:ring-2 focus:ring-[#131921] resize-none" 
+              value={text} 
+              onChange={e => setText(e.target.value)} 
+            />
+          </div>
+
+          {/* ✅ CHECKBOX: GØR OFFENTLIG */}
+          <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+            <input 
+              type="checkbox" 
+              id="publicCheckEdit"
+              checked={isPublic} 
+              onChange={(e) => setIsPublic(e.target.checked)}
+              className="w-5 h-5 accent-[#131921] cursor-pointer"
+            />
+            <div>
+              <label htmlFor="publicCheckEdit" className="text-sm font-bold text-[#131921] cursor-pointer select-none">
+                Gør opslaget offentligt
+              </label>
+              <p className="text-[10px] text-gray-500">
+                Hvis markeret, kan opslaget ses af alle på forsiden.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors">Annuller</button>
+            <button type="submit" disabled={loading} className="flex-[2] py-3 rounded-xl font-bold text-white bg-[#131921] hover:bg-gray-900 transition-colors">Gem Ændringer</button>
           </div>
         </form>
       </div>
@@ -157,18 +202,14 @@ export default function MineOpslagPage() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
 
-      {/* FILTER / TOP BAR (Samme stil som Opslag) */}
       <div className="bg-[#869FB9] py-6 px-4 shadow-sm relative z-10">
         <div className="max-w-6xl mx-auto space-y-4">
-          
-          {/* STOR OPRET KNAP */}
           <button 
             className="w-full bg-[#131921] text-white font-bold text-lg py-4 rounded-2xl shadow-lg hover:bg-gray-900 transition-all uppercase tracking-wider flex items-center justify-center gap-2 transform hover:scale-[1.01]"
             onClick={() => setIsCreateOpen(true)}
           >
             <i className="fa-solid fa-plus-circle text-2xl"></i> Opret nyt opslag
           </button>
-
         </div>
       </div>
 
@@ -182,14 +223,14 @@ export default function MineOpslagPage() {
             <p className="text-sm mt-2 opacity-70">Opret dit første opslag ovenfor!</p>
           </div>
         ) : (
-          /* RETTELSE: Fjernet h2 overskrift herfra */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {posts.map(post => {
               const img = getPrimaryImage(post);
               const expiry = getExpiry(post);
 
               return (
-                <div key={post.id} className="bg-white rounded-[24px] overflow-hidden shadow-md flex flex-col h-full hover:shadow-xl transition-shadow">
+                <div key={post.id} className="bg-white rounded-[24px] overflow-hidden shadow-md flex flex-col h-full hover:shadow-xl transition-shadow relative">
+                  
                   {/* Billede */}
                   <div className="w-full aspect-square bg-[#E7EBF0] relative flex items-center justify-center overflow-hidden">
                     {img ? (
@@ -197,11 +238,17 @@ export default function MineOpslagPage() {
                     ) : (
                       <span className="text-[#536071] font-bold text-sm">Ingen billede</span>
                     )}
+                    
+                    {/* ✅ PUBLIC BADGE */}
+                    {post.is_public && (
+                      <div className="absolute top-3 right-3 bg-green-500 text-white text-[10px] font-black px-2 py-1 rounded-full shadow-sm uppercase tracking-wider">
+                        Offentlig
+                      </div>
+                    )}
                   </div>
 
                   {/* Indhold */}
                   <div className="p-4 flex-1 flex flex-col">
-                    {/* Tags */}
                     <div className="flex gap-2 mb-3">
                       {post.kategori && (
                         <span className="bg-[#EBF2FA] text-[#131921] text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wide">
@@ -223,23 +270,34 @@ export default function MineOpslagPage() {
                     <p className="text-sm font-semibold text-[#222] mb-2 truncate">{post.omraade}</p>
                     <p className="text-sm text-[#444] line-clamp-2 mb-4 flex-1">{post.text}</p>
 
-                    {/* Knapper */}
-                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                    {/* ✅ KNAPPER (Stylet som forenings-siden) */}
+                    <div className="flex flex-wrap gap-2 mt-auto pt-3 border-t border-gray-100">
+                      
+                      {/* Forlæng Knap */}
                       <button 
                         onClick={() => handleExtend(post)}
-                        className={`flex-1 py-2 rounded-full text-[10px] font-bold text-white uppercase tracking-wider ${expiry.state === 'overdue' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-[#131921] hover:bg-gray-800'}`}
+                        className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold text-white uppercase tracking-wide flex items-center justify-center gap-2 transition-colors ${expiry.state === 'overdue' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-[#131921] hover:bg-gray-800'}`}
                       >
-                        {expiry.state === 'overdue' ? 'Aktivér igen' : 'Forlæng'}
+                        <i className="fa-solid fa-clock-rotate-left"></i> {expiry.state === 'overdue' ? 'Aktivér' : 'Forlæng'}
                       </button>
                       
-                      <button onClick={() => setEditPost(post)} className="px-4 py-2 bg-[#131921] text-white rounded-full text-[10px] font-bold uppercase hover:bg-gray-800">
-                        Ret
+                      {/* Rediger Knap */}
+                      <button 
+                        onClick={() => setEditPost(post)} 
+                        className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
+                      >
+                        <i className="fa-solid fa-pen-to-square"></i> Ret
                       </button>
                       
-                      <button onClick={() => handleDelete(post.id)} className="px-4 py-2 bg-red-500 text-white rounded-full text-[10px] font-bold uppercase hover:bg-red-600">
-                        Slet
+                      {/* Slet Knap */}
+                      <button 
+                        onClick={() => handleDelete(post.id)} 
+                        className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
+                      >
+                        <i className="fa-solid fa-trash"></i>
                       </button>
                     </div>
+
                   </div>
                 </div>
               );
