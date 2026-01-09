@@ -15,7 +15,8 @@ type ThreadItem = {
   forening?: { navn: string };
   isDm?: boolean;
   dmUserId?: string; 
-  dmUserAvatar?: string | null; 
+  dmUserAvatar?: string | null;
+  unreadCount?: number; // ✅ NYT: Holder styr på antal ulæste
 };
 
 type ChatMessage = {
@@ -101,8 +102,9 @@ function BeskederContent() {
             title: t.title,
             created_at: t.created_at,
             forening_id: t.forening_id,
-            forening: t.foreninger, // ✅ Gem forenings-info
-            isDm: false
+            forening: t.foreninger,
+            isDm: false,
+            unreadCount: 0 // Foreningsbeskeder har ikke 'is_read' logik endnu i din DB
           }));
         }
       }
@@ -113,6 +115,18 @@ function BeskederContent() {
         .select('thread_id, sender_id, receiver_id, created_at')
         .or(`sender_id.eq.${session.user.id},receiver_id.eq.${session.user.id}`)
         .order('created_at', { ascending: false });
+
+      // ✅ NYT: Hent ulæste tællere for DMs
+      const { data: unreadData } = await supabase
+        .from('messages')
+        .select('thread_id')
+        .eq('receiver_id', session.user.id)
+        .eq('is_read', false);
+
+      const unreadMap = new Map<string, number>();
+      unreadData?.forEach((row: any) => {
+        unreadMap.set(row.thread_id, (unreadMap.get(row.thread_id) || 0) + 1);
+      });
 
       if (dmData && dmData.length > 0) {
         const uniqueThreads = new Map();
@@ -143,7 +157,8 @@ function BeskederContent() {
                     created_at: t.created_at,
                     isDm: true,
                     dmUserId: t.otherId,
-                    dmUserAvatar: getAvatarUrl(otherUser?.avatar_url)
+                    dmUserAvatar: getAvatarUrl(otherUser?.avatar_url),
+                    unreadCount: unreadMap.get(t.thread_id) || 0 // ✅ Sæt antal ulæste
                 };
             });
              initialThreads = [...dmThreads, ...initialThreads];
@@ -154,8 +169,9 @@ function BeskederContent() {
 
       setThreads(initialThreads);
 
-      // DM Logic for specific user param
+      // Håndter start-parametre
       if (dmUserId) {
+        // ... (samme logik som før) ...
         const { data: targetUser } = await supabase.from('users').select('*').eq('id', dmUserId).single();
         if (targetUser) {
           setDmTargetUser(targetUser);
@@ -167,7 +183,7 @@ function BeskederContent() {
             .limit(1);
           
           if (existingMsgs && existingMsgs.length > 0) {
-            setActiveThreadId(existingMsgs[0].thread_id);
+            handleSelectThread(existingMsgs[0].thread_id, true, session.user.id); // Brug hjælper funktion
           } else {
             setActiveThreadId(makeUuid());
           }
@@ -175,18 +191,12 @@ function BeskederContent() {
       } else if (startId) {
         const match = initialThreads.find(t => t.forening_id === startId);
         if (match) {
-          setActiveThreadId(match.id);
-          setIsDirectMessage(false);
+          handleSelectThread(match.id, false, session.user.id);
         }
       } else if (initialThreads.length > 0) {
         if (window.innerWidth >= 768) {
           const first = initialThreads[0];
-          setActiveThreadId(first.id);
-          setIsDirectMessage(!!first.isDm);
-          if(first.isDm && first.dmUserId) {
-               const { data: tUser } = await supabase.from('users').select('*').eq('id', first.dmUserId).single();
-               if(tUser) setDmTargetUser(tUser);
-          }
+          handleSelectThread(first.id, !!first.isDm, session.user.id, first.dmUserId);
         }
       }
 
@@ -195,7 +205,33 @@ function BeskederContent() {
     init();
   }, [startId, dmUserId, router]);
 
-  // 2. Hent beskeder & Realtime
+  // ✅ NYT: Hjælpefunktion til at vælge tråd og markere som læst
+  const handleSelectThread = async (threadId: string, isDm: boolean, currentUserId: string, targetUserId?: string) => {
+    setActiveThreadId(threadId);
+    setIsDirectMessage(isDm);
+
+    if (isDm && targetUserId) {
+       const { data: tUser } = await supabase.from('users').select('*').eq('id', targetUserId).single();
+       if(tUser) setDmTargetUser(tUser);
+    } else {
+       setDmTargetUser(null);
+    }
+
+    // 🔴 Fjern rød prik lokalt med det samme
+    setThreads(prev => prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t));
+
+    // 🔴 Opdater databasen (kun for DMs hvor vi har 'is_read')
+    if (isDm) {
+      await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('thread_id', threadId)
+        .eq('receiver_id', currentUserId)
+        .eq('is_read', false);
+    }
+  };
+
+  // 2. Hent beskeder & Realtime (Samme som før, men bruger activeThreadId)
   useEffect(() => {
     if (!activeThreadId) return;
     
@@ -242,11 +278,15 @@ function BeskederContent() {
         { event: 'INSERT', schema: 'public', table: table, filter: `thread_id=eq.${activeThreadId}` },
         async (payload) => {
           const newMsg = payload.new as any;
+          
+          // Hvis beskeden kommer i den aktive tråd, marker den som læst med det samme (hvis det er DM)
+          if (isDirectMessage && newMsg.sender_id !== userId) {
+             await supabase.from('messages').update({ is_read: true }).eq('id', newMsg.id);
+          }
+
           setMessages((prev) => {
             if (prev.some(m => m.id === newMsg.id)) return prev;
-            
             const senderId = isDirectMessage ? newMsg.sender_id : newMsg.user_id;
-            
             return [...prev, {
               id: newMsg.id,
               text: newMsg.text,
@@ -264,7 +304,7 @@ function BeskederContent() {
       supabase.removeChannel(channel);
     };
 
-  }, [activeThreadId, isDirectMessage]);
+  }, [activeThreadId, isDirectMessage, userId]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -303,7 +343,8 @@ function BeskederContent() {
         thread_id: activeThreadId,
         sender_id: userId,
         receiver_id: dmTargetUser.id,
-        text: text
+        text: text,
+        is_read: false // Default ulæst
       }]).select().single();
       error = res.error;
       data = res.data;
@@ -325,13 +366,12 @@ function BeskederContent() {
     }
   };
 
-  // ✅ BEREGN INFO TIL TOPPEN AF CHATTEN
   const activeThreadInfo = isDirectMessage 
     ? { title: dmTargetUser?.name || 'Direkte Besked', subtitle: 'Privat samtale' }
     : threads.find(t => t.id === activeThreadId) 
       ? { 
           title: threads.find(t => t.id === activeThreadId)?.title, 
-          subtitle: threads.find(t => t.id === activeThreadId)?.forening?.navn // ✅ Foreningsnavn
+          subtitle: threads.find(t => t.id === activeThreadId)?.forening?.navn
         }
       : { title: 'Chat', subtitle: '' };
 
@@ -362,21 +402,21 @@ function BeskederContent() {
               {threads.map(t => (
                 <button 
                   key={t.id}
-                  onClick={async () => { 
-                      setActiveThreadId(t.id); 
-                      setIsDirectMessage(!!t.isDm);
-                      if (t.isDm && t.dmUserId) {
-                          const { data: tUser } = await supabase.from('users').select('*').eq('id', t.dmUserId).single();
-                          if(tUser) setDmTargetUser(tUser);
-                      } else {
-                          setDmTargetUser(null);
-                      }
-                  }}
-                  className={`w-full text-left p-3 rounded-xl flex flex-col gap-1 transition-all ${activeThreadId === t.id ? 'bg-white shadow-sm ring-1 ring-gray-100' : 'hover:bg-gray-100'}`}
+                  onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)} // ✅ BRUGER NY FUNKTION
+                  className={`w-full text-left p-3 rounded-xl flex flex-col gap-1 transition-all relative ${activeThreadId === t.id ? 'bg-white shadow-sm ring-1 ring-gray-100' : 'hover:bg-gray-100'}`}
                 >
-                  <span className={`font-bold text-sm ${activeThreadId === t.id ? 'text-[#131921]' : 'text-gray-700'}`}>{t.title}</span>
+                  <div className="flex justify-between items-center w-full">
+                    <span className={`font-bold text-sm truncate ${activeThreadId === t.id ? 'text-[#131921]' : 'text-gray-700'}`}>{t.title}</span>
+                    
+                    {/* 🔴 DEN RØDE PRIK (VIS KUN HVIS UNREAD > 0) */}
+                    {t.unreadCount && t.unreadCount > 0 ? (
+                      <span className="flex h-3 w-3 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      </span>
+                    ) : null}
+                  </div>
                   
-                  {/* ✅ VIS FORENINGSNAVN ELLER 'DIREKTE BESKED' */}
                   <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide line-clamp-1">
                       {t.isDm ? 'Direkte Besked' : t.forening?.navn}
                   </span>
@@ -399,7 +439,6 @@ function BeskederContent() {
                   
                   <div className="flex-1 ml-2">
                     <h3 className="font-bold text-[#131921]">{activeThreadInfo.title}</h3>
-                    {/* ✅ VIS OGSÅ SUBTITLE (FORENINGSNAVN) I TOPPEN */}
                     <p className="text-xs text-gray-500 font-medium">{activeThreadInfo.subtitle}</p>
                   </div>
                 </div>
