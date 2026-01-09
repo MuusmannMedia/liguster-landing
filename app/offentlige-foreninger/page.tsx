@@ -57,10 +57,12 @@ export default function OffentligeForeningerPage() {
       <div className="bg-[#0D253F] px-4 pt-10 pb-16 text-center relative overflow-hidden">
         <div className="max-w-3xl mx-auto relative z-10">
           <h1 className="text-3xl md:text-4xl font-black text-white mb-4 tracking-tight">
-            Oplev fællesskabet på din vej
+            Find dit næste fællesskab her
           </h1>
           <p className="text-white/80 text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-8">
-            Her kan du se en liste over foreninger, der bruger Liguster til at skabe tryghed og sammenhold. Klik ind og se, om din vej er med – eller opret den selv.
+            Uanset om det er grundejerforeningen, dartklubben, en løbegruppe eller et nyt initiativ i opgangen. 
+            Her kan du se de foreninger og klubber, der har åbnet dørene op på Liguster. 
+            Kig indenfor – eller start dit eget fællesskab i dag.
           </p>
           
           {/* Søgefelt */}
@@ -69,7 +71,7 @@ export default function OffentligeForeningerPage() {
              <input 
                type="text" 
                className="w-full h-12 rounded-full pl-12 pr-4 bg-white text-[#222] placeholder-gray-500 outline-none shadow-lg focus:ring-4 focus:ring-white/20 transition-all" 
-               placeholder="Søg efter vejnavn eller by..." 
+               placeholder="Søg efter navn, by eller interesse..." 
                value={search} 
                onChange={e => setSearch(e.target.value)} 
              />
