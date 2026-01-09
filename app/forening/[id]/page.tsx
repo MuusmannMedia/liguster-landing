@@ -6,7 +6,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
 import Link from 'next/link';
-import Image from 'next/image'; // ✅ Nu aktiveret til logoet
+import Image from 'next/image';
 
 // --- TYPER ---
 type Forening = {
@@ -131,12 +131,10 @@ export default function ForeningDetaljePage() {
       setLoading(true);
       
       try {
-        // 1. Hent Session
         const { data: { session } } = await supabase.auth.getSession();
         const currentUserId = session?.user?.id || null;
         setUserId(currentUserId);
 
-        // 2. Hent Forening
         if (!idOrSlug) return;
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
         let query = supabase.from("foreninger").select("*");
@@ -146,7 +144,6 @@ export default function ForeningDetaljePage() {
         const { data: foreningData, error } = await query.single();
 
         if (error || !foreningData) {
-          console.error("Forening ikke fundet:", error);
           setForening(null);
           setLoading(false);
           return;
@@ -159,7 +156,6 @@ export default function ForeningDetaljePage() {
         setEditDescription(foreningData.beskrivelse || "");
         setEditIsPublic(foreningData.is_public || false);
 
-        // 3. Tjek Adgang
         if (!currentUserId) {
           if (foreningData.is_public) {
             setLoading(false);
@@ -170,7 +166,6 @@ export default function ForeningDetaljePage() {
           }
         }
 
-        // 4. MEDLEM: Hent resten af data
         if (currentUserId) {
           const fId = foreningData.id;
           
@@ -178,7 +173,6 @@ export default function ForeningDetaljePage() {
           const p2 = supabase.from("forening_threads").select("*").eq("forening_id", fId).order("created_at", { ascending: false }).limit(3);
           const p3 = supabase.from("forening_events").select("*").eq("forening_id", fId).order("start_at", { ascending: false }).limit(3);
           
-          // Fetch calendar events
           const today = new Date();
           const first = startOfMonth(today);
           const last = endOfMonth(today);
@@ -186,7 +180,6 @@ export default function ForeningDetaljePage() {
           const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
           const p4 = supabase.from("forening_events").select("id, title, start_at, end_at, location, price").eq("forening_id", fId).gte("start_at", bufferStart.toISOString()).lte("start_at", bufferEnd.toISOString());
 
-          // Fetch images
           const { data: allEvents } = await supabase.from("forening_events").select("id").eq("forening_id", fId);
           let p5: any = Promise.resolve({ data: [] });
           if (allEvents && allEvents.length > 0) {
@@ -214,7 +207,6 @@ export default function ForeningDetaljePage() {
     loadAllData();
   }, [idOrSlug]);
 
-  // Kalender helpers
   useEffect(() => {
     if (realForeningId && userId) {
         const fetchCal = async () => {
@@ -230,7 +222,6 @@ export default function ForeningDetaljePage() {
   }, [monthCursor, realForeningId, userId]);
 
 
-  // --- ACTIONS ---
   const handleShareForening = async () => {
     if (!forening) return;
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -324,7 +315,6 @@ export default function ForeningDetaljePage() {
   if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>;
   if (!forening) return <div className="min-h-screen bg-[#869FB9] p-10 text-center text-white">Forening ikke fundet</div>;
 
-  // --- 🔴 PUBLIC TEASER VIEW ---
   if (!userId) {
     return (
       <div className="min-h-screen flex flex-col bg-[#869FB9]">
@@ -352,7 +342,6 @@ export default function ForeningDetaljePage() {
 
           <div className="bg-[#0D253F] rounded-[24px] p-8 md:p-10 text-center shadow-lg relative overflow-hidden">
             <div className="flex flex-col items-center mb-6">
-               {/* ✅ KORREKT LOGO INDSAT HER */}
                <div className="relative w-48 h-16">
                   <Image src="/Liguster-logo-NEG.png" alt="Liguster" fill className="object-contain" />
                </div>
@@ -457,7 +446,6 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* --- KNAPPER OG PREVIEWS --- */}
         <button onClick={() => router.push(`/beskeder?id=${realForeningId}`)} className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors">
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">BESKEDER</div>
         </button>
@@ -509,24 +497,60 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
+        {/* ✅ OPSTRAMMET KALENDER */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
+          
           <div className="flex items-center justify-between mb-4 px-2">
-            <button onClick={() => changeMonth(-1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">‹</button>
-            <h3 className="font-bold text-[#131921] capitalize">{monthCursor.toLocaleDateString("da-DK", { month: 'long', year: 'numeric' })}</h3>
-            <button onClick={() => changeMonth(1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">›</button>
+            <button 
+              onClick={() => changeMonth(-1)} 
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-[#131921] font-bold border border-gray-200"
+            >
+              ‹
+            </button>
+            <h3 className="font-black text-[#131921] text-lg capitalize tracking-tight">
+              {monthCursor.toLocaleDateString("da-DK", { month: 'long', year: 'numeric' })}
+            </h3>
+            <button 
+              onClick={() => changeMonth(1)} 
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-[#131921] font-bold border border-gray-200"
+            >
+              ›
+            </button>
           </div>
-          <div className="grid grid-cols-7 text-center mb-2">{['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'].map(d => (<span key={d} className="text-xs font-bold text-gray-400 uppercase">{d}</span>))}</div>
+
+          <div className="grid grid-cols-7 text-center mb-2">
+            {['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'].map(d => (
+              <span key={d} className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{d}</span>
+            ))}
+          </div>
+          
           <div className="grid grid-cols-7 gap-1">
             {buildMonthGrid(monthCursor).map((week, wIdx) => week.map((day, dIdx) => {
                 const isCurrentMonth = day.getMonth() === monthCursor.getMonth();
                 const key = toKey(day);
                 const dayEvents = eventsByDate.get(key) || [];
                 const hasEvents = dayEvents.length > 0;
+                
                 return (
-                  <div key={`${wIdx}-${dIdx}`} onClick={() => hasEvents && setSelectedDateEvents({ date: key, events: dayEvents })} className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative cursor-pointer ${isCurrentMonth ? 'text-gray-800' : 'text-gray-300'} ${hasEvents ? 'bg-blue-50 font-bold hover:bg-blue-100' : ''}`}>
+                  <div 
+                    key={`${wIdx}-${dIdx}`} 
+                    onClick={() => hasEvents && setSelectedDateEvents({ date: key, events: dayEvents })} 
+                    className={`
+                      aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative cursor-pointer transition-colors
+                      ${!isCurrentMonth ? 'text-gray-300 bg-gray-50/50' : 'text-gray-800'}
+                      ${hasEvents ? 'bg-[#131921] text-white hover:bg-black font-bold shadow-md transform scale-[0.95]' : 'hover:bg-gray-50'}
+                    `}
+                  >
                     {day.getDate()}
-                    {hasEvents && <div className="absolute bottom-1.5 w-1.5 h-1.5 bg-[#131921] rounded-full"></div>}
+                    {/* Event prikker */}
+                    {hasEvents && (
+                      <div className="flex gap-0.5 mt-0.5">
+                        {dayEvents.slice(0, 3).map((_, i) => (
+                          <div key={i} className="w-1 h-1 rounded-full bg-white opacity-80"></div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               }))}
@@ -565,7 +589,7 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* MODALER FOR MEDLEMMER OG EVENTS BEHOLDES HER... (Samme kode som før) */}
+      {/* MODALER FOR MEDLEMMER OG EVENTS ... (Samme kode som før) */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
