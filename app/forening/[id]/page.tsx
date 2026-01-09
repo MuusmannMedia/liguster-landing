@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
 import Link from 'next/link';
+import Image from 'next/image'; // ✅ Nu aktiveret til logoet
 
 // --- TYPER ---
 type Forening = {
@@ -187,10 +188,7 @@ export default function ForeningDetaljePage() {
 
           // Fetch images
           const { data: allEvents } = await supabase.from("forening_events").select("id").eq("forening_id", fId);
-          
-          // ✅ FIX: Brug 'any' for at undgå TypeScript fejl når vi mixer Promise.resolve og Supabase Query
           let p5: any = Promise.resolve({ data: [] });
-          
           if (allEvents && allEvents.length > 0) {
              const eventIds = allEvents.map(e => e.id);
              p5 = supabase.from("event_images").select("id, image_url").in("event_id", eventIds).order("created_at", { ascending: false }).limit(8);
@@ -354,9 +352,10 @@ export default function ForeningDetaljePage() {
 
           <div className="bg-[#0D253F] rounded-[24px] p-8 md:p-10 text-center shadow-lg relative overflow-hidden">
             <div className="flex flex-col items-center mb-6">
-               <div className="text-white text-4xl mb-1"><i className="fa-solid fa-wheat-awn"></i></div>
-               <div className="text-white text-xs font-bold tracking-[0.2em] uppercase">LIGUSTER</div>
-               <div className="text-white/60 text-[8px]">Opslag • Forening • Fællesskab</div>
+               {/* ✅ KORREKT LOGO INDSAT HER */}
+               <div className="relative w-48 h-16">
+                  <Image src="/Liguster-logo-NEG.png" alt="Liguster" fill className="object-contain" />
+               </div>
             </div>
 
             <h2 className="text-white text-2xl md:text-3xl font-bold mb-4">Klar til at gøre en forskel lokalt?</h2>
@@ -458,6 +457,7 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
+        {/* --- KNAPPER OG PREVIEWS --- */}
         <button onClick={() => router.push(`/beskeder?id=${realForeningId}`)} className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors">
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">BESKEDER</div>
         </button>
@@ -565,7 +565,7 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* MODALER... */}
+      {/* MODALER FOR MEDLEMMER OG EVENTS BEHOLDES HER... (Samme kode som før) */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
