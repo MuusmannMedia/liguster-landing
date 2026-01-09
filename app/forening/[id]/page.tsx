@@ -137,29 +137,25 @@ export default function ForeningDetaljePage() {
     const fetchMainData = async () => {
       if (!idOrSlug) return;
 
-      // Tjek om URL'en ligner et ID (gammelt link) eller en Slug
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-
       let query = supabase.from("foreninger").select("*");
       
       if (isUuid) {
         query = query.eq("id", idOrSlug);
       } else {
-        query = query.eq("slug", idOrSlug); // Søg efter sluggen
+        query = query.eq("slug", idOrSlug);
       }
 
       const { data } = await query.single();
 
       if (data) {
         setForening(data);
-        setRealForeningId(data.id); // Gem det rigtige UUID
-        
-        // Sæt edit felter
+        setRealForeningId(data.id);
         setEditNavn(data.navn || "");
         setEditSted(data.sted || "");
         setEditDescription(data.beskrivelse || "");
       } else {
-        setLoading(false); // Fandt intet
+        setLoading(false);
       }
     };
 
@@ -223,7 +219,18 @@ export default function ForeningDetaljePage() {
 
   // --- ACTIONS ---
 
-  // ✅ DEL FORENING FUNKTION
+  // ✅ DEL: Kopiér Link (Separat knap)
+  const handleCopyLink = async () => {
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      alert("Link kopieret til udklipsholder!");
+    } catch (err) {
+      alert("Kunne ikke kopiere link.");
+    }
+  };
+
+  // ✅ DEL: Share Sheet (Separat knap)
   const handleShareForening = async () => {
     if (!forening) return;
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -239,12 +246,8 @@ export default function ForeningDetaljePage() {
         // Bruger annullerede
       }
     } else {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        alert("Link kopieret til udklipsholder!");
-      } catch (err) {
-        alert("Kunne ikke kopiere link.");
-      }
+      // Fallback hvis share API ikke findes (desktop)
+      handleCopyLink();
     }
   };
 
@@ -328,7 +331,6 @@ export default function ForeningDetaljePage() {
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
-              // ✅ Brug <img> for at sikre visning
               <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-400">Intet billede</div>
@@ -352,24 +354,33 @@ export default function ForeningDetaljePage() {
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
                 <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap">{forening.beskrivelse}</p>
                 
-                {/* ✅ KNAPPER TIL ADMIN/DELING */}
-                <div className="flex gap-2 mt-4">
+                {/* ✅ KNAPPER (KOPIER, DEL, REDIGER) - STYLET SOM I PostDetailModal */}
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {/* Kopier Knap */}
+                  <button 
+                    onClick={handleCopyLink}
+                    className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
+                  >
+                    <i className="fa-solid fa-link"></i> Kopiér
+                  </button>
+
+                  {/* Del Knap */}
+                  <button 
+                    onClick={handleShareForening}
+                    className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
+                  >
+                    <i className="fa-solid fa-share-nodes"></i> Del
+                  </button>
+
+                  {/* Rediger Knap (Kun admin) */}
                   {isMeAdmin && (
                     <button 
                       onClick={() => setIsEditing(true)} 
-                      className="px-4 py-2 bg-gray-100 text-gray-700 text-[10px] font-bold rounded-full uppercase tracking-wider hover:bg-gray-200 transition-colors"
+                      className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
                     >
-                      Rediger oplysninger
+                      <i className="fa-solid fa-pen-to-square"></i> Rediger
                     </button>
                   )}
-                  
-                  {/* DEL KNAP */}
-                  <button 
-                    onClick={handleShareForening}
-                    className="px-4 py-2 bg-[#131921] text-white text-[10px] font-bold rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors flex items-center gap-2"
-                  >
-                    <i className="fa-solid fa-share-nodes"></i> Del forening
-                  </button>
                 </div>
 
               </div>
@@ -490,7 +501,7 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* MODALER FOR MEDLEMMER OG EVENTS BEHOLDES HER... (Samme kode som før) */}
+      {/* MODALER... (Samme som før) */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
