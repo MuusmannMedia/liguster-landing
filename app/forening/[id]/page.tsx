@@ -64,8 +64,9 @@ const getAvatarUrl = (path: string | null | undefined) => {
   return data.publicUrl;
 };
 
+// ✅ RETTET HJÆLPER: Returnerer nu "" i stedet for null for at fikse build error
 const getEventImageUrl = (path: string | null | undefined) => {
-  if (!path) return null;
+  if (!path) return ""; 
   if (path.startsWith('http')) return path;
   const { data } = supabase.storage.from('event_images').getPublicUrl(path);
   return data.publicUrl;
@@ -191,7 +192,6 @@ export default function ForeningDetaljePage() {
           const bufferStart = new Date(first); bufferStart.setDate(first.getDate() - 7);
           const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
           
-          // ✅ HENT ALLE DETALJER TIL KALENDEREN (Beskrivelse, billede osv.)
           const p4 = supabase.from("forening_events")
             .select("id, title, start_at, end_at, location, price, description, image_url")
             .eq("forening_id", fId)
@@ -225,7 +225,6 @@ export default function ForeningDetaljePage() {
     loadAllData();
   }, [idOrSlug]);
 
-  // Kalender helpers
   useEffect(() => {
     if (realForeningId && userId) {
         const fetchCal = async () => {
@@ -245,7 +244,6 @@ export default function ForeningDetaljePage() {
   }, [monthCursor, realForeningId, userId]);
 
 
-  // --- ACTIONS ---
   const handleShareForening = async () => {
     if (!forening) return;
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -387,7 +385,6 @@ export default function ForeningDetaljePage() {
     );
   }
 
-  // --- 🟢 LOGGED IN VIEW ---
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
@@ -513,7 +510,7 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* ✅ OPSTRAMMET KALENDER DESIGN */}
+        {/* KALENDER */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
           
@@ -556,7 +553,7 @@ export default function ForeningDetaljePage() {
                       aspect-square flex flex-col items-center justify-center rounded-xl text-sm relative cursor-pointer transition-all duration-200
                       ${!isCurrentMonth ? 'text-gray-300' : 'text-gray-800'}
                       ${hasEvents 
-                        ? 'bg-[#131921] text-white shadow-lg transform hover:scale-105 font-bold border-2 border-[#131921]' // Markant mørk
+                        ? 'bg-[#131921] text-white shadow-lg transform hover:scale-105 font-bold border-2 border-[#131921]'
                         : 'hover:bg-gray-100 hover:font-bold'
                       }
                     `}
@@ -603,7 +600,6 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* MEDLEM MODAL */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
@@ -641,7 +637,6 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* ✅ DETALJERET EVENT MODAL (Når man klikker i kalenderen) */}
       {selectedDateEvents && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-xl rounded-[24px] shadow-2xl relative overflow-hidden max-h-[85vh] overflow-y-auto">
@@ -656,11 +651,10 @@ export default function ForeningDetaljePage() {
                 {selectedDateEvents.events.map(e => (
                   <div key={e.id} className="flex flex-col gap-3">
                     
-                    {/* Billede (hvis det findes) */}
                     {e.image_url && (
                       <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-100 relative shadow-sm">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={getEventImageUrl(e.image_url)} alt="" className="w-full h-full object-cover" />
+                        <img src={getEventImageUrl(e.image_url) || ""} alt="" className="w-full h-full object-cover" />
                       </div>
                     )}
 
