@@ -16,7 +16,7 @@ type ThreadItem = {
   isDm?: boolean;
   dmUserId?: string; 
   dmUserAvatar?: string | null;
-  unreadCount?: number; // ✅ NYT: Holder styr på antal ulæste
+  unreadCount?: number; // Holder styr på den røde prik
 };
 
 type ChatMessage = {
@@ -104,7 +104,7 @@ function BeskederContent() {
             forening_id: t.forening_id,
             forening: t.foreninger,
             isDm: false,
-            unreadCount: 0 // Foreningsbeskeder har ikke 'is_read' logik endnu i din DB
+            unreadCount: 0 
           }));
         }
       }
@@ -116,7 +116,7 @@ function BeskederContent() {
         .or(`sender_id.eq.${session.user.id},receiver_id.eq.${session.user.id}`)
         .order('created_at', { ascending: false });
 
-      // ✅ NYT: Hent ulæste tællere for DMs
+      // ✅ HENT ULÆSTE TÆLLERE
       const { data: unreadData } = await supabase
         .from('messages')
         .select('thread_id')
@@ -158,7 +158,7 @@ function BeskederContent() {
                     isDm: true,
                     dmUserId: t.otherId,
                     dmUserAvatar: getAvatarUrl(otherUser?.avatar_url),
-                    unreadCount: unreadMap.get(t.thread_id) || 0 // ✅ Sæt antal ulæste
+                    unreadCount: unreadMap.get(t.thread_id) || 0 // ✅ SÆT PRIKKEN HER
                 };
             });
              initialThreads = [...dmThreads, ...initialThreads];
@@ -169,9 +169,8 @@ function BeskederContent() {
 
       setThreads(initialThreads);
 
-      // Håndter start-parametre
+      // Start logik (hvis man kommer fra et link)
       if (dmUserId) {
-        // ... (samme logik som før) ...
         const { data: targetUser } = await supabase.from('users').select('*').eq('id', dmUserId).single();
         if (targetUser) {
           setDmTargetUser(targetUser);
@@ -183,7 +182,7 @@ function BeskederContent() {
             .limit(1);
           
           if (existingMsgs && existingMsgs.length > 0) {
-            handleSelectThread(existingMsgs[0].thread_id, true, session.user.id); // Brug hjælper funktion
+            handleSelectThread(existingMsgs[0].thread_id, true, session.user.id, dmUserId);
           } else {
             setActiveThreadId(makeUuid());
           }
@@ -205,7 +204,7 @@ function BeskederContent() {
     init();
   }, [startId, dmUserId, router]);
 
-  // ✅ NYT: Hjælpefunktion til at vælge tråd og markere som læst
+  // ✅ DENNE FUNKTION FJERNER PRIKKEN I DB
   const handleSelectThread = async (threadId: string, isDm: boolean, currentUserId: string, targetUserId?: string) => {
     setActiveThreadId(threadId);
     setIsDirectMessage(isDm);
@@ -217,21 +216,23 @@ function BeskederContent() {
        setDmTargetUser(null);
     }
 
-    // 🔴 Fjern rød prik lokalt med det samme
+    // 1. Fjern prik visuelt med det samme (Optimistisk UI)
     setThreads(prev => prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t));
 
-    // 🔴 Opdater databasen (kun for DMs hvor vi har 'is_read')
+    // 2. Opdater databasen (Kræver SQL Policy fra trin 1!)
     if (isDm) {
-      await supabase
+      const { error } = await supabase
         .from('messages')
         .update({ is_read: true })
         .eq('thread_id', threadId)
         .eq('receiver_id', currentUserId)
         .eq('is_read', false);
+      
+      if (error) console.error("Kunne ikke markere som læst:", error.message);
     }
   };
 
-  // 2. Hent beskeder & Realtime (Samme som før, men bruger activeThreadId)
+  // 2. Hent beskeder & Start Realtime
   useEffect(() => {
     if (!activeThreadId) return;
     
@@ -271,19 +272,16 @@ function BeskederContent() {
     fetchMessages();
 
     const table = isDirectMessage ? 'messages' : 'forening_messages';
+    
     const channel = supabase
       .channel(`chat:${activeThreadId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: table, filter: `thread_id=eq.${activeThreadId}` },
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: table, filter: `thread_id=eq.${activeThreadId}` },
         async (payload) => {
           const newMsg = payload.new as any;
-          
-          // Hvis beskeden kommer i den aktive tråd, marker den som læst med det samme (hvis det er DM)
+          // Hvis vi modtager en besked i den åbne tråd, marker som læst
           if (isDirectMessage && newMsg.sender_id !== userId) {
              await supabase.from('messages').update({ is_read: true }).eq('id', newMsg.id);
           }
-
           setMessages((prev) => {
             if (prev.some(m => m.id === newMsg.id)) return prev;
             const senderId = isDirectMessage ? newMsg.sender_id : newMsg.user_id;
@@ -344,7 +342,7 @@ function BeskederContent() {
         sender_id: userId,
         receiver_id: dmTargetUser.id,
         text: text,
-        is_read: false // Default ulæst
+        is_read: false
       }]).select().single();
       error = res.error;
       data = res.data;
@@ -402,17 +400,17 @@ function BeskederContent() {
               {threads.map(t => (
                 <button 
                   key={t.id}
-                  onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)} // ✅ BRUGER NY FUNKTION
+                  onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)}
                   className={`w-full text-left p-3 rounded-xl flex flex-col gap-1 transition-all relative ${activeThreadId === t.id ? 'bg-white shadow-sm ring-1 ring-gray-100' : 'hover:bg-gray-100'}`}
                 >
                   <div className="flex justify-between items-center w-full">
                     <span className={`font-bold text-sm truncate ${activeThreadId === t.id ? 'text-[#131921]' : 'text-gray-700'}`}>{t.title}</span>
                     
-                    {/* 🔴 DEN RØDE PRIK (VIS KUN HVIS UNREAD > 0) */}
+                    {/* 🔴 RØD PRIK - Vises kun hvis unreadCount > 0 */}
                     {t.unreadCount && t.unreadCount > 0 ? (
                       <span className="flex h-3 w-3 relative">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-white"></span>
                       </span>
                     ) : null}
                   </div>
