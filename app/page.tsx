@@ -116,6 +116,16 @@ export default function LigusterLandingPage() {
           </div>
 
           <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse">
+            
+            {/* ✅ NY KNAP: FORENINGER */}
+            <Link
+              href="/offentlige-foreninger"
+              className="text-white hover:text-white/80 font-bold text-sm px-4 py-2.5 transition-all flex items-center mr-2"
+            >
+              Foreninger
+            </Link>
+
+            {/* LOG IND KNAP */}
             <Link
               href="/login"
               className="text-white bg-white/20 hover:bg-white/30 font-medium rounded-lg text-sm px-5 py-2.5 transition-all backdrop-blur-sm border border-white/40 flex items-center"
@@ -140,13 +150,13 @@ export default function LigusterLandingPage() {
             </h1>
 
             <p className="max-w-2xl mb-6 font-light text-gray-200 lg:mb-8 md:text-lg lg:text-xl">
-  Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med fokus på tryghed,
-  enkelhed og en grønnere hverdag.
-  <br className="hidden md:block" />
-  <span className="block mt-2 font-normal text-white">
-    🚀 Apps til iPhone og Android er på vej og lander snart!
-  </span>
-</p>
+              Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med fokus på tryghed,
+              enkelhed og en grønnere hverdag.
+              <br className="hidden md:block" />
+              <span className="block mt-2 font-normal text-white">
+                🚀 Apps til iPhone og Android er på vej og lander snart!
+              </span>
+            </p>
 
             <div className="flex flex-col md:flex-row gap-4">
               <a
@@ -220,8 +230,6 @@ export default function LigusterLandingPage() {
         <div className="max-w-5xl mx-auto px-4">
           <div className="bg-liguster-gradient rounded-[2.5rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
             
-            {/* BACKGROUND LOGO REMOVED */}
-
             <div className="relative z-10 flex flex-col items-center">
               {/* Logo i toppen - NU ENDNU STØRRE */}
               <div className="relative w-[500px] h-[165px] mb-10">
