@@ -14,8 +14,8 @@ type ThreadItem = {
   forening_id?: string;
   forening?: { navn: string };
   isDm?: boolean;
-  dmUserId?: string; // ID of the other user in DM
-  dmUserAvatar?: string | null; // Avatar of the other user in DM
+  dmUserId?: string; 
+  dmUserAvatar?: string | null; 
 };
 
 type ChatMessage = {
@@ -101,7 +101,7 @@ function BeskederContent() {
             title: t.title,
             created_at: t.created_at,
             forening_id: t.forening_id,
-            forening: t.foreninger,
+            forening: t.foreninger, // ✅ Gem forenings-info
             isDm: false
           }));
         }
@@ -179,7 +179,6 @@ function BeskederContent() {
           setIsDirectMessage(false);
         }
       } else if (initialThreads.length > 0) {
-        // --- RETTELSE HER: Kun vælg første tråd automatisk hvis vi er på DESKTOP ---
         if (window.innerWidth >= 768) {
           const first = initialThreads[0];
           setActiveThreadId(first.id);
@@ -326,10 +325,14 @@ function BeskederContent() {
     }
   };
 
+  // ✅ BEREGN INFO TIL TOPPEN AF CHATTEN
   const activeThreadInfo = isDirectMessage 
     ? { title: dmTargetUser?.name || 'Direkte Besked', subtitle: 'Privat samtale' }
     : threads.find(t => t.id === activeThreadId) 
-      ? { title: threads.find(t => t.id === activeThreadId)?.title, subtitle: threads.find(t => t.id === activeThreadId)?.forening?.navn }
+      ? { 
+          title: threads.find(t => t.id === activeThreadId)?.title, 
+          subtitle: threads.find(t => t.id === activeThreadId)?.forening?.navn // ✅ Foreningsnavn
+        }
       : { title: 'Chat', subtitle: '' };
 
   if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>;
@@ -372,7 +375,9 @@ function BeskederContent() {
                   className={`w-full text-left p-3 rounded-xl flex flex-col gap-1 transition-all ${activeThreadId === t.id ? 'bg-white shadow-sm ring-1 ring-gray-100' : 'hover:bg-gray-100'}`}
                 >
                   <span className={`font-bold text-sm ${activeThreadId === t.id ? 'text-[#131921]' : 'text-gray-700'}`}>{t.title}</span>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">
+                  
+                  {/* ✅ VIS FORENINGSNAVN ELLER 'DIREKTE BESKED' */}
+                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide line-clamp-1">
                       {t.isDm ? 'Direkte Besked' : t.forening?.navn}
                   </span>
                 </button>
@@ -385,7 +390,6 @@ function BeskederContent() {
             {activeThreadId ? (
               <>
                 <div className="p-4 border-b border-gray-100 flex items-center gap-3 shadow-sm z-10 bg-white">
-                  {/* ÆNDRING: Meget tydeligere tilbage-knap */}
                   <button 
                     onClick={() => setActiveThreadId(null)} 
                     className="md:hidden w-10 h-10 flex items-center justify-center bg-white text-[#131921] rounded-full shadow-md border border-gray-100 z-50 hover:bg-gray-50 active:scale-95 transition-all"
@@ -395,7 +399,8 @@ function BeskederContent() {
                   
                   <div className="flex-1 ml-2">
                     <h3 className="font-bold text-[#131921]">{activeThreadInfo.title}</h3>
-                    <p className="text-xs text-gray-500">{activeThreadInfo.subtitle}</p>
+                    {/* ✅ VIS OGSÅ SUBTITLE (FORENINGSNAVN) I TOPPEN */}
+                    <p className="text-xs text-gray-500 font-medium">{activeThreadInfo.subtitle}</p>
                   </div>
                 </div>
 
