@@ -34,7 +34,6 @@ type Medlem = {
 
 type Thread = { id: string; title: string; created_at: string; created_by: string };
 
-// Opdateret Event type med beskrivelse og billede til kalenderen
 type Event = { 
   id: string; 
   title: string; 
@@ -47,6 +46,13 @@ type Event = {
 };
 
 type ImagePreview = { id: number; image_url: string };
+
+type UserSearchResult = {
+  id: string;
+  name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+};
 
 // --- HJÆLPERE ---
 const getDisplayName = (m: any) => {
@@ -64,7 +70,6 @@ const getAvatarUrl = (path: string | null | undefined) => {
   return data.publicUrl;
 };
 
-// ✅ RETTET HJÆLPER: Returnerer nu "" i stedet for null for at fikse build error
 const getEventImageUrl = (path: string | null | undefined) => {
   if (!path) return ""; 
   if (path.startsWith('http')) return path;
@@ -137,6 +142,12 @@ export default function ForeningDetaljePage() {
 
   const [showMembers, setShowMembers] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Medlem | null>(null);
+
+  // Invite States
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   
   // --- SAMLET DATA LOADER ---
   useEffect(() => {
@@ -244,6 +255,7 @@ export default function ForeningDetaljePage() {
   }, [monthCursor, realForeningId, userId]);
 
 
+  // --- ACTIONS ---
   const handleShareForening = async () => {
     if (!forening) return;
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -317,6 +329,61 @@ export default function ForeningDetaljePage() {
     const { error } = await supabase.from('foreningsmedlemmer').update({ rolle: 'admin' }).eq('forening_id', realForeningId).eq('user_id', targetUserId);
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
+
+  const inviteUser = async (targetUserId: string) => {
+    if (!realForeningId || !confirm("Vil du invitere denne bruger?")) return;
+    const { error } = await supabase.from('foreningsmedlemmer').insert({
+        forening_id: realForeningId,
+        user_id: targetUserId,
+        rolle: 'medlem',
+        status: 'pending' // Brugeren inviteres og er 'pending'
+    });
+
+    if (error) {
+        if (error.code === '23505') { // Unik nøgle overtrådt (brugeren er allerede medlem/inviteret)
+            alert("Brugeren er allerede medlem eller inviteret.");
+        } else {
+            alert("Fejl ved invitation: " + error.message);
+        }
+    } else {
+        alert("Invitation sendt!");
+        setShowInviteModal(false);
+        setSearchQuery("");
+        setSearchResults([]);
+    }
+  };
+
+  // Søge funktion til modal
+  useEffect(() => {
+    const searchUsers = async () => {
+        if (searchQuery.trim().length < 2) {
+            setSearchResults([]);
+            return;
+        }
+        setIsSearching(true);
+        // Søg efter brugere som IKKE allerede er medlemmer (dette kræver lidt ekstra logik, men her holder vi det simpelt først)
+        const { data, error } = await supabase
+            .from('users')
+            .select('id, name, username, avatar_url')
+            .or(`name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
+            .limit(5);
+        
+        if (!error && data) {
+            // Filtrer brugere fra som allerede er medlemmer
+            const existingMemberIds = medlemmer.map(m => m.user_id);
+            const filtered = data.filter((u: any) => !existingMemberIds.includes(u.id));
+            setSearchResults(filtered);
+        }
+        setIsSearching(false);
+    };
+
+    const timeoutId = setTimeout(() => {
+        searchUsers();
+    }, 500); // Debounce søgning
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, medlemmer]);
+
 
   const triggerImageSelect = () => { fileInputRef.current?.click(); };
   const changeMonth = (delta: number) => { setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1)); };
@@ -446,7 +513,10 @@ export default function ForeningDetaljePage() {
                   <button onClick={handleCopyLink} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-link"></i> Kopiér</button>
                   <button onClick={handleShareForening} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-share-nodes"></i> Del</button>
                   {isMeAdmin && (
-                    <button onClick={() => setIsEditing(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-pen-to-square"></i> Rediger</button>
+                    <>
+                      <button onClick={() => setIsEditing(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-pen-to-square"></i> Rediger</button>
+                      <button onClick={() => setShowInviteModal(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-user-plus"></i> Inviter</button>
+                    </>
                   )}
                 </div>
               </div>
@@ -637,6 +707,7 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
+      {/* ✅ DETALJERET EVENT MODAL */}
       {selectedDateEvents && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-xl rounded-[24px] shadow-2xl relative overflow-hidden max-h-[85vh] overflow-y-auto">
@@ -683,6 +754,52 @@ export default function ForeningDetaljePage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ NY INVITE MODAL */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
+            <button onClick={() => setShowInviteModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black text-xl">✕</button>
+            <h3 className="text-xl font-bold text-[#131921] mb-4">Inviter bruger</h3>
+            <div className="mb-4">
+              <input
+                type="text"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none"
+                placeholder="Søg på navn eller brugernavn..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+                {isSearching ? (
+                    <div className="text-center text-gray-500 py-4">Søger...</div>
+                ) : searchResults.length > 0 ? (
+                    searchResults.map(user => (
+                        <div key={user.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-xl">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden">
+                                    {getAvatarUrl(user.avatar_url) ? <img src={getAvatarUrl(user.avatar_url) || ""} className="w-full h-full object-cover" /> : null}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-sm">{user.name}</p>
+                                    <p className="text-[10px] text-gray-500 uppercase">{user.username}</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => inviteUser(user.id)}
+                                className="px-3 py-1.5 bg-[#131921] text-white text-xs font-bold rounded-lg hover:bg-gray-900"
+                            >
+                                Inviter
+                            </button>
+                        </div>
+                    ))
+                ) : searchQuery.length >= 2 ? (
+                    <div className="text-center text-gray-500 py-4">Ingen brugere fundet.</div>
+                ) : null}
             </div>
           </div>
         </div>
