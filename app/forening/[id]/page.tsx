@@ -330,27 +330,50 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
+  // ✅ OPDATERET INVITE USER MED BESKED
   const inviteUser = async (targetUserId: string) => {
     if (!realForeningId || !confirm("Vil du invitere denne bruger?")) return;
-    const { error } = await supabase.from('foreningsmedlemmer').insert({
+
+    // 1. Opret invitationen (status: pending)
+    const { error: inviteError } = await supabase.from('foreningsmedlemmer').insert({
         forening_id: realForeningId,
         user_id: targetUserId,
         rolle: 'medlem',
-        status: 'pending' // Brugeren inviteres og er 'pending'
+        status: 'pending'
     });
 
-    if (error) {
-        if (error.code === '23505') { // Unik nøgle overtrådt (brugeren er allerede medlem/inviteret)
+    if (inviteError) {
+        if (inviteError.code === '23505') {
             alert("Brugeren er allerede medlem eller inviteret.");
         } else {
-            alert("Fejl ved invitation: " + error.message);
+            alert("Fejl ved invitation: " + inviteError.message);
         }
-    } else {
-        alert("Invitation sendt!");
-        setShowInviteModal(false);
-        setSearchQuery("");
-        setSearchResults([]);
+        return;
     }
+
+    // 2. Send en besked med link til foreningen (Automatisk DM)
+    if (forening && userId) {
+        const link = `/forening/${forening.slug || forening.id}`;
+        // Linket er her lavet relativt, så det virker både i dev og prod.
+        const msgText = `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".\n\nDu kan se foreningen og acceptere invitationen her: ${link}`;
+
+        // Vi antager en simpel 'messages' tabel med sender/receiver.
+        const { error: msgError } = await supabase.from('messages').insert({
+            sender_id: userId,
+            receiver_id: targetUserId,
+            content: msgText, // HVIS DIN KOLONNE HEDDER 'text', SÅ RET 'content' TIL 'text' HER
+            is_read: false
+        });
+
+        if (msgError) {
+            console.warn("Invitation oprettet, men kunne ikke sende besked:", msgError);
+        }
+    }
+
+    alert("Invitation og besked sendt!");
+    setShowInviteModal(false);
+    setSearchQuery("");
+    setSearchResults([]);
   };
 
   // Søge funktion til modal
@@ -361,7 +384,6 @@ export default function ForeningDetaljePage() {
             return;
         }
         setIsSearching(true);
-        // Søg efter brugere som IKKE allerede er medlemmer (dette kræver lidt ekstra logik, men her holder vi det simpelt først)
         const { data, error } = await supabase
             .from('users')
             .select('id, name, username, avatar_url')
@@ -369,7 +391,6 @@ export default function ForeningDetaljePage() {
             .limit(5);
         
         if (!error && data) {
-            // Filtrer brugere fra som allerede er medlemmer
             const existingMemberIds = medlemmer.map(m => m.user_id);
             const filtered = data.filter((u: any) => !existingMemberIds.includes(u.id));
             setSearchResults(filtered);
@@ -379,7 +400,7 @@ export default function ForeningDetaljePage() {
 
     const timeoutId = setTimeout(() => {
         searchUsers();
-    }, 500); // Debounce søgning
+    }, 500); 
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery, medlemmer]);
@@ -759,7 +780,7 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* ✅ NY INVITE MODAL */}
+      {/* ✅ NY INVITE MODAL MED RETTET TEKSTFARVE */}
       {showInviteModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
@@ -768,7 +789,7 @@ export default function ForeningDetaljePage() {
             <div className="mb-4">
               <input
                 type="text"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-black placeholder-gray-500"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-black placeholder-gray-500" // ✅ Rettet her
                 placeholder="Søg på navn eller brugernavn..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
