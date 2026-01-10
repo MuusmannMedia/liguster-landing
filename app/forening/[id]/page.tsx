@@ -148,7 +148,7 @@ export default function ForeningDetaljePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [inviteMessage, setInviteMessage] = useState(""); // ✅ NY STATE: Personlig besked
+  const [inviteMessage, setInviteMessage] = useState("");
   
   // --- SAMLET DATA LOADER ---
   useEffect(() => {
@@ -331,7 +331,6 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
-  // ✅ OPDATERET INVITE USER MED PERSONLIG BESKED
   const inviteUser = async (targetUserId: string) => {
     if (!realForeningId || !confirm("Vil du invitere denne bruger?")) return;
 
@@ -356,7 +355,6 @@ export default function ForeningDetaljePage() {
     if (forening && userId) {
         const link = `/forening/${forening.slug || forening.id}`;
         
-        // Brug den personlige besked, eller en standard hvis tom
         const intro = inviteMessage.trim() !== "" 
             ? inviteMessage 
             : `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".`;
@@ -378,8 +376,16 @@ export default function ForeningDetaljePage() {
     alert("Invitation og besked sendt!");
     setShowInviteModal(false);
     setSearchQuery("");
-    setInviteMessage(""); // Reset besked
+    setInviteMessage("");
     setSearchResults([]);
+    fetchMedlemmer(); // Opdater listen med det samme
+  };
+
+  // Genindlæs medlemmer (til brug efter invite)
+  const fetchMedlemmer = async () => {
+    if (!realForeningId) return;
+    const { data } = await supabase.from("foreningsmedlemmer").select("user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (name, username, avatar_url, email)").eq("forening_id", realForeningId);
+    if (data) setMedlemmer(data as unknown as Medlem[]);
   };
 
   // Søge funktion til modal
@@ -415,7 +421,10 @@ export default function ForeningDetaljePage() {
   const triggerImageSelect = () => { fileInputRef.current?.click(); };
   const changeMonth = (delta: number) => { setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1)); };
 
+  // ✅ FILTRERING: Opdel i godkendte og pending
   const approved = medlemmer.filter(m => m.status === "approved");
+  const pending = medlemmer.filter(m => m.status === "pending"); // Ventende invitationer
+
   const myMembership = medlemmer.find(m => m.user_id === userId);
   const isMember = myMembership?.status === "approved";
   const isPending = myMembership?.status === "pending";
@@ -560,9 +569,14 @@ export default function ForeningDetaljePage() {
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">BESKEDER</div>
         </button>
 
-        <div className="bg-white rounded-[24px] p-4 shadow-sm">
+        {/* ✅ MEDLEMMER PREVIEW MED RØD PRIK */}
+        <div className="bg-white rounded-[24px] p-4 shadow-sm relative">
           <div className="flex justify-between items-center mb-3 px-2">
             <h3 className="font-black text-[#131921]">MEDLEMMER</h3>
+            {/* Rød prik hvis der er pending members */}
+            {pending.length > 0 && isMeAdmin && (
+               <div className="absolute top-5 left-32 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
+            )}
             <button onClick={() => setShowMembers(true)} className="text-xs font-bold text-gray-500 hover:text-black">Se alle</button>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 px-2 scrollbar-hide">
@@ -719,6 +733,8 @@ export default function ForeningDetaljePage() {
             ) : (
               <div className="max-h-[60vh] overflow-y-auto">
                 <h3 className="font-black text-[#131921] mb-4">MEDLEMMER ({approved.length})</h3>
+                
+                {/* Godkendte medlemmer */}
                 {approved.map(m => {
                   const avatarSrc = getAvatarUrl(m.users?.avatar_url);
                   return (
@@ -728,6 +744,30 @@ export default function ForeningDetaljePage() {
                     </div>
                   );
                 })}
+
+                {/* ✅ PENDING MEDLEMMER (Hvis der er nogen) */}
+                {pending.length > 0 && (
+                  <>
+                    <h3 className="font-black text-[#131921] mt-6 mb-2 text-sm uppercase">Afventer svar ({pending.length})</h3>
+                    {pending.map(m => {
+                      const avatarSrc = getAvatarUrl(m.users?.avatar_url);
+                      return (
+                        <div key={m.user_id} className="flex items-center gap-3 p-2 rounded-xl opacity-60 grayscale">
+                          <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden relative">
+                             {avatarSrc ? <img src={avatarSrc} className="w-full h-full object-cover" /> : null}
+                          </div>
+                          <div>
+                             <p className="font-bold text-sm text-gray-600">{getDisplayName(m)}</p>
+                             <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide border border-yellow-200">
+                               Inviteret
+                             </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+
               </div>
             )}
           </div>
@@ -795,13 +835,12 @@ export default function ForeningDetaljePage() {
             <div className="mb-4">
               <input
                 type="text"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-black placeholder-gray-500 font-medium" // ✅ TEKSTFARVE RETTET
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-black placeholder-gray-500 font-medium"
                 placeholder="Søg på navn eller brugernavn..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
               
-              {/* ✅ NYT TEKSTFELT TIL BESKED */}
               <textarea
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mt-3 h-24 outline-none text-black placeholder-gray-500 resize-none font-medium text-sm"
                 placeholder="Personlig besked (valgfri)"
