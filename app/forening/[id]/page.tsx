@@ -148,6 +148,7 @@ export default function ForeningDetaljePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState(""); // ✅ NY STATE: Personlig besked
   
   // --- SAMLET DATA LOADER ---
   useEffect(() => {
@@ -330,7 +331,7 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
-  // ✅ OPDATERET INVITE USER MED BESKED
+  // ✅ OPDATERET INVITE USER MED PERSONLIG BESKED
   const inviteUser = async (targetUserId: string) => {
     if (!realForeningId || !confirm("Vil du invitere denne bruger?")) return;
 
@@ -354,14 +355,18 @@ export default function ForeningDetaljePage() {
     // 2. Send en besked med link til foreningen (Automatisk DM)
     if (forening && userId) {
         const link = `/forening/${forening.slug || forening.id}`;
-        // Linket er her lavet relativt, så det virker både i dev og prod.
-        const msgText = `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".\n\nDu kan se foreningen og acceptere invitationen her: ${link}`;
+        
+        // Brug den personlige besked, eller en standard hvis tom
+        const intro = inviteMessage.trim() !== "" 
+            ? inviteMessage 
+            : `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".`;
 
-        // Vi antager en simpel 'messages' tabel med sender/receiver.
+        const msgText = `${intro}\n\nDu kan se foreningen og acceptere invitationen her: ${link}`;
+
         const { error: msgError } = await supabase.from('messages').insert({
             sender_id: userId,
             receiver_id: targetUserId,
-            content: msgText, // HVIS DIN KOLONNE HEDDER 'text', SÅ RET 'content' TIL 'text' HER
+            content: msgText, 
             is_read: false
         });
 
@@ -373,6 +378,7 @@ export default function ForeningDetaljePage() {
     alert("Invitation og besked sendt!");
     setShowInviteModal(false);
     setSearchQuery("");
+    setInviteMessage(""); // Reset besked
     setSearchResults([]);
   };
 
@@ -780,7 +786,7 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* ✅ NY INVITE MODAL MED RETTET TEKSTFARVE */}
+      {/* ✅ NY INVITE MODAL - RETTET */}
       {showInviteModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
@@ -789,13 +795,22 @@ export default function ForeningDetaljePage() {
             <div className="mb-4">
               <input
                 type="text"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-black placeholder-gray-500" // ✅ Rettet her
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-black placeholder-gray-500 font-medium" // ✅ TEKSTFARVE RETTET
                 placeholder="Søg på navn eller brugernavn..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              
+              {/* ✅ NYT TEKSTFELT TIL BESKED */}
+              <textarea
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mt-3 h-24 outline-none text-black placeholder-gray-500 resize-none font-medium text-sm"
+                placeholder="Personlig besked (valgfri)"
+                value={inviteMessage}
+                onChange={(e) => setInviteMessage(e.target.value)}
+              />
             </div>
-            <div className="max-h-[60vh] overflow-y-auto">
+            
+            <div className="max-h-[50vh] overflow-y-auto">
                 {isSearching ? (
                     <div className="text-center text-gray-500 py-4">Søger...</div>
                 ) : searchResults.length > 0 ? (
