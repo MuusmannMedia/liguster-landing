@@ -768,7 +768,7 @@ export default function ForeningDetaljePage() {
             <div className="mb-4">
               <input
                 type="text"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-black placeholder-gray-500"
                 placeholder="Søg på navn eller brugernavn..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -785,7 +785,7 @@ export default function ForeningDetaljePage() {
                                     {getAvatarUrl(user.avatar_url) ? <img src={getAvatarUrl(user.avatar_url) || ""} className="w-full h-full object-cover" /> : null}
                                 </div>
                                 <div>
-                                    <p className="font-bold text-sm">{user.name}</p>
+                                    <p className="font-bold text-sm text-gray-900">{user.name}</p>
                                     <p className="text-[10px] text-gray-500 uppercase">{user.username}</p>
                                 </div>
                             </div>
