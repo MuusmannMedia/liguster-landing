@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
+import Link from 'next/link'; // Husk at importere Link
 
 // --- TYPER ---
 type ThreadItem = {
@@ -16,7 +17,7 @@ type ThreadItem = {
   isDm?: boolean;
   dmUserId?: string; 
   dmUserAvatar?: string | null;
-  unreadCount?: number; // Holder styr på den røde prik
+  unreadCount?: number; 
 };
 
 type ChatMessage = {
@@ -44,6 +45,29 @@ const makeUuid = () => {
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+};
+
+// ✅ NY HJÆLPER: Gør links klikbare i chatten
+const formatTextWithLinks = (text: string) => {
+  // Regex til at finde URLs (både absolute og relative starter med /)
+  const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\/forening\/[\w-]+)/ig;
+  
+  const parts = text.split(urlRegex);
+  
+  // Vi filterer undefined/tomme dele fra split regex
+  const cleanParts = text.split(/(\s+)/).map((word, i) => {
+    // Tjek om ordet er et link til forening (vores invitationslink)
+    if (word.startsWith('/forening/')) {
+        return <Link key={i} href={word} className="text-blue-300 underline hover:text-blue-100 break-all">{word}</Link>;
+    }
+    // Tjek om ordet er en absolut URL
+    if (word.match(/^https?:\/\//)) {
+        return <a key={i} href={word} target="_blank" rel="noopener noreferrer" className="text-blue-300 underline hover:text-blue-100 break-all">{word}</a>;
+    }
+    return word;
+  });
+
+  return cleanParts;
 };
 
 function BeskederContent() {
@@ -116,7 +140,7 @@ function BeskederContent() {
         .or(`sender_id.eq.${session.user.id},receiver_id.eq.${session.user.id}`)
         .order('created_at', { ascending: false });
 
-      // ✅ HENT ULÆSTE TÆLLERE
+      // HENT ULÆSTE TÆLLERE
       const { data: unreadData } = await supabase
         .from('messages')
         .select('thread_id')
@@ -158,7 +182,7 @@ function BeskederContent() {
                     isDm: true,
                     dmUserId: t.otherId,
                     dmUserAvatar: getAvatarUrl(otherUser?.avatar_url),
-                    unreadCount: unreadMap.get(t.thread_id) || 0 // ✅ SÆT PRIKKEN HER
+                    unreadCount: unreadMap.get(t.thread_id) || 0 
                 };
             });
              initialThreads = [...dmThreads, ...initialThreads];
@@ -169,7 +193,7 @@ function BeskederContent() {
 
       setThreads(initialThreads);
 
-      // Start logik (hvis man kommer fra et link)
+      // Start logik
       if (dmUserId) {
         const { data: targetUser } = await supabase.from('users').select('*').eq('id', dmUserId).single();
         if (targetUser) {
@@ -204,7 +228,6 @@ function BeskederContent() {
     init();
   }, [startId, dmUserId, router]);
 
-  // ✅ DENNE FUNKTION FJERNER PRIKKEN I DB
   const handleSelectThread = async (threadId: string, isDm: boolean, currentUserId: string, targetUserId?: string) => {
     setActiveThreadId(threadId);
     setIsDirectMessage(isDm);
@@ -216,10 +239,8 @@ function BeskederContent() {
        setDmTargetUser(null);
     }
 
-    // 1. Fjern prik visuelt med det samme (Optimistisk UI)
     setThreads(prev => prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t));
 
-    // 2. Opdater databasen (Kræver SQL Policy fra trin 1!)
     if (isDm) {
       const { error } = await supabase
         .from('messages')
@@ -278,7 +299,6 @@ function BeskederContent() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: table, filter: `thread_id=eq.${activeThreadId}` },
         async (payload) => {
           const newMsg = payload.new as any;
-          // Hvis vi modtager en besked i den åbne tråd, marker som læst
           if (isDirectMessage && newMsg.sender_id !== userId) {
              await supabase.from('messages').update({ is_read: true }).eq('id', newMsg.id);
           }
@@ -461,7 +481,10 @@ function BeskederContent() {
                           </div>
                           <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm relative ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none'}`}>
                             {!isMe && <p className="text-[10px] font-bold text-gray-400 mb-1">{msg.users?.name || 'Ukendt'}</p>}
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                            
+                            {/* ✅ BRUG AF FORMATTERINGS-HJÆLPEREN HER */}
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{formatTextWithLinks(msg.text)}</p>
+                            
                             <p className={`text-[9px] mt-1 text-right ${isMe ? 'text-gray-400' : 'text-gray-300'}`}>
                               {new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                             </p>
