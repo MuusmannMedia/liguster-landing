@@ -77,7 +77,6 @@ const getEventImageUrl = (path: string | null | undefined) => {
   return data.publicUrl;
 };
 
-// UUID Generator til tråde
 const makeUuid = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -158,6 +157,9 @@ export default function ForeningDetaljePage() {
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [inviteMessage, setInviteMessage] = useState("");
+  
+  // ✅ NY STATE: Lås knappen mens vi inviterer for at undgå dobbelt-klik/fejl
+  const [invitingId, setInvitingId] = useState<string | null>(null);
   
   // --- SAMLET DATA LOADER ---
   useEffect(() => {
@@ -340,66 +342,82 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
-  // ✅ RETTET INVITE FUNKTION (Tråd + Mobil fix)
+  // ✅ ROBUST INVITE FUNCTION (Lås state, Try/Finally)
   const inviteUser = async (targetUserId: string) => {
-    if (!realForeningId || !confirm("Vil du invitere denne bruger?")) return;
+    // Hvis vi allerede inviterer denne bruger, stop (undgå dobbelt klik)
+    if (invitingId) return;
+    
+    if (!realForeningId) return;
+    // Vi spørger først, så vi ikke låser knappen unødigt hvis de siger nej
+    if (!confirm("Vil du invitere denne bruger?")) return;
 
-    // 1. Opret invitation
-    const { error: inviteError } = await supabase.from('foreningsmedlemmer').insert({
-        forening_id: realForeningId,
-        user_id: targetUserId,
-        rolle: 'medlem',
-        status: 'pending'
-    });
+    setInvitingId(targetUserId); // Lås knappen
 
-    if (inviteError) {
-        if (inviteError.code === '23505') {
-            alert("Brugeren er allerede medlem eller inviteret.");
-        } else {
-            alert("Fejl ved invitation: " + inviteError.message);
-        }
-        return;
-    }
-
-    // 2. Send besked (med korrekt thread_id)
-    if (forening && userId) {
-        const link = `/forening/${forening.slug || forening.id}`;
-        const intro = inviteMessage.trim() !== "" ? inviteMessage : `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".`;
-        const msgText = `${intro}\n\nDu kan se foreningen og acceptere invitationen her: ${link}`;
-
-        // A. Find eksisterende tråd
-        let threadIdToUse = null;
-        const { data: existingThread } = await supabase
-            .from('messages')
-            .select('thread_id')
-            .or(`and(sender_id.eq.${userId},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${userId})`)
-            .limit(1)
-            .maybeSingle();
-
-        if (existingThread && existingThread.thread_id) {
-            threadIdToUse = existingThread.thread_id;
-        } else {
-            threadIdToUse = makeUuid();
-        }
-
-        // B. Indsæt beskeden
-        const { error: msgError } = await supabase.from('messages').insert({
-            thread_id: threadIdToUse,
-            sender_id: userId,
-            receiver_id: targetUserId,
-            text: msgText, // Bruger 'text'
-            is_read: false
+    try {
+        // 1. Opret invitation
+        const { error: inviteError } = await supabase.from('foreningsmedlemmer').insert({
+            forening_id: realForeningId,
+            user_id: targetUserId,
+            rolle: 'medlem',
+            status: 'pending'
         });
 
-        if (msgError) console.warn("Besked fejl:", msgError);
-    }
+        if (inviteError) {
+            if (inviteError.code === '23505') {
+                alert("Brugeren er allerede medlem eller inviteret.");
+            } else {
+                alert("Fejl ved invitation: " + inviteError.message);
+            }
+            return; // Stop her ved fejl
+        }
 
-    alert("Invitation og besked sendt!");
-    setShowInviteModal(false);
-    setSearchQuery("");
-    setInviteMessage("");
-    setSearchResults([]);
-    fetchMedlemmer(); 
+        // 2. Send besked (hvis invitation lykkedes)
+        if (forening && userId) {
+            const link = `/forening/${forening.slug || forening.id}`;
+            const intro = inviteMessage.trim() !== "" ? inviteMessage : `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".`;
+            const msgText = `${intro}\n\nDu kan se foreningen og acceptere invitationen her: ${link}`;
+
+            // A. Find eksisterende tråd
+            let threadIdToUse = null;
+            const { data: existingThread } = await supabase
+                .from('messages')
+                .select('thread_id')
+                .or(`and(sender_id.eq.${userId},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${userId})`)
+                .limit(1)
+                .maybeSingle();
+
+            if (existingThread && existingThread.thread_id) {
+                threadIdToUse = existingThread.thread_id;
+            } else {
+                threadIdToUse = makeUuid();
+            }
+
+            // B. Indsæt besked
+            const { error: msgError } = await supabase.from('messages').insert({
+                thread_id: threadIdToUse,
+                sender_id: userId,
+                receiver_id: targetUserId,
+                text: msgText,
+                is_read: false
+            });
+
+            if (msgError) console.warn("Besked fejl:", msgError);
+        }
+
+        alert("Invitation og besked sendt!");
+        // Reset UI
+        setShowInviteModal(false);
+        setSearchQuery("");
+        setInviteMessage("");
+        setSearchResults([]);
+        fetchMedlemmer(); 
+
+    } catch (err) {
+        console.error("Uventet fejl:", err);
+        alert("Der skete en uventet fejl.");
+    } finally {
+        setInvitingId(null); // Lås op igen uanset udfald
+    }
   };
 
   const fetchMedlemmer = async () => {
@@ -637,7 +655,6 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* KALENDER */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
           
@@ -727,6 +744,70 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
+      {/* ✅ NY INVITE MODAL - ROBUST & MOBILVENLIG */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
+            <button onClick={() => setShowInviteModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black text-xl">✕</button>
+            <h3 className="text-xl font-bold text-[#131921] mb-4">Inviter bruger</h3>
+            <div className="mb-4">
+              <input
+                type="text"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-black placeholder-gray-500 font-medium"
+                placeholder="Søg på navn eller brugernavn..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              
+              <textarea
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mt-3 h-24 outline-none text-black placeholder-gray-500 resize-none font-medium text-sm"
+                placeholder="Personlig besked (valgfri)"
+                value={inviteMessage}
+                onChange={(e) => setInviteMessage(e.target.value)}
+              />
+            </div>
+            
+            <div className="max-h-[50vh] overflow-y-auto">
+                {isSearching ? (
+                    <div className="text-center text-gray-500 py-4">Søger...</div>
+                ) : searchResults.length > 0 ? (
+                    searchResults.map(user => (
+                        <div key={user.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-xl">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden">
+                                    {getAvatarUrl(user.avatar_url) ? <img src={getAvatarUrl(user.avatar_url) || ""} className="w-full h-full object-cover" /> : null}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-sm text-gray-900">{user.name}</p>
+                                    <p className="text-[10px] text-gray-500 uppercase">{user.username}</p>
+                                </div>
+                            </div>
+                            
+                            {/* ✅ ROBUST KNAP MED LÅS OG MOBIL-FIX */}
+                            <button 
+                                type="button"
+                                disabled={invitingId === user.id}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    inviteUser(user.id);
+                                }}
+                                className={`px-3 py-1.5 text-white text-xs font-bold rounded-lg transition-colors touch-manipulation
+                                    ${invitingId === user.id ? 'bg-gray-400' : 'bg-[#131921] hover:bg-gray-900'}`}
+                            >
+                                {invitingId === user.id ? "Sender..." : "Inviter"}
+                            </button>
+                        </div>
+                    ))
+                ) : searchQuery.length >= 2 ? (
+                    <div className="text-center text-gray-500 py-4">Ingen brugere fundet.</div>
+                ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Visning af medlemmer / godkendte og pending */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
@@ -832,62 +913,6 @@ export default function ForeningDetaljePage() {
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ✅ NY INVITE MODAL - RETTET */}
-      {showInviteModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
-            <button onClick={() => setShowInviteModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black text-xl">✕</button>
-            <h3 className="text-xl font-bold text-[#131921] mb-4">Inviter bruger</h3>
-            <div className="mb-4">
-              <input
-                type="text"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none text-black placeholder-gray-500 font-medium"
-                placeholder="Søg på navn eller brugernavn..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              
-              <textarea
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mt-3 h-24 outline-none text-black placeholder-gray-500 resize-none font-medium text-sm"
-                placeholder="Personlig besked (valgfri)"
-                value={inviteMessage}
-                onChange={(e) => setInviteMessage(e.target.value)}
-              />
-            </div>
-            
-            <div className="max-h-[50vh] overflow-y-auto">
-                {isSearching ? (
-                    <div className="text-center text-gray-500 py-4">Søger...</div>
-                ) : searchResults.length > 0 ? (
-                    searchResults.map(user => (
-                        <div key={user.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-xl">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden">
-                                    {getAvatarUrl(user.avatar_url) ? <img src={getAvatarUrl(user.avatar_url) || ""} className="w-full h-full object-cover" /> : null}
-                                </div>
-                                <div>
-                                    <p className="font-bold text-sm text-gray-900">{user.name}</p>
-                                    <p className="text-[10px] text-gray-500 uppercase">{user.username}</p>
-                                </div>
-                            </div>
-                            <button 
-                                type="button" 
-                                onTouchStart={(e) => { e.preventDefault(); inviteUser(user.id); }}
-                                onClick={() => inviteUser(user.id)}
-                                className="px-3 py-1.5 bg-[#131921] text-white text-xs font-bold rounded-lg hover:bg-gray-900"
-                            >
-                                Inviter
-                            </button>
-                        </div>
-                    ))
-                ) : searchQuery.length >= 2 ? (
-                    <div className="text-center text-gray-500 py-4">Ingen brugere fundet.</div>
-                ) : null}
             </div>
           </div>
         </div>
