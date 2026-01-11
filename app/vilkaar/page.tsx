@@ -64,7 +64,7 @@ export default function VilkaarPage() {
           <section>
             <h2 className="text-2xl font-bold text-white mb-3">Konto og ophør</h2>
             <p>
-              Du er ansvarlig for at holde dine login-oplysninger hemmelige. Du kan til enhver tid slette din konto og dine data via funktionen "Slet konto" under indstillinger i appen.
+              Du er ansvarlig for at holde dine login-oplysninger hemmelige. Du kan til enhver tid slette din konto og dine data via funktionen "Slet konto" under "Mig" i appen.
             </p>
           </section>
 
