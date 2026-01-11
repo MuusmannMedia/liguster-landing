@@ -108,7 +108,7 @@ export default function VilkaarPage() {
           <section>
             <h2 className="text-2xl font-bold text-white mb-3">Ændringer af vilkår</h2>
             <p>
-              Vi kan til enhver tid opdatere disse vilkår for brugen af Tjenesten. Ved væsentlige ændringer vil vi, så vidt muligt, give besked herom. Den seneste version vil altid være tilgængelig i appen.
+              Vi kan til enhver tid opdatere disse vilkår for brugen af Tjenesten. Ved væsentlige ændringer vil vi, så vidt muligt, give besked herom.
             </p>
           </section>
 
