@@ -158,7 +158,7 @@ export default function ForeningDetaljePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [inviteMessage, setInviteMessage] = useState("");
   
-  // ✅ OPTIMERET STATE: Lås kun den specifikke bruger
+  // Lås knappen state
   const [invitingId, setInvitingId] = useState<string | null>(null);
   
   // --- SAMLET DATA LOADER ---
@@ -283,19 +283,41 @@ export default function ForeningDetaljePage() {
     try { await navigator.clipboard.writeText(shareUrl); alert("Link kopieret!"); } catch (err) { alert("Kunne ikke kopiere link."); }
   };
 
+  // ✅ NY TOGGLE PUBLIC FUNKTION
+  const togglePublic = async () => {
+    if (!realForeningId || !isMeAdmin) return;
+    
+    const newValue = !forening?.is_public;
+    
+    // Optimistisk UI opdatering
+    setForening(prev => prev ? { ...prev, is_public: newValue } : null);
+    setEditIsPublic(newValue);
+
+    const { error } = await supabase
+        .from('foreninger')
+        .update({ is_public: newValue })
+        .eq('id', realForeningId);
+
+    if (error) {
+        alert("Fejl ved opdatering: " + error.message);
+        // Rul tilbage ved fejl
+        setForening(prev => prev ? { ...prev, is_public: !newValue } : null);
+        setEditIsPublic(!newValue);
+    }
+  };
+
   const handleSaveInfo = async () => {
     if (!realForeningId) return;
     const { error } = await supabase.from('foreninger').update({ 
         navn: editNavn, 
         sted: editSted, 
-        beskrivelse: editDescription,
-        is_public: editIsPublic 
+        beskrivelse: editDescription
     }).eq('id', realForeningId);
 
     if (error) {
       alert("Fejl: " + error.message);
     } else {
-      setForening(prev => prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription, is_public: editIsPublic } : null);
+      setForening(prev => prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription } : null);
       setIsEditing(false);
     }
   };
@@ -342,18 +364,16 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
-  // ✅ OPTIMERET INVITE FUNKTION (Array syntax + Try/Finally + Specifik Lås)
+  // ✅ OPTIMERET INVITE FUNKTION
   const inviteUser = async (targetUserId: string) => {
-    // Stop kun hvis vi allerede arbejder på DENNE bruger
     if (invitingId === targetUserId) return;
     
     if (!realForeningId) return;
     if (!confirm("Vil du invitere denne bruger?")) return;
 
-    setInvitingId(targetUserId); // Lås knappen for denne bruger
+    setInvitingId(targetUserId);
 
     try {
-        // 1. Opret invitation (Array syntax)
         const { error: inviteError } = await supabase.from('foreningsmedlemmer').insert([{
             forening_id: realForeningId,
             user_id: targetUserId,
@@ -370,13 +390,11 @@ export default function ForeningDetaljePage() {
             return;
         }
 
-        // 2. Send besked (med korrekt thread_id og 'text' kolonne)
         if (forening && userId) {
             const link = `/forening/${forening.slug || forening.id}`;
             const intro = inviteMessage.trim() !== "" ? inviteMessage : `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".`;
             const msgText = `${intro}\n\nDu kan se foreningen og acceptere invitationen her: ${link}`;
 
-            // A. Find eksisterende tråd
             let threadIdToUse = null;
             const { data: existingThread } = await supabase
                 .from('messages')
@@ -391,12 +409,11 @@ export default function ForeningDetaljePage() {
                 threadIdToUse = makeUuid();
             }
 
-            // B. Indsæt beskeden
             const { error: msgError } = await supabase.from('messages').insert([{
                 thread_id: threadIdToUse,
                 sender_id: userId,
                 receiver_id: targetUserId,
-                text: msgText, // Bruger 'text'
+                text: msgText, 
                 is_read: false
             }]);
 
@@ -404,7 +421,6 @@ export default function ForeningDetaljePage() {
         }
 
         alert("Invitation og besked sendt!");
-        // Reset UI
         setShowInviteModal(false);
         setSearchQuery("");
         setInviteMessage("");
@@ -415,7 +431,7 @@ export default function ForeningDetaljePage() {
         console.error("Uventet fejl:", err);
         alert("Der skete en uventet fejl.");
     } finally {
-        setInvitingId(null); // Lås op igen uanset udfald
+        setInvitingId(null);
     }
   };
 
@@ -487,9 +503,11 @@ export default function ForeningDetaljePage() {
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">Intet billede</div>
               )}
-              <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-[#131921] text-xs font-black px-3 py-1.5 rounded-full shadow-sm uppercase tracking-wider">
-                 Offentlig visning
-              </div>
+              {forening.is_public && (
+                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-[#131921] text-xs font-black px-3 py-1.5 rounded-full shadow-sm uppercase tracking-wider">
+                   Offentlig
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
@@ -546,22 +564,6 @@ export default function ForeningDetaljePage() {
                 <input value={editSted} onChange={(e) => setEditSted(e.target.value)} style={{ color: '#000000' }} className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] font-bold text-gray-700 bg-white" placeholder="Sted" />
                 <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ color: '#000000' }} className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm text-gray-900 placeholder-gray-500 bg-white" placeholder="Beskrivelse..." />
                 
-                <div className="flex items-center gap-3 px-1 border-t border-gray-100 pt-3 mt-1">
-                  <input 
-                    type="checkbox" 
-                    id="isPublicCheck"
-                    checked={editIsPublic} 
-                    onChange={(e) => setEditIsPublic(e.target.checked)}
-                    className="w-5 h-5 accent-[#131921] cursor-pointer"
-                  />
-                  <div>
-                    <label htmlFor="isPublicCheck" className="text-sm font-bold text-[#131921] cursor-pointer select-none">
-                      Gør foreningssiden offentlig
-                    </label>
-                    <p className="text-xs text-gray-500 mt-0.5">Hvis markeret, vises foreningen på den offentlige liste.</p>
-                  </div>
-                </div>
-
                 <div className="flex gap-2 justify-end pt-2">
                   <button onClick={() => setIsEditing(false)} className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-full text-xs font-bold hover:bg-gray-200">ANNULLER</button>
                   <button onClick={handleSaveInfo} className="px-4 py-2.5 bg-[#131921] text-white rounded-full text-xs font-bold hover:bg-gray-900">GEM ÆNDRINGER</button>
@@ -585,6 +587,15 @@ export default function ForeningDetaljePage() {
                   <button onClick={handleShareForening} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-share-nodes"></i> Del</button>
                   {isMeAdmin && (
                     <>
+                      {/* ✅ OFFENTLIG TOGGLE KNAP */}
+                      <button 
+                        onClick={togglePublic} 
+                        className={`px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2`}
+                      >
+                        <div className={`w-2.5 h-2.5 rounded-full ${forening.is_public ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                        {forening.is_public ? 'Offentlig' : 'Privat'}
+                      </button>
+
                       <button onClick={() => setIsEditing(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-pen-to-square"></i> Rediger</button>
                       <button onClick={() => setShowInviteModal(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-user-plus"></i> Inviter</button>
                     </>
@@ -654,6 +665,7 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
+        {/* KALENDER */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
           
@@ -884,6 +896,7 @@ export default function ForeningDetaljePage() {
                     
                     {e.image_url && (
                       <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-100 relative shadow-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={getEventImageUrl(e.image_url) || ""} alt="" className="w-full h-full object-cover" />
                       </div>
                     )}
