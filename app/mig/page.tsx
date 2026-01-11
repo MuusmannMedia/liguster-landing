@@ -215,7 +215,7 @@ export default function MigPage() {
               <input 
                 value={newName} 
                 onChange={e => setNewName(e.target.value)} 
-                className="w-full text-center text-xl font-bold bg-gray-50 border-b-2 border-[#131921] py-2 outline-none"
+                className="w-full text-center text-xl font-bold bg-gray-50 border-b-2 border-[#131921] py-2 outline-none text-[#131921]" // ✅ RETTET HER: text-[#131921]
                 autoFocus
               />
               <div className="flex gap-4 text-sm font-bold">
