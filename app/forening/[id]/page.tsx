@@ -331,11 +331,9 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
-  // ✅ INVITE USER FIX (Mobile Support)
   const inviteUser = async (targetUserId: string) => {
     if (!realForeningId || !confirm("Vil du invitere denne bruger?")) return;
 
-    // 1. Opret invitationen (status: pending)
     const { error: inviteError } = await supabase.from('foreningsmedlemmer').insert({
         forening_id: realForeningId,
         user_id: targetUserId,
@@ -352,14 +350,9 @@ export default function ForeningDetaljePage() {
         return;
     }
 
-    // 2. Send en besked med link til foreningen (Automatisk DM)
     if (forening && userId) {
         const link = `/forening/${forening.slug || forening.id}`;
-        
-        const intro = inviteMessage.trim() !== "" 
-            ? inviteMessage 
-            : `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".`;
-
+        const intro = inviteMessage.trim() !== "" ? inviteMessage : `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".`;
         const msgText = `${intro}\n\nDu kan se foreningen og acceptere invitationen her: ${link}`;
 
         const { error: msgError } = await supabase.from('messages').insert({
@@ -369,9 +362,7 @@ export default function ForeningDetaljePage() {
             is_read: false
         });
 
-        if (msgError) {
-            console.warn("Invitation oprettet, men kunne ikke sende besked:", msgError);
-        }
+        if (msgError) console.warn("Besked fejl:", msgError);
     }
 
     alert("Invitation og besked sendt!");
@@ -710,7 +701,6 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* MEDLEM MODAL */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
@@ -733,8 +723,6 @@ export default function ForeningDetaljePage() {
             ) : (
               <div className="max-h-[60vh] overflow-y-auto">
                 <h3 className="font-black text-[#131921] mb-4">MEDLEMMER ({approved.length})</h3>
-                
-                {/* Godkendte medlemmer */}
                 {approved.map(m => {
                   const avatarSrc = getAvatarUrl(m.users?.avatar_url);
                   return (
@@ -774,8 +762,7 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* DETALJERET EVENT MODAL... */}
-      {/* ... (Resten er uændret) */}
+      {/* ✅ DETALJERET EVENT MODAL */}
       {selectedDateEvents && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-xl rounded-[24px] shadow-2xl relative overflow-hidden max-h-[85vh] overflow-y-auto">
