@@ -331,6 +331,7 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
+  // ✅ RETTET INVITE USER
   const inviteUser = async (targetUserId: string) => {
     if (!realForeningId || !confirm("Vil du invitere denne bruger?")) return;
 
@@ -358,7 +359,7 @@ export default function ForeningDetaljePage() {
         const { error: msgError } = await supabase.from('messages').insert({
             sender_id: userId,
             receiver_id: targetUserId,
-            content: msgText, 
+            text: msgText, // ✅ Rettet til 'text'
             is_read: false
         });
 
@@ -434,7 +435,6 @@ export default function ForeningDetaljePage() {
       <div className="min-h-screen flex flex-col bg-[#869FB9]">
         <SiteHeader />
         <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
-          {/* Public view content... */}
           <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
             <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
               {forening.billede_url ? (
@@ -485,7 +485,6 @@ export default function ForeningDetaljePage() {
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
         <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
 
-        {/* ... (Samme foreningsheader) ... */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
@@ -560,7 +559,6 @@ export default function ForeningDetaljePage() {
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">BESKEDER</div>
         </button>
 
-        {/* ✅ MEDLEMMER MED RØD PRIK HVIS PENDING */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm relative">
           <div className="flex justify-between items-center mb-3 px-2">
             <h3 className="font-black text-[#131921]">MEDLEMMER</h3>
@@ -611,7 +609,6 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* KALENDER */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
           
@@ -733,7 +730,6 @@ export default function ForeningDetaljePage() {
                   );
                 })}
 
-                {/* ✅ PENDING MEDLEMMER (Hvis der er nogen) */}
                 {pending.length > 0 && (
                   <>
                     <h3 className="font-black text-[#131921] mt-6 mb-2 text-sm uppercase">Afventer svar ({pending.length})</h3>
@@ -762,7 +758,6 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* ✅ DETALJERET EVENT MODAL */}
       {selectedDateEvents && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-xl rounded-[24px] shadow-2xl relative overflow-hidden max-h-[85vh] overflow-y-auto">
@@ -779,7 +774,6 @@ export default function ForeningDetaljePage() {
                     
                     {e.image_url && (
                       <div className="w-full aspect-video rounded-2xl overflow-hidden bg-gray-100 relative shadow-sm">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={getEventImageUrl(e.image_url) || ""} alt="" className="w-full h-full object-cover" />
                       </div>
                     )}
@@ -814,7 +808,6 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* ✅ NY INVITE MODAL - RETTET */}
       {showInviteModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
@@ -854,7 +847,7 @@ export default function ForeningDetaljePage() {
                             </div>
                             <button 
                                 type="button" 
-                                onMouseDown={(e) => e.preventDefault()}
+                                onTouchStart={(e) => { e.preventDefault(); inviteUser(user.id); }}
                                 onClick={() => inviteUser(user.id)}
                                 className="px-3 py-1.5 bg-[#131921] text-white text-xs font-bold rounded-lg hover:bg-gray-900"
                             >
