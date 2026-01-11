@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
-import Link from 'next/link'; // Husk at importere Link
+import Link from 'next/link';
 
 // --- TYPER ---
 type ThreadItem = {
@@ -47,20 +47,15 @@ const makeUuid = () => {
   });
 };
 
-// ✅ NY HJÆLPER: Gør links klikbare i chatten
 const formatTextWithLinks = (text: string) => {
-  // Regex til at finde URLs (både absolute og relative starter med /)
   const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\/forening\/[\w-]+)/ig;
   
   const parts = text.split(urlRegex);
   
-  // Vi filterer undefined/tomme dele fra split regex
   const cleanParts = text.split(/(\s+)/).map((word, i) => {
-    // Tjek om ordet er et link til forening (vores invitationslink)
     if (word.startsWith('/forening/')) {
         return <Link key={i} href={word} className="text-blue-300 underline hover:text-blue-100 break-all">{word}</Link>;
     }
-    // Tjek om ordet er en absolut URL
     if (word.match(/^https?:\/\//)) {
         return <a key={i} href={word} target="_blank" rel="noopener noreferrer" className="text-blue-300 underline hover:text-blue-100 break-all">{word}</a>;
     }
@@ -100,19 +95,16 @@ function BeskederContent() {
       }
       setUserId(session.user.id);
 
-      // Min profil
       const { data: profile } = await supabase.from('users').select('name, avatar_url').eq('id', session.user.id).single();
       if (profile) {
         setMyProfile({ name: profile.name || 'Mig', avatar_url: getAvatarUrl(profile.avatar_url) });
       }
 
-      // Hent forenings-tråde
       const { data: memberships } = await supabase.from('foreningsmedlemmer').select('forening_id').eq('user_id', session.user.id).eq('status', 'approved');
       const myForeningIds = memberships?.map((m: any) => m.forening_id) || [];
 
       let initialThreads: ThreadItem[] = [];
       
-      // Fetch Association Threads
       if (myForeningIds.length > 0) {
         const { data: threadData } = await supabase
           .from('forening_threads')
@@ -133,14 +125,12 @@ function BeskederContent() {
         }
       }
 
-      // Fetch Direct Message Threads
       const { data: dmData } = await supabase
         .from('messages')
         .select('thread_id, sender_id, receiver_id, created_at')
         .or(`sender_id.eq.${session.user.id},receiver_id.eq.${session.user.id}`)
         .order('created_at', { ascending: false });
 
-      // HENT ULÆSTE TÆLLERE
       const { data: unreadData } = await supabase
         .from('messages')
         .select('thread_id')
@@ -193,7 +183,6 @@ function BeskederContent() {
 
       setThreads(initialThreads);
 
-      // Start logik
       if (dmUserId) {
         const { data: targetUser } = await supabase.from('users').select('*').eq('id', dmUserId).single();
         if (targetUser) {
@@ -253,7 +242,6 @@ function BeskederContent() {
     }
   };
 
-  // 2. Hent beskeder & Start Realtime
   useEffect(() => {
     if (!activeThreadId) return;
     
@@ -384,6 +372,36 @@ function BeskederContent() {
     }
   };
 
+  // ✅ NY SLET TRÅD FUNKTION
+  const handleDeleteThread = async () => {
+    if (!activeThreadId || !confirm("Er du sikker på, at du vil slette hele denne samtale?")) return;
+
+    const table = isDirectMessage ? 'messages' : 'forening_messages'; // Eller 'forening_threads' hvis du vil slette hele tråden, ikke kun beskederne.
+    
+    // Hvis det er en DM, sletter vi beskederne. 
+    // (Hvis det er en foreningstråd, skal du måske slette selve tråden fra 'forening_threads' i stedet)
+    let error;
+    if (isDirectMessage) {
+        // Slet beskeder i tråden
+        const res = await supabase.from('messages').delete().eq('thread_id', activeThreadId);
+        error = res.error;
+    } else {
+        // Slet foreningstråden (og dermed beskederne via cascade hvis sat op, ellers slet beskeder først)
+        // Her antager jeg vi sletter selve tråden:
+        const res = await supabase.from('forening_threads').delete().eq('id', activeThreadId);
+        error = res.error;
+    }
+
+    if (error) {
+        alert("Fejl ved sletning: " + error.message);
+    } else {
+        // Fjern tråden fra UI
+        setThreads(prev => prev.filter(t => t.id !== activeThreadId));
+        setActiveThreadId(null);
+        setMessages([]);
+    }
+  };
+
   const activeThreadInfo = isDirectMessage 
     ? { title: dmTargetUser?.name || 'Direkte Besked', subtitle: 'Privat samtale' }
     : threads.find(t => t.id === activeThreadId) 
@@ -425,8 +443,6 @@ function BeskederContent() {
                 >
                   <div className="flex justify-between items-center w-full">
                     <span className={`font-bold text-sm truncate ${activeThreadId === t.id ? 'text-[#131921]' : 'text-gray-700'}`}>{t.title}</span>
-                    
-                    {/* 🔴 RØD PRIK - Vises kun hvis unreadCount > 0 */}
                     {t.unreadCount && t.unreadCount > 0 ? (
                       <span className="flex h-3 w-3 relative">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -434,7 +450,6 @@ function BeskederContent() {
                       </span>
                     ) : null}
                   </div>
-                  
                   <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide line-clamp-1">
                       {t.isDm ? 'Direkte Besked' : t.forening?.navn}
                   </span>
@@ -447,18 +462,31 @@ function BeskederContent() {
           <div className={`flex-1 flex flex-col bg-white ${!activeThreadId ? 'hidden md:flex' : 'flex'}`}>
             {activeThreadId ? (
               <>
-                <div className="p-4 border-b border-gray-100 flex items-center gap-3 shadow-sm z-10 bg-white">
-                  <button 
-                    onClick={() => setActiveThreadId(null)} 
-                    className="md:hidden w-10 h-10 flex items-center justify-center bg-white text-[#131921] rounded-full shadow-md border border-gray-100 z-50 hover:bg-gray-50 active:scale-95 transition-all"
-                  >
-                    <i className="fa-solid fa-arrow-left text-lg"></i>
-                  </button>
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-3 shadow-sm z-10 bg-white">
                   
-                  <div className="flex-1 ml-2">
-                    <h3 className="font-bold text-[#131921]">{activeThreadInfo.title}</h3>
-                    <p className="text-xs text-gray-500 font-medium">{activeThreadInfo.subtitle}</p>
+                  <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => setActiveThreadId(null)} 
+                        className="md:hidden w-10 h-10 flex items-center justify-center bg-white text-[#131921] rounded-full shadow-md border border-gray-100 z-50 hover:bg-gray-50 active:scale-95 transition-all"
+                    >
+                        <i className="fa-solid fa-arrow-left text-lg"></i>
+                    </button>
+                    
+                    <div>
+                        <h3 className="font-bold text-[#131921]">{activeThreadInfo.title}</h3>
+                        <p className="text-xs text-gray-500 font-medium">{activeThreadInfo.subtitle}</p>
+                    </div>
                   </div>
+
+                  {/* ✅ SLET KNAP HER */}
+                  <button 
+                    onClick={handleDeleteThread}
+                    title="Slet samtale"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <i className="fa-regular fa-trash-can"></i>
+                  </button>
+
                 </div>
 
                 <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F5F7FA]">
@@ -481,10 +509,7 @@ function BeskederContent() {
                           </div>
                           <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm relative ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none'}`}>
                             {!isMe && <p className="text-[10px] font-bold text-gray-400 mb-1">{msg.users?.name || 'Ukendt'}</p>}
-                            
-                            {/* ✅ BRUG AF FORMATTERINGS-HJÆLPEREN HER */}
                             <p className="text-sm leading-relaxed whitespace-pre-wrap">{formatTextWithLinks(msg.text)}</p>
-                            
                             <p className={`text-[9px] mt-1 text-right ${isMe ? 'text-gray-400' : 'text-gray-300'}`}>
                               {new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                             </p>
