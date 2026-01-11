@@ -72,7 +72,7 @@ export default function VilkaarPage() {
           <section>
             <h2 className="text-2xl font-bold text-white mb-3">Ingen garanti</h2>
             <p className="mb-3">
-              Vi bestræber os på, at Tjenesten er tilgængelig og fungerer stabilt, men vi kan ikke garantere uafbrudt adgang, fejlfrie funktioner eller at appen til enhver tid er opdateret.
+              Vi bestræber os på, at Tjenesten er tilgængelig og fungerer stabilt, men vi kan ikke garantere uafbrudt adgang, fejlfrie funktioner eller at systemet til enhver tid er opdateret.
             </p>
             <p>
               Tjenesten stilles til rådighed "som den er" uden nogen form for garanti, hverken udtrykkelig eller underforstået, herunder – men ikke begrænset til – garantier for egnethed til et bestemt formål.
