@@ -77,6 +77,15 @@ const getEventImageUrl = (path: string | null | undefined) => {
   return data.publicUrl;
 };
 
+// UUID Generator til tråde
+const makeUuid = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 const fmtDate = (d: any) => new Date(d).toLocaleDateString("da-DK", { day: 'numeric', month: 'long' });
 const fmtTime = (d: any) => new Date(d).toLocaleTimeString("da-DK", { hour: '2-digit', minute: '2-digit' });
 
@@ -331,10 +340,11 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
-  // ✅ RETTET INVITE USER
+  // ✅ RETTET INVITE FUNKTION (Tråd + Mobil fix)
   const inviteUser = async (targetUserId: string) => {
     if (!realForeningId || !confirm("Vil du invitere denne bruger?")) return;
 
+    // 1. Opret invitation
     const { error: inviteError } = await supabase.from('foreningsmedlemmer').insert({
         forening_id: realForeningId,
         user_id: targetUserId,
@@ -351,15 +361,33 @@ export default function ForeningDetaljePage() {
         return;
     }
 
+    // 2. Send besked (med korrekt thread_id)
     if (forening && userId) {
         const link = `/forening/${forening.slug || forening.id}`;
         const intro = inviteMessage.trim() !== "" ? inviteMessage : `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".`;
         const msgText = `${intro}\n\nDu kan se foreningen og acceptere invitationen her: ${link}`;
 
+        // A. Find eksisterende tråd
+        let threadIdToUse = null;
+        const { data: existingThread } = await supabase
+            .from('messages')
+            .select('thread_id')
+            .or(`and(sender_id.eq.${userId},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${userId})`)
+            .limit(1)
+            .maybeSingle();
+
+        if (existingThread && existingThread.thread_id) {
+            threadIdToUse = existingThread.thread_id;
+        } else {
+            threadIdToUse = makeUuid();
+        }
+
+        // B. Indsæt beskeden
         const { error: msgError } = await supabase.from('messages').insert({
+            thread_id: threadIdToUse,
             sender_id: userId,
             receiver_id: targetUserId,
-            text: msgText, // ✅ Rettet til 'text'
+            text: msgText, // Bruger 'text'
             is_read: false
         });
 
@@ -609,6 +637,7 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
+        {/* KALENDER */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
           
@@ -808,6 +837,7 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
+      {/* ✅ NY INVITE MODAL - RETTET */}
       {showInviteModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
