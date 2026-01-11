@@ -372,22 +372,16 @@ function BeskederContent() {
     }
   };
 
-  // ✅ NY SLET TRÅD FUNKTION
   const handleDeleteThread = async () => {
     if (!activeThreadId || !confirm("Er du sikker på, at du vil slette hele denne samtale?")) return;
 
-    const table = isDirectMessage ? 'messages' : 'forening_messages'; // Eller 'forening_threads' hvis du vil slette hele tråden, ikke kun beskederne.
+    const table = isDirectMessage ? 'messages' : 'forening_messages';
     
-    // Hvis det er en DM, sletter vi beskederne. 
-    // (Hvis det er en foreningstråd, skal du måske slette selve tråden fra 'forening_threads' i stedet)
     let error;
     if (isDirectMessage) {
-        // Slet beskeder i tråden
         const res = await supabase.from('messages').delete().eq('thread_id', activeThreadId);
         error = res.error;
     } else {
-        // Slet foreningstråden (og dermed beskederne via cascade hvis sat op, ellers slet beskeder først)
-        // Her antager jeg vi sletter selve tråden:
         const res = await supabase.from('forening_threads').delete().eq('id', activeThreadId);
         error = res.error;
     }
@@ -395,7 +389,6 @@ function BeskederContent() {
     if (error) {
         alert("Fejl ved sletning: " + error.message);
     } else {
-        // Fjern tråden fra UI
         setThreads(prev => prev.filter(t => t.id !== activeThreadId));
         setActiveThreadId(null);
         setMessages([]);
@@ -443,6 +436,7 @@ function BeskederContent() {
                 >
                   <div className="flex justify-between items-center w-full">
                     <span className={`font-bold text-sm truncate ${activeThreadId === t.id ? 'text-[#131921]' : 'text-gray-700'}`}>{t.title}</span>
+                    
                     {t.unreadCount && t.unreadCount > 0 ? (
                       <span className="flex h-3 w-3 relative">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -450,6 +444,7 @@ function BeskederContent() {
                       </span>
                     ) : null}
                   </div>
+                  
                   <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide line-clamp-1">
                       {t.isDm ? 'Direkte Besked' : t.forening?.navn}
                   </span>
@@ -478,13 +473,13 @@ function BeskederContent() {
                     </div>
                   </div>
 
-                  {/* ✅ SLET KNAP HER */}
+                  {/* ✅ SLET KNAP MED TEKST */}
                   <button 
                     onClick={handleDeleteThread}
-                    title="Slet samtale"
-                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors group"
                   >
-                    <i className="fa-regular fa-trash-can"></i>
+                    <span className="text-xs font-bold uppercase tracking-wide">Slet besked</span>
+                    <i className="fa-regular fa-trash-can text-lg group-hover:scale-110 transition-transform"></i>
                   </button>
 
                 </div>
