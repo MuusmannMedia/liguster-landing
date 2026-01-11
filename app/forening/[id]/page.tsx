@@ -158,7 +158,7 @@ export default function ForeningDetaljePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [inviteMessage, setInviteMessage] = useState("");
   
-  // ✅ NY STATE: Lås knappen mens vi inviterer for at undgå dobbelt-klik/fejl
+  // ✅ OPTIMERET STATE: Lås kun den specifikke bruger
   const [invitingId, setInvitingId] = useState<string | null>(null);
   
   // --- SAMLET DATA LOADER ---
@@ -342,25 +342,24 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
-  // ✅ ROBUST INVITE FUNCTION (Lås state, Try/Finally)
+  // ✅ OPTIMERET INVITE FUNKTION (Array syntax + Try/Finally + Specifik Lås)
   const inviteUser = async (targetUserId: string) => {
-    // Hvis vi allerede inviterer denne bruger, stop (undgå dobbelt klik)
-    if (invitingId) return;
+    // Stop kun hvis vi allerede arbejder på DENNE bruger
+    if (invitingId === targetUserId) return;
     
     if (!realForeningId) return;
-    // Vi spørger først, så vi ikke låser knappen unødigt hvis de siger nej
     if (!confirm("Vil du invitere denne bruger?")) return;
 
-    setInvitingId(targetUserId); // Lås knappen
+    setInvitingId(targetUserId); // Lås knappen for denne bruger
 
     try {
-        // 1. Opret invitation
-        const { error: inviteError } = await supabase.from('foreningsmedlemmer').insert({
+        // 1. Opret invitation (Array syntax)
+        const { error: inviteError } = await supabase.from('foreningsmedlemmer').insert([{
             forening_id: realForeningId,
             user_id: targetUserId,
             rolle: 'medlem',
             status: 'pending'
-        });
+        }]);
 
         if (inviteError) {
             if (inviteError.code === '23505') {
@@ -368,10 +367,10 @@ export default function ForeningDetaljePage() {
             } else {
                 alert("Fejl ved invitation: " + inviteError.message);
             }
-            return; // Stop her ved fejl
+            return;
         }
 
-        // 2. Send besked (hvis invitation lykkedes)
+        // 2. Send besked (med korrekt thread_id og 'text' kolonne)
         if (forening && userId) {
             const link = `/forening/${forening.slug || forening.id}`;
             const intro = inviteMessage.trim() !== "" ? inviteMessage : `Hej! Jeg har inviteret dig til at være med i foreningen "${forening.navn}".`;
@@ -392,14 +391,14 @@ export default function ForeningDetaljePage() {
                 threadIdToUse = makeUuid();
             }
 
-            // B. Indsæt besked
-            const { error: msgError } = await supabase.from('messages').insert({
+            // B. Indsæt beskeden
+            const { error: msgError } = await supabase.from('messages').insert([{
                 thread_id: threadIdToUse,
                 sender_id: userId,
                 receiver_id: targetUserId,
-                text: msgText,
+                text: msgText, // Bruger 'text'
                 is_read: false
-            });
+            }]);
 
             if (msgError) console.warn("Besked fejl:", msgError);
         }
@@ -744,7 +743,7 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
-      {/* ✅ NY INVITE MODAL - ROBUST & MOBILVENLIG */}
+      {/* ✅ NY INVITE MODAL - RETTET (Kun onClick, ingen onTouchStart) */}
       {showInviteModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
@@ -783,10 +782,11 @@ export default function ForeningDetaljePage() {
                                 </div>
                             </div>
                             
-                            {/* ✅ ROBUST KNAP MED LÅS OG MOBIL-FIX */}
+                            {/* ✅ KNAP RETTET: Kun onClick + touch-manipulation */}
                             <button 
                                 type="button"
                                 disabled={invitingId === user.id}
+                                aria-busy={invitingId === user.id}
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -807,7 +807,7 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* Visning af medlemmer / godkendte og pending */}
+      {/* Resten af modalerne er uændrede */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
