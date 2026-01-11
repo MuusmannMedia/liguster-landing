@@ -587,7 +587,10 @@ export default function ForeningDetaljePage() {
                   <button onClick={handleShareForening} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-share-nodes"></i> Del</button>
                   {isMeAdmin && (
                     <>
-                      {/* ✅ OFFENTLIG TOGGLE KNAP */}
+                      <button onClick={() => setIsEditing(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-pen-to-square"></i> Rediger</button>
+                      <button onClick={() => setShowInviteModal(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-user-plus"></i> Inviter</button>
+                      
+                      {/* ✅ OFFENTLIG TOGGLE KNAP - FLYTTET HER */}
                       <button 
                         onClick={togglePublic} 
                         className={`px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2`}
@@ -595,9 +598,6 @@ export default function ForeningDetaljePage() {
                         <div className={`w-2.5 h-2.5 rounded-full ${forening.is_public ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                         {forening.is_public ? 'Offentlig' : 'Privat'}
                       </button>
-
-                      <button onClick={() => setIsEditing(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-pen-to-square"></i> Rediger</button>
-                      <button onClick={() => setShowInviteModal(true)} className="px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"><i className="fa-solid fa-user-plus"></i> Inviter</button>
                     </>
                   )}
                 </div>
