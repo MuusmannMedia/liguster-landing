@@ -331,6 +331,7 @@ export default function ForeningDetaljePage() {
     if (!error) { alert("Opdateret."); window.location.reload(); }
   };
 
+  // ✅ INVITE USER FIX (Mobile Support)
   const inviteUser = async (targetUserId: string) => {
     if (!realForeningId || !confirm("Vil du invitere denne bruger?")) return;
 
@@ -378,17 +379,15 @@ export default function ForeningDetaljePage() {
     setSearchQuery("");
     setInviteMessage("");
     setSearchResults([]);
-    fetchMedlemmer(); // Opdater listen med det samme
+    fetchMedlemmer(); 
   };
 
-  // Genindlæs medlemmer (til brug efter invite)
   const fetchMedlemmer = async () => {
     if (!realForeningId) return;
     const { data } = await supabase.from("foreningsmedlemmer").select("user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (name, username, avatar_url, email)").eq("forening_id", realForeningId);
     if (data) setMedlemmer(data as unknown as Medlem[]);
   };
 
-  // Søge funktion til modal
   useEffect(() => {
     const searchUsers = async () => {
         if (searchQuery.trim().length < 2) {
@@ -421,9 +420,8 @@ export default function ForeningDetaljePage() {
   const triggerImageSelect = () => { fileInputRef.current?.click(); };
   const changeMonth = (delta: number) => { setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1)); };
 
-  // ✅ FILTRERING: Opdel i godkendte og pending
   const approved = medlemmer.filter(m => m.status === "approved");
-  const pending = medlemmer.filter(m => m.status === "pending"); // Ventende invitationer
+  const pending = medlemmer.filter(m => m.status === "pending");
 
   const myMembership = medlemmer.find(m => m.user_id === userId);
   const isMember = myMembership?.status === "approved";
@@ -445,6 +443,7 @@ export default function ForeningDetaljePage() {
       <div className="min-h-screen flex flex-col bg-[#869FB9]">
         <SiteHeader />
         <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
+          {/* Public view content... */}
           <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
             <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
               {forening.billede_url ? (
@@ -495,6 +494,7 @@ export default function ForeningDetaljePage() {
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
         <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
 
+        {/* ... (Samme foreningsheader) ... */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
@@ -569,11 +569,10 @@ export default function ForeningDetaljePage() {
            <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">BESKEDER</div>
         </button>
 
-        {/* ✅ MEDLEMMER PREVIEW MED RØD PRIK */}
+        {/* ✅ MEDLEMMER MED RØD PRIK HVIS PENDING */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm relative">
           <div className="flex justify-between items-center mb-3 px-2">
             <h3 className="font-black text-[#131921]">MEDLEMMER</h3>
-            {/* Rød prik hvis der er pending members */}
             {pending.length > 0 && isMeAdmin && (
                <div className="absolute top-5 left-32 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
             )}
@@ -711,6 +710,7 @@ export default function ForeningDetaljePage() {
       </main>
       <SiteFooter />
 
+      {/* MEDLEM MODAL */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
@@ -774,7 +774,8 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* ✅ DETALJERET EVENT MODAL */}
+      {/* DETALJERET EVENT MODAL... */}
+      {/* ... (Resten er uændret) */}
       {selectedDateEvents && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-xl rounded-[24px] shadow-2xl relative overflow-hidden max-h-[85vh] overflow-y-auto">
@@ -865,6 +866,8 @@ export default function ForeningDetaljePage() {
                                 </div>
                             </div>
                             <button 
+                                type="button" 
+                                onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => inviteUser(user.id)}
                                 className="px-3 py-1.5 bg-[#131921] text-white text-xs font-bold rounded-lg hover:bg-gray-900"
                             >
