@@ -39,6 +39,9 @@ export default function MigPage() {
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  
+  // Modal state
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,31 +54,25 @@ export default function MigPage() {
       }
       setUser(session.user);
       
-      // Hent profil data
       const { data } = await supabase.from('users').select('*').eq('id', session.user.id).single();
       
       if (data) {
-        // --- LOGIK FRA APPEN: Håndter avatar URL ---
         let finalAvatarUrl = null;
         if (data.avatar_url) {
-          // Hvis det allerede er en fuld http-url
           if (data.avatar_url.startsWith('http')) {
             finalAvatarUrl = `${data.avatar_url}?t=${Date.now()}`;
           } else {
-            // Hvis det er en sti (som appen gemmer), hent public URL
             const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.avatar_url);
             if (urlData?.publicUrl) {
               finalAvatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
             }
           }
         }
-
         setProfile({ ...data, avatar_url: finalAvatarUrl });
         setNewName(data.name || "");
       } else {
         setNewName(session.user.user_metadata?.full_name || "");
       }
-      
       setLoading(false);
     };
     init();
@@ -89,13 +86,8 @@ export default function MigPage() {
   const handleSaveName = async () => {
     if (!newName.trim()) return alert("Navn kan ikke være tomt");
     setSaving(true);
-    
-    // 1. Opdater auth metadata
     await supabase.auth.updateUser({ data: { full_name: newName } });
-    
-    // 2. Opdater public users tabel
     const { error } = await supabase.from('users').update({ name: newName }).eq('id', user.id);
-    
     if (error) {
       alert("Fejl: " + error.message);
     } else {
@@ -108,26 +100,16 @@ export default function MigPage() {
   const handleUploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-
     try {
       setUploading(true);
       const compressedBlob = await resizeImage(file);
-      
-      // Vi bruger samme sti-struktur som appen: userId/timestamp.jpg
       const filePath = `${user.id}/${Date.now()}.jpg`;
-
-      // Upload
       const { error: upErr } = await supabase.storage.from('avatars').upload(filePath, compressedBlob, { upsert: false });
       if (upErr) throw upErr;
-
-      // Opdater DB med STIEN (ikke URL'en), så appen også forstår det
       const { error: updErr } = await supabase.from('users').update({ avatar_url: filePath }).eq('id', user.id);
       if (updErr) throw updErr;
-
-      // Generer URL til visning her og nu
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
       const publicUrl = data.publicUrl ? `${data.publicUrl}?t=${Date.now()}` : null;
-
       setProfile({ ...profile, avatar_url: publicUrl });
     } catch (err: any) {
       alert("Upload fejl: " + err.message);
@@ -142,34 +124,20 @@ export default function MigPage() {
     if (!error) setProfile({ ...profile, avatar_url: null });
   };
 
-  // --- RETTET FUNKTION: Sender nu TOKEN med til serveren ---
   const handleDeleteAccount = async () => {
     if (!confirm("ER DU SIKKER? Dette sletter din konto og alt data permanent!")) return;
-    
     setSaving(true);
-
     try {
-      // 1. Hent den aktuelle session (dit adgangskort)
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error("Kunne ikke finde din session. Prøv at logge ud og ind igen.");
-      }
-
-      // 2. Kald serveren og vis adgangskortet i 'Authorization' headeren
+      if (!session) throw new Error("Kunne ikke finde din session. Prøv at logge ud og ind igen.");
       const res = await fetch('/api/auth/delete-user', {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`, // <--- HER ER MAGIEN
-        }
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
-      
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Kunne ikke slette konto");
       }
-      
-      // 3. Log ud og send væk
       await supabase.auth.signOut();
       router.push('/login');
     } catch (err: any) {
@@ -181,8 +149,6 @@ export default function MigPage() {
   if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>;
 
   const displayName = profile?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Bruger";
-  
-  // Fallback hvis ingen avatar
   const avatarUrl = profile?.avatar_url || `https://ui-avatars.com/api/?name=${displayName}&background=random&size=256`;
 
   return (
@@ -193,14 +159,14 @@ export default function MigPage() {
         
         <div className="bg-white w-full rounded-[30px] p-8 shadow-xl flex flex-col items-center">
           
-          {/* Avatar - NU KVADRATISK (1:1) og FULD BREDDE */}
-          <div className="relative w-full aspect-square rounded-[24px] overflow-hidden mb-6 bg-gray-100 shadow-inner">
+          {/* Avatar */}
+          <div className="relative w-full aspect-[5/6] rounded-[24px] overflow-hidden mb-6 bg-gray-100 shadow-inner">
             <Image 
               src={avatarUrl} 
               alt="Profil" 
               fill 
               className="object-cover"
-              unoptimized // Vigtigt da vi henter fra eksterne URL'er (Supabase storage)
+              unoptimized
             />
             {uploading && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white">
@@ -215,7 +181,7 @@ export default function MigPage() {
               <input 
                 value={newName} 
                 onChange={e => setNewName(e.target.value)} 
-                className="w-full text-center text-xl font-bold bg-gray-50 border-b-2 border-[#131921] py-2 outline-none text-[#131921]" // ✅ RETTET HER: text-[#131921]
+                className="w-full text-center text-xl font-bold bg-gray-50 border-b-2 border-[#131921] py-2 outline-none text-[#131921]"
                 autoFocus
               />
               <div className="flex gap-4 text-sm font-bold">
@@ -264,7 +230,6 @@ export default function MigPage() {
               LOG UD
             </button>
 
-            {/* --- KNAP: type="button" og e.preventDefault() --- */}
             <button 
               type="button" 
               onClick={(e) => {
@@ -278,16 +243,55 @@ export default function MigPage() {
             </button>
           </div>
 
-          {/* Info */}
+          {/* Info + Link */}
           <div className="text-center text-gray-500 text-sm">
             <p>{user.email}</p>
             <p className="opacity-60 text-xs mt-1">Du er logget ind</p>
+            
+            {/* LINK TIL MODAL */}
+            <button 
+              onClick={() => setShowInfoModal(true)}
+              className="text-gray-500 hover:text-gray-800 text-xs mt-1 underline decoration-gray-400 hover:decoration-gray-800 transition-colors"
+            >
+              Sammen om en tryg platform
+            </button>
           </div>
 
         </div>
 
       </main>
       <SiteFooter />
+
+      {/* MODAL (DIALOG) */}
+      {showInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-[24px] max-w-md w-full p-6 shadow-2xl animate-fadeIn">
+            <h3 className="text-xl font-bold text-[#131921] mb-4 text-center">
+              Sammen om en tryg platform
+            </h3>
+            
+            <div className="text-gray-600 text-sm space-y-4 leading-relaxed text-center">
+              <p>
+                Vi værner om privatlivets fred, og vi kigger ikke med i foreningernes lukkede rum. Tillid er nøglen til et godt foreningsliv.
+              </p>
+              <p>
+                Men tillid forpligter. Vi accepterer ikke, at platformen bruges til ulovlige aktiviteter eller adfærd, der skader andre.
+              </p>
+              <p>
+                Oplever du, at en forening eller en gruppe overskrider disse grænser, opfordrer vi dig til at kontakte vores support fortroligt på <a href="mailto:kontakt@liguster-app.dk" className="text-blue-600 hover:underline font-semibold">kontakt@liguster-app.dk</a>. Så tager vi hånd om det.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowInfoModal(false)}
+              className="mt-6 w-full py-3 bg-[#131921] text-white rounded-full font-bold text-sm hover:bg-gray-900 transition-colors"
+            >
+              LUK
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
