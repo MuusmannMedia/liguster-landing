@@ -200,12 +200,12 @@ export default function ForeningDetaljePage() {
     loadAllData();
   }, [idOrSlug, router]);
 
-  // ✅ RETTET LOGIK: FJERNET AUTOMATISK BESKED HELT
+  // ✅ RETTET LOGIK: FJERNET AUTOSKREVET TEKST
   const handleWriteToMember = async (targetUserId: string) => {
     if (!userId || !targetUserId) return;
     setLoading(true);
     try {
-      // 1. Tjek om der findes en tråd i forvejen
+      // 1. Tjek om der findes en tråd
       const { data: existingThread } = await supabase
         .from('messages')
         .select('thread_id')
@@ -216,12 +216,12 @@ export default function ForeningDetaljePage() {
       let threadIdToUse = existingThread?.thread_id;
 
       // 2. Hvis ingen tråd findes, generer vi bare et nyt ID til URL'en
-      // Vi sender IKKE en besked til databasen her. 
-      // Først når brugeren skriver noget på besked-siden, gemmes tråden.
+      // Websiden/indbakken vil håndtere at starte chatten når brugeren skriver første besked.
       if (!threadIdToUse) {
         threadIdToUse = makeUuid();
       }
       
+      // Send brugeren videre med det fundne eller nye ID
       router.push(`/beskeder?id=${threadIdToUse}&dmUser=${targetUserId}`);
     } catch (err) {
       alert("Kunne ikke åbne chat.");
