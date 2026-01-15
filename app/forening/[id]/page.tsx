@@ -232,6 +232,19 @@ export default function ForeningDetaljePage() {
     if (!error) { setForening(prev => prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription } : null); setIsEditing(false); }
   };
 
+  // ✅ GENOPRETTET LOGIK: GØR OFFENTLIG / PRIVAT
+  const togglePublic = async () => {
+    if (!realForeningId || !isMeAdmin) return;
+    const newValue = !forening?.is_public;
+    setForening(prev => prev ? { ...prev, is_public: newValue } : null);
+    const { error } = await supabase.from('foreninger').update({ is_public: newValue }).eq('id', realForeningId);
+    if (error) {
+      // Rul tilbage ved fejl
+      setForening(prev => prev ? { ...prev, is_public: !newValue } : null);
+      alert("Kunne ikke opdatere synlighed.");
+    }
+  };
+
   const handleJoin = async () => {
     if (!userId || !realForeningId) { router.push('/opret'); return; }
     await supabase.from('foreningsmedlemmer').insert([{ forening_id: realForeningId, user_id: userId, rolle: 'medlem', status: 'pending' }]);
@@ -303,6 +316,14 @@ export default function ForeningDetaljePage() {
                       <>
                         <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Rediger tekst</button>
                         <button className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Inviter</button>
+                        
+                        {/* ✅ GENOPRETTET KNAP: OFFENTLIG / PRIVAT */}
+                        <button 
+                          onClick={togglePublic} 
+                          className={`px-4 py-2 text-xs font-bold rounded-full uppercase ${forening.is_public ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}
+                        >
+                          {forening.is_public ? 'Offentlig' : 'Privat'}
+                        </button>
                       </>
                     )}
                   </div>
@@ -407,7 +428,7 @@ export default function ForeningDetaljePage() {
         )}
       </main>
 
-      {/* MODALER - KUN TILGÆNGELIGE FOR GODKENDTE MEDLEMMER */}
+      {/* MODALER (UBEVARET) */}
       {isApprovedMember && (
         <>
           {showFirstMessageModal && selectedMember && (
