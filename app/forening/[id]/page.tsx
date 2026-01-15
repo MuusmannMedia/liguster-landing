@@ -210,33 +210,32 @@ export default function ForeningDetaljePage() {
     loadAllData();
   }, [idOrSlug, router]);
 
-  // ✅ RETTET LOGIK: FINDER/OPRETTER CHAT FØR NAVIGATION
+  // ✅ RETTET LOGIK: FINDER/OPRETTER CHAT UDEN AT INDSÆTTE "VELKOMSTBESKED"
   const handleWriteToMember = async (targetUserId: string) => {
     if (!userId || !targetUserId) return;
     setLoading(true);
+
     try {
-      const { data: existingThread } = await supabase
+      // Find eksisterende tråd (seneste besked mellem jer)
+      const { data: existingThread, error: findErr } = await supabase
         .from('messages')
-        .select('thread_id')
-        .or(`and(sender_id.eq.${userId},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${userId})`)
+        .select('thread_id, created_at')
+        .or(
+          `and(sender_id.eq.${userId},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${userId})`
+        )
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      let threadIdToUse = existingThread?.thread_id;
+      if (findErr) throw findErr;
 
-      if (!threadIdToUse) {
-        threadIdToUse = makeUuid();
-        await supabase.from('messages').insert([{
-          thread_id: threadIdToUse,
-          sender_id: userId,
-          receiver_id: targetUserId,
-          text: "Hej! Jeg skriver til dig fra foreningen.",
-          is_read: false
-        }]);
-      }
+      // Brug eksisterende tråd hvis den findes – ellers lav en ny UUID (men indsæt INGEN besked)
+      const threadIdToUse = existingThread?.thread_id ?? makeUuid();
+
+      // Navigér til beskeder
       router.push(`/beskeder?id=${threadIdToUse}&dmUser=${targetUserId}`);
     } catch (err) {
-      alert("Kunne ikke åbne chat.");
+      alert('Kunne ikke åbne chat.');
     } finally {
       setLoading(false);
     }
@@ -378,41 +377,38 @@ export default function ForeningDetaljePage() {
           </div>
         </div>
 
-        {/* SAMTALER SEKTION */}
-        <div onClick={() => router.push(`/forening/${realForeningId}/threads`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer">
+        <div onClick={() => router.push(`/forening/${realForeningId}/threads`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">SAMTALER</div>
           {threads.length === 0 ? <p className="text-sm text-gray-400">Ingen tråde endnu.</p> : (
             <div className="space-y-3">
               {threads.map((t, idx) => (
-                <div key={t.id} className={`${idx !== 0 ? 'border-t pt-3' : ''}`}>
-                  <h4 className="font-bold text-[#131921]">{t.title}</h4>
+                <div key={t.id} className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
+                  <div><h4 className="font-bold text-[#131921] text-lg">{t.title}</h4><p className="text-xs text-gray-500 mt-1">Oprettet {fmtDate(t.created_at)}</p></div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* AKTIVITETER SEKTION */}
-        <div onClick={() => router.push(`/forening/${realForeningId}/events`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer">
+        <div onClick={() => router.push(`/forening/${realForeningId}/events`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">AKTIVITETER</div>
           {events.length === 0 ? <p className="text-sm text-gray-400">Ingen aktiviteter endnu.</p> : (
             <div className="space-y-3">
               {events.map((e, idx) => (
-                <div key={e.id} className={`${idx !== 0 ? 'border-t pt-3' : ''}`}>
-                  <h4 className="font-bold text-[#131921]">{e.title}</h4>
+                <div key={e.id} className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
+                  <div><h4 className="font-bold text-[#131921] text-lg">{e.title}</h4><p className="text-xs text-gray-500 mt-1">{fmtDate(e.start_at)} {e.location && `• ${e.location}`}</p></div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* KALENDER SEKTION */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={() => changeMonth(-1)} className="p-2">❮</button>
-            <h3 className="font-black text-[#131921] capitalize">{monthCursor.toLocaleDateString("da-DK", { month: 'long', year: 'numeric' })}</h3>
-            <button onClick={() => changeMonth(1)} className="p-2">❯</button>
+          <div className="flex items-center justify-between mb-4 px-2">
+            <button onClick={() => changeMonth(-1)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200">❮</button>
+            <h3 className="font-black text-[#131921] text-xl capitalize">{monthCursor.toLocaleDateString("da-DK", { month: 'long', year: 'numeric' })}</h3>
+            <button onClick={() => changeMonth(1)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200">❯</button>
           </div>
           <div className="grid grid-cols-7 gap-1.5">
             {buildMonthGrid(monthCursor).map((week) => week.map((day, idx) => (
@@ -423,7 +419,6 @@ export default function ForeningDetaljePage() {
           </div>
         </div>
 
-        {/* BILLEDER SEKTION */}
         <div onClick={() => router.push(`/forening/${realForeningId}/images`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">BILLEDER</div>
           <div className="flex gap-2">
@@ -435,16 +430,14 @@ export default function ForeningDetaljePage() {
           </div>
         </div>
 
-        {/* BUND KNAPPER */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm space-y-3 mb-10">
-           {isMember && <button onClick={handleLeave} className="w-full py-3 bg-gray-200 text-gray-600 rounded-full font-bold">Afslut medlemskab</button>}
-           {isOwner && <button onClick={handleDeleteForening} className="w-full py-3 bg-red-100 text-red-600 rounded-full font-bold">Slet forening</button>}
+           {isMember && <button onClick={handleLeave} className="w-full py-3 bg-gray-200 text-gray-600 rounded-full font-bold hover:bg-gray-300 transition-colors">Afslut medlemskab</button>}
+           {isOwner && <button onClick={handleDeleteForening} className="w-full py-3 bg-red-100 text-red-600 rounded-full font-bold hover:bg-red-200 transition-colors">Slet forening</button>}
         </div>
       </main>
 
-      {/* MODAL: MEDLEMMER */}
       {showMembers && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative max-h-[80vh] overflow-y-auto">
             <button onClick={() => setShowMembers(false)} className="absolute top-4 right-4 text-gray-400 text-xl font-black">✕</button>
             {selectedMember ? (
@@ -455,23 +448,22 @@ export default function ForeningDetaljePage() {
                 <h3 className="text-xl font-bold text-[#131921]">{getDisplayName(selectedMember)}</h3>
                 <p className="text-xs uppercase font-bold text-gray-400 mb-6">{selectedMember.rolle || 'MEDLEM'}</p>
                 
-                {/* ✅ RETTET KNAP HERUNDER */}
                 <button 
                   onClick={() => handleWriteToMember(selectedMember.user_id)} 
-                  className="w-full py-3 bg-[#131921] text-white rounded-full font-bold mb-3 shadow-lg"
+                  className="w-full py-3 bg-[#131921] text-white rounded-full font-bold mb-3 shadow-lg hover:bg-gray-900 transition-colors"
                 >
                   Skriv til medlem
                 </button>
                 
-                {isMeAdmin && selectedMember.rolle !== 'admin' && <button onClick={() => promoteToAdmin(selectedMember.user_id)} className="w-full py-3 bg-blue-100 text-blue-700 rounded-full font-bold mb-3">Gør til admin</button>}
-                <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 mt-2">← Tilbage</button>
+                {isMeAdmin && selectedMember.rolle !== 'admin' && <button onClick={() => promoteToAdmin(selectedMember.user_id)} className="w-full py-3 bg-blue-100 text-blue-700 rounded-full font-bold mb-3 hover:bg-blue-200 transition-colors">Gør til admin</button>}
+                <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 mt-2 hover:text-black">← Tilbage</button>
               </div>
             ) : (
               <div>
                 <h3 className="font-black text-[#131921] mb-4">MEDLEMMER ({approved.length})</h3>
                 <div className="space-y-2">
                   {approved.map(m => (
-                    <div key={m.user_id} onClick={() => setSelectedMember(m)} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl cursor-pointer">
+                    <div key={m.user_id} onClick={() => setSelectedMember(m)} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors">
                       <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden">{getAvatarUrl(m.users?.avatar_url) ? <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" /> : null}</div>
                       <div><p className="font-bold text-sm text-black">{getDisplayName(m)}</p><p className="text-[10px] text-gray-400 font-bold uppercase">{m.rolle || 'MEDLEM'}</p></div>
                     </div>
