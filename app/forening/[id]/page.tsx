@@ -120,14 +120,7 @@ const buildMonthGrid = (base: Date) => {
   return weeks;
 };
 
-// --- EVENT "TYPE" (heuristik) ---
-// Du nævnte "forskellig farve alt efter type" – du har ikke et eksplicit type-felt i Event.
-// Derfor bruger vi en simpel, praktisk heuristik:
-//
-// 1) Betalt: price > 0  -> lilla
-// 2) Online: location indeholder "online/zoom/teams" -> grøn
-// 3) Ellers: standard (gratis/normal) -> blå
-//
+// --- EVENT "TYPE" ---
 const getEventType = (e: Event): 'paid' | 'online' | 'normal' => {
   const price = typeof e.price === 'number' ? e.price : 0;
   const loc = (e.location || '').toLowerCase();
@@ -140,8 +133,6 @@ const getEventType = (e: Event): 'paid' | 'online' | 'normal' => {
 
 const dayColorClass = (events: Event[]) => {
   if (!events || events.length === 0) return '';
-
-  // Hvis flere typer samme dag, prioriterer vi "paid" > "online" > "normal"
   const types = new Set(events.map(getEventType));
   if (types.has('paid')) return 'bg-purple-600 text-white';
   if (types.has('online')) return 'bg-emerald-600 text-white';
@@ -189,7 +180,6 @@ export default function ForeningDetaljePage() {
   const [firstMessageText, setFirstMessageText] = useState('');
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
 
-  // ✅ Ny state: valgt dato i kalenderen
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -407,7 +397,6 @@ export default function ForeningDetaljePage() {
   const isOwner = forening?.oprettet_af === userId;
   const isMeAdmin = isOwner || myMembership?.rolle === 'admin';
 
-  // ✅ Byg event-map pr dato (bruges af kalender)
   const eventsByDate = useMemo(() => {
     const map = new Map<string, Event[]>();
     for (const e of calendarEvents) {
@@ -416,7 +405,6 @@ export default function ForeningDetaljePage() {
       list.push(e);
       map.set(key, list);
     }
-    // sorter events inde i hver dag
     for (const [k, list] of map.entries()) {
       list.sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
       map.set(k, list);
@@ -426,7 +414,6 @@ export default function ForeningDetaljePage() {
 
   const todayKey = useMemo(() => toKey(new Date()), []);
 
-  // ✅ Events for valgte dag
   const selectedDayEvents = useMemo(() => {
     if (!selectedDayKey) return [];
     return eventsByDate.get(selectedDayKey) || [];
@@ -457,7 +444,6 @@ export default function ForeningDetaljePage() {
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
         <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
 
-        {/* HERO */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
@@ -516,7 +502,6 @@ export default function ForeningDetaljePage() {
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
                 <p className="text-[#444] text-sm whitespace-pre-wrap">{forening.beskrivelse}</p>
 
-                {/* Knapper (kun godkendte) */}
                 {isApprovedMember && (
                   <div className="flex flex-wrap gap-2 mt-4">
                     <button
@@ -551,7 +536,6 @@ export default function ForeningDetaljePage() {
             )}
           </div>
 
-          {/* Join-bar */}
           {!isApprovedMember &&
             (isPending ? (
               <div className="w-full py-3 bg-gray-400 text-white rounded-full font-bold text-center">
@@ -567,7 +551,6 @@ export default function ForeningDetaljePage() {
             ))}
         </div>
 
-        {/* ALT HERUNDER KUN FOR GODKENDTE */}
         {isApprovedMember && (
           <>
             <button
@@ -579,7 +562,6 @@ export default function ForeningDetaljePage() {
               </div>
             </button>
 
-            {/* MEDLEMMER */}
             <div className="bg-white rounded-[24px] p-4 shadow-sm relative">
               <div className="flex justify-between items-center mb-3 px-2">
                 <h3 className="font-black text-[#131921]">MEDLEMMER</h3>
@@ -618,7 +600,6 @@ export default function ForeningDetaljePage() {
               </div>
             </div>
 
-            {/* SAMTALER */}
             <div
               onClick={() => router.push(`/forening/${realForeningId}/threads`)}
               className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -645,7 +626,6 @@ export default function ForeningDetaljePage() {
               )}
             </div>
 
-            {/* AKTIVITETER */}
             <div
               onClick={() => router.push(`/forening/${realForeningId}/events`)}
               className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -706,7 +686,6 @@ export default function ForeningDetaljePage() {
                 </button>
               </div>
 
-              {/* Ugedage */}
               <div className="grid grid-cols-7 gap-1.5 px-1 mb-2 text-[10px] font-black text-gray-400 uppercase tracking-wider">
                 {['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'].map((d) => (
                   <div key={d} className="text-center">
@@ -715,7 +694,6 @@ export default function ForeningDetaljePage() {
                 ))}
               </div>
 
-              {/* ✅ Kalendergrid med blå dage (hvid tekst) + type-farver */}
               <div className="grid grid-cols-7 gap-1.5">
                 {buildMonthGrid(monthCursor).map((week) =>
                   week.map((day, idx) => {
@@ -755,7 +733,6 @@ export default function ForeningDetaljePage() {
                       >
                         <span>{day.getDate()}</span>
 
-                        {/* lille count badge i hjørnet */}
                         {hasEvents && dayEvents.length > 1 && (
                           <span className="absolute top-1 right-1 text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">
                             {dayEvents.length}
@@ -767,7 +744,6 @@ export default function ForeningDetaljePage() {
                 )}
               </div>
 
-              {/* ✅ “Kort” under kalenderen: viser alle aktiviteter for valgte dag + link til rigtige kort på /events */}
               {selectedDayKey && selectedDayEvents.length > 0 && (
                 <div className="mt-4 bg-[#F9FBFC] border border-gray-100 rounded-2xl p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -823,7 +799,6 @@ export default function ForeningDetaljePage() {
                           </div>
 
                           <div className="mt-3 flex items-center justify-end gap-2">
-                            {/* Link til det “rigtige kort” på /events (brug query param til at scrolle/åbne kort der) */}
                             <button
                               onClick={() => router.push(`/forening/${realForeningId}/events?event=${e.id}`)}
                               className="px-4 py-2 rounded-full bg-[#131921] text-white font-black text-xs hover:bg-black transition-colors"
@@ -846,16 +821,8 @@ export default function ForeningDetaljePage() {
                   </div>
                 </div>
               )}
-
-              {/* Legend */}
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-black">
-                <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700">Aktivitet</span>
-                <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Online</span>
-                <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-700">Betalt</span>
-              </div>
             </div>
 
-            {/* BILLEDER */}
             <div
               onClick={() => router.push(`/forening/${realForeningId}/images`)}
               className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -876,7 +843,6 @@ export default function ForeningDetaljePage() {
               </div>
             </div>
 
-            {/* Footer-actions */}
             <div className="bg-white rounded-[24px] p-4 shadow-sm flex flex-col md:flex-row gap-3 mb-10">
               <button
                 onClick={handleLeave}
@@ -905,7 +871,7 @@ export default function ForeningDetaljePage() {
         )}
       </main>
 
-      {/* MODAL: Første besked */}
+      {/* MODALER... (uændret herfra) */}
       {isApprovedMember && showFirstMessageModal && selectedMember && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-6 relative">
@@ -918,31 +884,22 @@ export default function ForeningDetaljePage() {
             >
               ✕
             </button>
-
             <div className="text-center mb-6">
               <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden mx-auto mb-3">
                 {getAvatarUrl(selectedMember.users?.avatar_url) ? (
-                  <img
-                    src={getAvatarUrl(selectedMember.users?.avatar_url)!}
-                    className="w-full h-full object-cover"
-                    alt=""
-                  />
+                  <img src={getAvatarUrl(selectedMember.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
                 ) : (
-                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl font-black">
-                    ?
-                  </div>
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl font-black">?</div>
                 )}
               </div>
               <h3 className="text-xl font-bold text-[#131921]">Skriv til {getDisplayName(selectedMember)}</h3>
             </div>
-
             <textarea
               value={firstMessageText}
               onChange={(e) => setFirstMessageText(e.target.value)}
               placeholder="Skriv din første besked her..."
               className="w-full h-32 p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-[#131921] transition-all font-medium text-black"
             />
-
             <button
               onClick={handleSendFirstMessage}
               disabled={isSendingFirstMessage || !firstMessageText.trim()}
@@ -954,14 +911,12 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* MODAL: Medlemmer */}
       {isApprovedMember && showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative max-h-[80vh] overflow-y-auto">
             <button onClick={() => setShowMembers(false)} className="absolute top-4 right-4 text-gray-400 text-xl font-black">
               ✕
             </button>
-
             {selectedMember ? (
               <div className="flex flex-col items-center pt-4">
                 <div className="w-24 h-24 rounded-2xl bg-gray-100 overflow-hidden mb-4">
@@ -971,17 +926,14 @@ export default function ForeningDetaljePage() {
                     <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl font-black">?</div>
                   )}
                 </div>
-
                 <h3 className="text-xl font-bold text-[#131921]">{getDisplayName(selectedMember)}</h3>
                 <p className="text-xs uppercase font-bold text-gray-400 mb-6">{selectedMember.rolle || 'MEDLEM'}</p>
-
                 <button
                   onClick={() => handleOpenMessageModal(selectedMember)}
                   className="w-full py-3 bg-[#131921] text-white rounded-full font-bold mb-3 shadow-lg hover:bg-gray-900 transition-colors"
                 >
                   Skriv til medlem
                 </button>
-
                 {isMeAdmin && selectedMember.rolle !== 'admin' && (
                   <button
                     onClick={() => promoteToAdmin(selectedMember.user_id)}
@@ -990,7 +942,6 @@ export default function ForeningDetaljePage() {
                     Gør til admin
                   </button>
                 )}
-
                 <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 mt-2 hover:text-black">
                   ← Tilbage
                 </button>
