@@ -51,10 +51,10 @@ const formatTextWithLinks = (text: string) => {
   const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\/forening\/[\w-]+)/ig;
   const cleanParts = text.split(/(\s+)/).map((word, i) => {
     if (word.startsWith('/forening/')) {
-        return <Link key={i} href={word} className="text-blue-500 underline hover:text-blue-700 break-all">{word}</Link>;
+        return <Link key={i} href={word} className="text-blue-600 underline hover:text-blue-800 break-all">{word}</Link>;
     }
     if (word.match(/^https?:\/\//)) {
-        return <a key={i} href={word} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline hover:text-blue-700 break-all">{word}</a>;
+        return <a key={i} href={word} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800 break-all">{word}</a>;
     }
     return word;
   });
@@ -281,21 +281,32 @@ function BeskederContent() {
     else { setThreads(prev => prev.filter(t => t.id !== activeThreadId)); setActiveThreadId(null); setMessages([]); }
   };
 
+  /* ───────── ANMELD LOGIK (Synkroniseret med Appen) ───────── */
   const handleReport = async () => {
     if (!activeThreadId || !userId || !dmTargetUser) return;
+    
     const reason = window.prompt("Hvorfor vil du anmelde denne samtale? (stødende, chikane, spam)");
     if (!reason) return;
+    
     setSubmittingReport(true);
+    
     try {
+      // Find tråden for at få fat i postId hvis det findes
+      const currentThread = threads.find(t => t.id === activeThreadId);
+      
       const { data: inserted, error: dbErr } = await supabase.from("reports").insert({
         reporter_id: userId,
         thread_id: activeThreadId,
+        post_id: currentThread?.forening_id || null, 
         reason: reason,
         status: "pending"
       }).select("id").single();
+      
       if (dbErr) throw dbErr;
 
       const lastMsg = messages[messages.length - 1]?.text || "Ingen beskeder endnu";
+      
+      // Send til Make Webhook (Nøjagtig samme felter som app/Beskeder.tsx)
       await fetch("https://hook.eu1.make.com/cvdk1pfd6augxw0w57s5l1rtgl9mhqrc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -305,6 +316,7 @@ function BeskederContent() {
           reason: reason,
           note: reason,
           threadId: activeThreadId,
+          postId: currentThread?.forening_id || null,
           reporterId: userId,
           ownerId: dmTargetUser.id,
           beskedTekst: lastMsg
@@ -323,22 +335,22 @@ function BeskederContent() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
       <main className="flex-1 w-full max-w-6xl mx-auto p-4 pb-20">
-        <div className="bg-white rounded-[30px] shadow-xl overflow-hidden min-h-[70vh] flex flex-col md:flex-row">
+        <div className="bg-white rounded-[40px] shadow-2xl overflow-hidden min-h-[75vh] flex flex-col md:flex-row border border-gray-100">
           
           {/* SIDEBAR */}
           <div className={`w-full md:w-80 bg-gray-50 border-r border-gray-100 flex-shrink-0 flex flex-col ${activeThreadId ? 'hidden md:flex' : 'flex'}`}>
-            <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-black text-[#131921]">Indbakke</h2>
-                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mt-1">Dine samtaler</p>
+            <div className="p-8 border-b border-gray-200">
+                <h2 className="text-2xl font-black text-[#131921]">Indbakke</h2>
+                <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest mt-1">Dine samtaler</p>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
               {threads.map(t => (
-                <button key={t.id} onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)} className={`w-full text-left p-3 rounded-2xl flex flex-col gap-1 transition-all ${activeThreadId === t.id ? 'bg-white shadow-sm ring-1 ring-gray-200' : 'hover:bg-gray-200'}`}>
+                <button key={t.id} onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)} className={`w-full text-left p-4 rounded-2xl flex flex-col gap-1 transition-all ${activeThreadId === t.id ? 'bg-white shadow-md ring-1 ring-gray-200 scale-[1.02]' : 'hover:bg-gray-200'}`}>
                   <div className="flex justify-between items-center w-full">
-                    <span className="font-black text-[14px] text-[#131921] truncate">{t.title}</span>
-                    {t.unreadCount ? <span className="h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white"></span> : null}
+                    <span className="font-black text-[15px] text-[#131921] truncate">{t.title}</span>
+                    {t.unreadCount ? <span className="h-2.5 w-2.5 rounded-full bg-red-600 border-2 border-white"></span> : null}
                   </div>
-                  <span className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">{t.isDm ? 'Privat' : t.forening?.navn}</span>
+                  <span className="text-[10px] text-gray-600 font-black uppercase tracking-[0.15em]">{t.isDm ? 'Privat' : t.forening?.navn}</span>
                 </button>
               ))}
             </div>
@@ -348,41 +360,39 @@ function BeskederContent() {
           <div className={`flex-1 flex flex-col bg-white ${!activeThreadId ? 'hidden md:flex' : 'flex'}`}>
             {activeThreadId ? (
               <>
-                {/* TOPBAR */}
-                <div className="p-5 border-b border-gray-100 flex items-center justify-between shadow-sm bg-white z-10">
-                  <div className="flex items-center gap-4">
-                    <button onClick={() => setActiveThreadId(null)} className="md:hidden w-10 h-10 flex items-center justify-center bg-gray-50 text-[#131921] rounded-full border border-gray-200"><i className="fa-solid fa-arrow-left"></i></button>
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between shadow-sm bg-white z-10">
+                  <div className="flex items-center gap-5">
+                    <button onClick={() => setActiveThreadId(null)} className="md:hidden w-11 h-11 flex items-center justify-center bg-gray-50 text-[#131921] rounded-2xl border border-gray-200"><i className="fa-solid fa-arrow-left"></i></button>
                     <div>
-                        <h3 className="font-black text-[#131921] text-lg leading-tight">{activeThreadInfo.title}</h3>
-                        <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{activeThreadInfo.subtitle}</p>
+                        <h3 className="font-black text-[#131921] text-xl leading-none">{activeThreadInfo.title}</h3>
+                        <p className="text-[11px] text-gray-500 font-black uppercase tracking-widest mt-1.5">{activeThreadInfo.subtitle}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
                     {isDirectMessage && (
-                      <button onClick={handleReport} disabled={submittingReport} className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-orange-50 text-orange-600 transition-colors border border-transparent hover:border-orange-100">
-                        <span className="text-[11px] font-black uppercase tracking-widest">Anmeld</span>
+                      <button onClick={handleReport} disabled={submittingReport} className="flex items-center gap-2 px-5 py-2.5 rounded-xl hover:bg-orange-50 text-orange-600 transition-all border border-transparent hover:border-orange-100">
+                        <span className="text-[11px] font-black uppercase tracking-[0.1em]">Anmeld</span>
                         <i className="fa-solid fa-triangle-exclamation"></i>
                       </button>
                     )}
-                    <button onClick={handleDeleteThread} className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-red-50 text-red-600 transition-colors border border-transparent hover:border-red-100">
-                      <span className="text-[11px] font-black uppercase tracking-widest">Slet</span>
+                    <button onClick={handleDeleteThread} className="flex items-center gap-2 px-5 py-2.5 rounded-xl hover:bg-red-50 text-red-600 transition-all border border-transparent hover:border-red-100">
+                      <span className="text-[11px] font-black uppercase tracking-[0.1em]">Slet</span>
                       <i className="fa-regular fa-trash-can"></i>
                     </button>
                   </div>
                 </div>
 
-                {/* BESKEDER */}
-                <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#F8FAFC]">
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-8 bg-[#F9FBFC]">
                   {messages.map(msg => {
                     const isMe = msg.user_id === userId;
                     return (
-                        <div key={msg.id} className={`flex gap-3 items-end ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                        <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0 bg-gray-200">
+                        <div key={msg.id} className={`flex gap-4 items-end ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md flex-shrink-0 bg-gray-200">
                             <img src={msg.users?.avatar_url || `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}&background=random`} alt="" className="w-full h-full object-cover" />
                         </div>
-                        <div className={`max-w-[75%] rounded-2xl p-4 shadow-sm ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-50'}`}>
-                            <p className="text-[14px] leading-relaxed font-medium whitespace-pre-wrap">{formatTextWithLinks(msg.text)}</p>
-                            <p className={`text-[10px] mt-2 text-right font-bold tracking-tight ${isMe ? 'text-gray-400' : 'text-gray-400'}`}>
+                        <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'}`}>
+                            <p className="text-[15px] leading-relaxed font-semibold whitespace-pre-wrap">{formatTextWithLinks(msg.text)}</p>
+                            <p className={`text-[10px] mt-2.5 text-right font-black tracking-widest ${isMe ? 'text-gray-400' : 'text-gray-400'}`}>
                                 {new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                             </p>
                         </div>
@@ -391,17 +401,10 @@ function BeskederContent() {
                   })}
                 </div>
 
-                {/* INPUT */}
-                <div className="p-5 bg-white border-t border-gray-100">
-                  <div className="flex gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-200 focus-within:border-[#131921] transition-all">
-                    <input 
-                        value={newMessage} 
-                        onChange={e => setNewMessage(e.target.value)} 
-                        onKeyDown={e => e.key === 'Enter' && handleSend()} 
-                        placeholder="Skriv din besked her..." 
-                        className="flex-1 bg-transparent px-4 py-2 outline-none text-[15px] text-[#131921] font-medium placeholder:text-gray-400" 
-                    />
-                    <button onClick={handleSend} disabled={!newMessage.trim()} className="w-12 h-12 bg-[#131921] rounded-xl text-white flex items-center justify-center hover:bg-black transition-all shadow-md active:scale-95 disabled:opacity-30 disabled:grayscale">
+                <div className="p-6 bg-white border-t border-gray-100">
+                  <div className="flex gap-4 bg-gray-50 p-2 rounded-2xl border border-gray-200 focus-within:bg-white focus-within:border-[#131921] transition-all">
+                    <input value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Skriv din besked her..." className="flex-1 bg-transparent px-5 py-3 outline-none text-[16px] text-[#131921] font-semibold placeholder:text-gray-400" />
+                    <button onClick={handleSend} disabled={!newMessage.trim()} className="w-14 h-14 bg-[#131921] rounded-xl text-white flex items-center justify-center hover:bg-black transition-all shadow-xl active:scale-95 disabled:opacity-30">
                         <i className="fa-solid fa-paper-plane text-sm"></i>
                     </button>
                   </div>
@@ -409,8 +412,8 @@ function BeskederContent() {
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center text-gray-300 flex-col py-20">
-                <i className="fa-regular fa-comments text-7xl mb-6 opacity-20"></i>
-                <p className="text-gray-400 font-black uppercase tracking-[0.2em] text-sm">Vælg en samtale</p>
+                <i className="fa-regular fa-comments text-8xl mb-8 opacity-10"></i>
+                <p className="text-gray-400 font-black uppercase tracking-[0.3em] text-xs">Vælg en samtale</p>
               </div>
             )}
           </div>
