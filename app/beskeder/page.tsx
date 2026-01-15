@@ -69,13 +69,13 @@ const formatTextWithLinks = (text: string) => {
 function BeskederContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const threadIdFromUrl = searchParams.get('id');   // <- vigtigt
   const dmUserIdFromUrl = searchParams.get('dmUser');
 
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [myProfile, setMyProfile] = useState<{ name: string; avatar_url: string | null } | null>(
-    null
-  );
+  const [myProfile, setMyProfile] = useState<{ name: string; avatar_url: string | null } | null>(null);
 
   const [threads, setThreads] = useState<ThreadItem[]>([]);
   const threadsRef = useRef<ThreadItem[]>([]);
@@ -105,12 +105,46 @@ function BeskederContent() {
     return dmDeletedMap[threadId] ?? null;
   };
 
-  async function handleSelectThread(
-    threadId: string,
-    isDm: boolean,
-    currentUserId: string,
-    targetUserId?: string
-  ) {
+  // --- persist menu-dot state til header ---
+  const hasUnread = useMemo(() => threads.some(t => (t.unreadCount ?? 0) > 0), [threads]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('liguster_has_unread', hasUnread ? '1' : '0');
+      window.dispatchEvent(new CustomEvent('liguster:unread', { detail: { hasUnread } }));
+    } catch {}
+  }, [hasUnread]);
+
+  // --- markér tråd som læst (DB + local) ---
+  const markThreadAsRead = async (threadId: string, isDm: boolean) => {
+    if (!userId) return;
+    const now = new Date().toISOString();
+
+    if (isDm) {
+      // state: last_read_at
+      await supabase
+        .from('dm_thread_state')
+        .upsert({ thread_id: threadId, user_id: userId, last_read_at: now }, { onConflict: 'thread_id,user_id' });
+
+      // markér DM beskeder som læst (kun dem du modtager)
+      await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('thread_id', threadId)
+        .eq('receiver_id', userId)
+        .eq('is_read', false);
+
+    } else {
+      // forening: last_read_at
+      await supabase
+        .from('forening_thread_state')
+        .upsert({ thread_id: threadId, user_id: userId, last_read_at: now }, { onConflict: 'thread_id,user_id' });
+    }
+
+    // lokal nulstilling
+    setThreads(prev => prev.map(t => (t.id === threadId ? { ...t, unreadCount: 0 } : t)));
+  };
+
+  async function handleSelectThread(threadId: string, isDm: boolean, currentUserId: string, targetUserId?: string) {
     setActiveThreadId(threadId);
     setIsDirectMessage(isDm);
 
@@ -121,8 +155,8 @@ function BeskederContent() {
       setDmTargetUser(null);
     }
 
-    // Nulstil lokal unread count
-    setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, unreadCount: 0 } : t)));
+    // markér som læst i DB (så det virker efter reload)
+    await markThreadAsRead(threadId, isDm);
   }
 
   const upsertThreadToTop = async (opts: {
@@ -143,13 +177,10 @@ function BeskederContent() {
         const updated: ThreadItem = {
           ...existing,
           created_at,
-          unreadCount:
-            activeThreadId === threadId ? 0 : (existing.unreadCount ?? 0) + (isIncoming ? 1 : 0),
+          unreadCount: activeThreadId === threadId ? 0 : (existing.unreadCount ?? 0) + (isIncoming ? 1 : 0),
         };
         const rest = prev.filter((t) => !(t.id === threadId && t.isDm));
-        return [updated, ...rest].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
+        return [updated, ...rest].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       }
       return prev;
     });
@@ -157,11 +188,7 @@ function BeskederContent() {
     // Hvis tråden ikke findes (ny DM), tilføj den
     const already = threadsRef.current.find((t) => t.id === threadId && t.isDm);
     if (!already) {
-      const { data: u } = await supabase
-        .from('users')
-        .select('id, name, avatar_url')
-        .eq('id', otherUserId)
-        .single();
+      const { data: u } = await supabase.from('users').select('id, name, avatar_url').eq('id', otherUserId).single();
 
       const newThread: ThreadItem = {
         id: threadId,
@@ -175,9 +202,7 @@ function BeskederContent() {
 
       setThreads((prev) => {
         const rest = prev.filter((t) => !(t.id === threadId && t.isDm));
-        return [newThread, ...rest].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
+        return [newThread, ...rest].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       });
     }
   };
@@ -203,9 +228,7 @@ function BeskederContent() {
     if (isDirectMessage && dmTargetUser) {
       res = await supabase
         .from('messages')
-        .insert([
-          { thread_id: activeThreadId, sender_id: userId, receiver_id: dmTargetUser.id, text, is_read: false },
-        ])
+        .insert([{ thread_id: activeThreadId, sender_id: userId, receiver_id: dmTargetUser.id, text, is_read: false }])
         .select()
         .single();
     } else {
@@ -224,15 +247,10 @@ function BeskederContent() {
 
     setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: res.data.id } : m)));
 
+    // flyt tråd til top lokalt
     if (isDirectMessage && dmTargetUser) {
-      await upsertThreadToTop({
-        threadId: activeThreadId,
-        otherUserId: dmTargetUser.id,
-        created_at: res.data.created_at,
-        isIncoming: false,
-      });
+      await upsertThreadToTop({ threadId: activeThreadId, otherUserId: dmTargetUser.id, created_at: res.data.created_at, isIncoming: false });
     } else {
-      // Flyt foreningstråd til top ved egen besked (valgfrit)
       setThreads((prev) => {
         const idx = prev.findIndex((t) => t.id === activeThreadId && !t.isDm);
         if (idx === -1) return prev;
@@ -241,6 +259,9 @@ function BeskederContent() {
         const rest = prev.filter((_, i) => i !== idx);
         return [updated, ...rest].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       });
+
+      // jeg har skrevet -> så er tråden "læst" for mig
+      await markThreadAsRead(activeThreadId, false);
     }
   };
 
@@ -314,9 +335,7 @@ function BeskederContent() {
   // --- INIT ---
   useEffect(() => {
     const init = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
         router.push('/login');
@@ -388,7 +407,7 @@ function BeskederContent() {
         const uniq = new Map<string, any>();
         const oIds = new Set<string>();
 
-        for (const m of dms) {
+        for (const m of dms as any[]) {
           const delAt = deletedMap[m.thread_id] ?? null;
           if (delAt && new Date(m.created_at).getTime() <= new Date(delAt).getTime()) continue;
 
@@ -425,12 +444,46 @@ function BeskederContent() {
         }
       }
 
+      // --- HENT PERSISTENTE UNREAD COUNTS (DM + Forening) ---
+      const [dmUnreadRes, fUnreadRes] = await Promise.all([
+        supabase.rpc('get_dm_unread_counts', { p_user: cId }),
+        supabase.rpc('get_forening_unread_counts', { p_user: cId }),
+      ]);
+
+      const dmUnreadMap: Record<string, number> = {};
+      (dmUnreadRes.data ?? []).forEach((r: any) => (dmUnreadMap[r.thread_id] = r.unread_count));
+
+      const fUnreadMap: Record<string, number> = {};
+      (fUnreadRes.data ?? []).forEach((r: any) => (fUnreadMap[r.thread_id] = r.unread_count));
+
+      initT = initT.map(t => {
+        const u = t.isDm ? (dmUnreadMap[t.id] ?? 0) : (fUnreadMap[t.id] ?? 0);
+        return { ...t, unreadCount: u };
+      });
+
       initT.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setThreads(initT);
+
+      // Auto-open hvis man kommer via link
+      if (threadIdFromUrl) {
+        const asDm = !!dmUserIdFromUrl;
+        setActiveThreadId(threadIdFromUrl);
+        setIsDirectMessage(asDm);
+
+        if (asDm && dmUserIdFromUrl) {
+          const { data: tUser } = await supabase.from('users').select('*').eq('id', dmUserIdFromUrl).single();
+          if (tUser) setDmTargetUser(tUser);
+          await markThreadAsRead(threadIdFromUrl, true);
+        } else {
+          await markThreadAsRead(threadIdFromUrl, false);
+        }
+      }
+
       setLoading(false);
     };
 
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   // --- FETCH BESKEDER I AKTIV TRÅD ---
@@ -458,9 +511,7 @@ function BeskederContent() {
         const uMap: Record<string, any> = {};
         us?.forEach((u: any) => (uMap[u.id] = { name: u.name, avatar_url: getAvatarUrl(u.avatar_url) }));
 
-        setMessages(
-          data.map((m: any) => ({ ...m, users: uMap[m.user_id] || { name: '?', avatar_url: null } })) as any
-        );
+        setMessages(data.map((m: any) => ({ ...m, users: uMap[m.user_id] || { name: '?', avatar_url: null } })) as any);
         scrollToBottom();
         return;
       }
@@ -478,9 +529,7 @@ function BeskederContent() {
       const uMap: Record<string, any> = {};
       us?.forEach((u: any) => (uMap[u.id] = { name: u.name, avatar_url: getAvatarUrl(u.avatar_url) }));
 
-      setMessages(
-        data.map((m: any) => ({ ...m, users: uMap[m.user_id] || { name: '?', avatar_url: null } })) as any
-      );
+      setMessages(data.map((m: any) => ({ ...m, users: uMap[m.user_id] || { name: '?', avatar_url: null } })) as any);
       scrollToBottom();
     };
 
@@ -493,32 +542,14 @@ function BeskederContent() {
 
     const ch = supabase
       .channel(`inbox-dm-${userId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userId}` },
-        async (payload) => {
-          const m: any = payload.new;
-          await upsertThreadToTop({
-            threadId: m.thread_id,
-            otherUserId: m.sender_id,
-            created_at: m.created_at,
-            isIncoming: true,
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${userId}` },
-        async (payload) => {
-          const m: any = payload.new;
-          await upsertThreadToTop({
-            threadId: m.thread_id,
-            otherUserId: m.receiver_id,
-            created_at: m.created_at,
-            isIncoming: false,
-          });
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userId}` }, async (payload) => {
+        const m: any = payload.new;
+        await upsertThreadToTop({ threadId: m.thread_id, otherUserId: m.sender_id, created_at: m.created_at, isIncoming: true });
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${userId}` }, async (payload) => {
+        const m: any = payload.new;
+        await upsertThreadToTop({ threadId: m.thread_id, otherUserId: m.receiver_id, created_at: m.created_at, isIncoming: false });
+      })
       .subscribe();
 
     return () => {
@@ -526,7 +557,7 @@ function BeskederContent() {
     };
   }, [userId, dmDeletedMap, activeThreadId]);
 
-  // --- REALTIME: FORENING INBOX (opdater unread dot) ---
+  // --- REALTIME: FORENING INBOX (unread dot + flyt til top) ---
   useEffect(() => {
     if (!userId) return;
 
@@ -548,9 +579,7 @@ function BeskederContent() {
           };
 
           const rest = prev.filter((_, i) => i !== idx);
-          return [updated, ...rest].sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
+          return [updated, ...rest].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         });
       })
       .subscribe();
@@ -569,23 +598,20 @@ function BeskederContent() {
         };
   }, [activeThreadId, isDirectMessage, dmTargetUser, threads]);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#869FB9] flex items-center justify-center font-black">
         Indlæser...
       </div>
     );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
       <main className="flex-1 w-full max-w-6xl mx-auto p-4 pb-20">
         <div className="bg-white rounded-[40px] shadow-2xl overflow-hidden min-h-[75vh] flex flex-col md:flex-row border border-gray-100">
-          <div
-            className={`w-full md:w-80 bg-gray-50 border-r border-gray-100 flex-shrink-0 flex flex-col ${
-              activeThreadId ? 'hidden md:flex' : 'flex'
-            }`}
-          >
+          <div className={`w-full md:w-80 bg-gray-50 border-r border-gray-100 flex-shrink-0 flex flex-col ${activeThreadId ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-8 border-b border-gray-200">
               <h2 className="text-2xl font-black text-[#131921]">Indbakke</h2>
               {isAdmin && (
@@ -669,19 +695,12 @@ function BeskederContent() {
                       <div key={msg.id} className={`flex gap-4 items-end ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                         <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md flex-shrink-0 bg-gray-200">
                           <img
-                            src={
-                              msg.users?.avatar_url ||
-                              `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}&background=random`
-                            }
+                            src={msg.users?.avatar_url || `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}&background=random`}
                             alt=""
                             className="w-full h-full object-cover"
                           />
                         </div>
-                        <div
-                          className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${
-                            isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'
-                          }`}
-                        >
+                        <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'}`}>
                           <p className="text-[15px] leading-relaxed font-semibold whitespace-pre-wrap">
                             {formatTextWithLinks(msg.text)}
                           </p>
