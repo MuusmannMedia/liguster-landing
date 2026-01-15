@@ -27,13 +27,12 @@ export default function SignupPage() {
 
   // Validering
   const isNameValid = nameTrimmed.length > 0;
-
   const isEmailValid = useMemo(
     () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed),
     [emailTrimmed]
   );
 
-  // Password sikkerheds-logik (Matcher appen)
+  // Password sikkerheds-logik
   const isPasswordLongEnough = password.length >= 8;
   const hasNumber = /\d/.test(password); 
   const isPasswordStrong = isPasswordLongEnough && hasNumber;
@@ -44,30 +43,22 @@ export default function SignupPage() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!isNameValid) return alert('Indtast dit navn.');
-    if (!isEmailValid) return alert('Indtast en gyldig email.');
-    if (!isPasswordStrong) return alert('Password skal være mindst 8 tegn og indeholde et tal.');
-    if (!passwordsMatch) return alert('Passwords er ikke ens.');
+    if (!canSubmit) return;
 
     try {
       setLoading(true);
-
       const redirectUrl = `${window.location.origin}/login`;
 
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: emailTrimmed,
         password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: {
-            full_name: nameTrimmed,
-          },
+          data: { full_name: nameTrimmed },
         },
       });
 
       if (error) throw error;
-
       setSuccess(true);
     } catch (e: any) {
       alert(e?.message || 'Noget gik galt. Prøv igen.');
@@ -80,12 +71,14 @@ export default function SignupPage() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
 
-      <main className="flex-1 flex items-center justify-center p-4 py-20">
+      <main className="flex-1 flex items-center justify-center p-4 py-12">
         <div className="bg-white w-full max-w-md rounded-[30px] shadow-2xl p-8 md:p-10 relative">
+          
+          {/* Tilbage knap */}
           {!success && (
             <button
               onClick={() => router.push('/')}
-              className="absolute top-6 left-6 text-gray-400 hover:text-black transition-colors"
+              className="absolute top-8 left-8 text-gray-400 hover:text-black transition-colors"
               type="button"
             >
               <i className="fa-solid fa-arrow-left text-xl"></i>
@@ -93,8 +86,9 @@ export default function SignupPage() {
           )}
 
           {success ? (
+            /* --- SUCCES SCREEN --- */
             <div className="text-center animate-in fade-in zoom-in duration-300">
-              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-sm">
+              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">
                 <i className="fa-solid fa-envelope-open-text"></i>
               </div>
               <h1 className="text-2xl font-black text-[#131921] mb-4">Tjek din indbakke!</h1>
@@ -102,125 +96,126 @@ export default function SignupPage() {
                 Vi har sendt en bekræftelsesmail til:<br />
                 <span className="font-bold text-[#131921]">{emailTrimmed}</span>
               </p>
-              <div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-800 mb-8 border border-blue-100 flex items-start text-left gap-3">
-                <i className="fa-solid fa-circle-info mt-0.5 shrink-0"></i>
-                <span>Du skal klikke på linket i mailen for at aktivere din konto.</span>
-              </div>
-              <Link href="/login" className="block w-full bg-[#131921] text-white font-bold py-4 rounded-full shadow-lg hover:bg-gray-900 transition-all text-center">
+              <Link href="/login" className="block w-full bg-[#131921] text-white font-bold py-4 rounded-full text-center">
                 Gå til Log ind
               </Link>
             </div>
           ) : (
+            /* --- FORMULAR --- */
             <div className="flex flex-col items-center">
-              <h1 className="text-3xl font-black text-[#131921] mb-2 mt-4">Opret bruger</h1>
-              <p className="text-gray-500 text-sm text-center mb-8">Sikkerhedskrav: Min. 8 tegn & mindst ét tal.</p>
+              <h1 className="text-3xl font-black text-[#131921] mb-8 mt-4 text-center">
+                Opret bruger
+              </h1>
 
-              <form onSubmit={handleSignup} className="w-full flex flex-col gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase ml-4 mb-1">Navn</label>
+              <form onSubmit={handleSignup} className="w-full flex flex-col gap-5">
+                {/* NAVN */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-black text-gray-400 uppercase ml-5">Navn</label>
                   <input
                     type="text"
                     placeholder="Dit navn"
-                    className="w-full h-12 rounded-full px-6 bg-gray-50 border border-gray-200 text-black outline-none focus:border-[#131921] transition-colors"
+                    className="w-full h-14 rounded-3xl px-6 bg-gray-50 border border-gray-100 outline-none focus:border-gray-300 transition-all"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    disabled={loading}
                     autoComplete="name"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase ml-4 mb-1">Email</label>
+                {/* EMAIL */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-black text-gray-400 uppercase ml-5">Email</label>
                   <input
                     type="email"
                     placeholder="din@email.dk"
-                    className="w-full h-12 rounded-full px-6 bg-gray-50 border border-gray-200 text-black outline-none focus:border-[#131921] transition-colors"
+                    className="w-full h-14 rounded-3xl px-6 bg-gray-50 border border-gray-100 outline-none focus:border-gray-300 transition-all"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    disabled={loading}
                     autoComplete="email"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase ml-4 mb-1">Password</label>
+                {/* SIKKERHEDSKRAV (Layout som i appen) */}
+                <div className="ml-5 mt-2">
+                  <p className="text-[13px] font-black text-[#131921] mb-1">Sikkerhedskrav til password:</p>
+                  <ul className="text-[12px] text-gray-500 space-y-0.5">
+                    <li className="flex items-center gap-2">
+                      <span className="text-[10px]">•</span> Minimum 8 karakterer
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-[10px]">•</span> Skal indeholde mindst ét tal
+                    </li>
+                  </ul>
+                </div>
+
+                {/* PASSWORD */}
+                <div className="flex flex-col gap-1">
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Vælg password"
-                      className="w-full h-12 rounded-full px-6 pr-12 bg-gray-50 border border-gray-200 text-black outline-none focus:border-[#131921] transition-colors"
+                      className="w-full h-14 rounded-3xl px-6 pr-14 bg-gray-50 border border-gray-100 outline-none focus:border-gray-300 transition-all"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      disabled={loading}
                       autoComplete="new-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black p-2"
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
                     >
-                      <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-lg`}></i>
                     </button>
                   </div>
+
+                  {/* Password Styrke Indikator */}
+                  {password.length > 0 && (
+                    <div className="px-5 mt-1 flex items-center gap-2 transition-all">
+                      <div className={`h-1 w-8 rounded-full ${isPasswordStrong ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <span className={`text-[11px] font-bold ${isPasswordStrong ? 'text-green-600' : 'text-red-500'}`}>
+                        {!isPasswordLongEnough 
+                          ? `Mangler ${8 - password.length} tegn...` 
+                          : !hasNumber 
+                            ? 'Husk mindst ét tal' 
+                            : 'Password godkendt'}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Password Styrke Indikator (Web Version) */}
-                {password.length > 0 && (
-                  <div className="px-4 flex items-center gap-2">
-                    <div className={`h-1.5 w-12 rounded-full transition-all ${isPasswordStrong ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className={`text-xs font-bold ${isPasswordStrong ? 'text-green-600' : 'text-red-600'}`}>
-                      {!isPasswordLongEnough 
-                        ? `Mangler ${8 - password.length} tegn...` 
-                        : !hasNumber 
-                          ? 'Husk mindst ét tal' 
-                          : 'Password godkendt'}
-                    </span>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase ml-4 mb-1">Gentag Password</label>
+                {/* GENTAG PASSWORD */}
+                <div className="flex flex-col gap-1">
                   <div className="relative">
                     <input
                       type={showConfirm ? 'text' : 'password'}
                       placeholder="Bekræft password"
-                      className="w-full h-12 rounded-full px-6 pr-12 bg-gray-50 border border-gray-200 text-black outline-none focus:border-[#131921] transition-colors"
+                      className="w-full h-14 rounded-3xl px-6 pr-14 bg-gray-50 border border-gray-100 outline-none focus:border-gray-300 transition-all"
                       value={confirm}
                       onChange={(e) => setConfirm(e.target.value)}
-                      disabled={loading}
                       autoComplete="new-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirm(!showConfirm)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black p-2"
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
                     >
-                      <i className={`fa-solid ${showConfirm ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      <i className={`fa-solid ${showConfirm ? 'fa-eye-slash' : 'fa-eye'} text-lg`}></i>
                     </button>
                   </div>
-                </div>
-
-                <div className="flex flex-col gap-1 px-4">
-                  {!isEmailValid && email.length > 0 && (
-                    <p className="text-red-500 text-xs flex items-center gap-1">
-                      <i className="fa-solid fa-circle-exclamation"></i> Ugyldig email.
-                    </p>
-                  )}
                   {confirm.length > 0 && !passwordsMatch && (
-                    <p className="text-red-500 text-xs flex items-center gap-1">
+                    <p className="text-red-500 text-[11px] font-bold px-5 mt-1 flex items-center gap-1">
                       <i className="fa-solid fa-circle-exclamation"></i> Passwords matcher ikke.
                     </p>
                   )}
                 </div>
 
+                {/* OPRET KNAP */}
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className={`w-full h-14 rounded-full mt-4 font-bold text-base tracking-wide transition-all shadow-md flex items-center justify-center gap-2
-                    ${
-                      canSubmit
-                        ? 'bg-[#131921] text-white hover:bg-black hover:scale-[1.02]'
-                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  className={`w-full h-14 rounded-full mt-6 font-black text-sm tracking-widest transition-all flex items-center justify-center uppercase
+                    ${canSubmit
+                      ? 'bg-[#131921] text-white hover:bg-black'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     }
                   `}
                 >
