@@ -133,6 +133,31 @@ function BeskederContent() {
     } catch (e) { alert("Modtaget i systemet."); } finally { setSubmittingReport(false); }
   };
 
+  // ✅ NY FUNKTION: SLET CHAT
+  const handleDeleteThread = async () => {
+    if (!activeThreadId || !confirm("Er du sikker på, at du vil slette hele denne samtale?")) return;
+
+    let error;
+    if (isDirectMessage) {
+        // Slet alle beskeder i DM-tråden
+        const res = await supabase.from('messages').delete().eq('thread_id', activeThreadId);
+        error = res.error;
+    } else {
+        // Slet forenings-tråden (beskeder slettes via cascade hvis sat op, ellers slet dem manuelt)
+        const res = await supabase.from('forening_threads').delete().eq('id', activeThreadId);
+        error = res.error;
+    }
+
+    if (error) {
+        alert("Fejl ved sletning: " + error.message);
+    } else {
+        setThreads(prev => prev.filter(t => t.id !== activeThreadId));
+        setActiveThreadId(null);
+        setMessages([]);
+        alert("Samtalen er slettet.");
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -158,7 +183,7 @@ function BeskederContent() {
         const oIds = new Set<string>();
         dms.forEach((m: any) => { if (!uniq.has(m.thread_id)) { const oId = m.sender_id === cId ? m.receiver_id : m.sender_id; uniq.set(m.thread_id, { ...m, oId }); oIds.add(oId); } });
         const { data: usrs } = await supabase.from('users').select('id, name, avatar_url').in('id', Array.from(oIds));
-        const uMap = new Map(); usrs?.forEach(u => uMap.set(u.id, u));
+        const uMap = new Map(); if(usrs) usrs.forEach(u => uMap.set(u.id, u));
         const dmt: ThreadItem[] = Array.from(uniq.values()).map((t: any) => { const u = uMap.get(t.oId); return { id: t.thread_id, title: u?.name || 'Bruger', created_at: t.created_at, isDm: true, dmUserId: t.oId, dmUserAvatar: getAvatarUrl(u?.avatar_url), unreadCount: 0 }; });
         initT = [...dmt, ...initT];
       }
@@ -192,10 +217,7 @@ function BeskederContent() {
         const uIds = [...new Set(data.map((m: any) => m.user_id))];
         const { data: us } = await supabase.from('users').select('id, name, avatar_url').in('id', uIds);
         const uMap: Record<string, any> = {}; 
-        
-        // RETTET HER: us?.forEach sikrer buildet går igennem
         us?.forEach(u => uMap[u.id] = { name: u.name, avatar_url: getAvatarUrl(u.avatar_url) });
-        
         setMessages(data.map((m: any) => ({ ...m, users: uMap[m.user_id] || { name: '?', avatar_url: null } })) as any);
         setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 100);
       }
@@ -221,7 +243,7 @@ function BeskederContent() {
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
               {threads.map(t => (
-                <button key={t.id} onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)} className={`w-full text-left p-4 rounded-2xl flex flex-col gap-1 ${activeThreadId === t.id ? 'bg-white shadow-md ring-1 ring-gray-200' : 'hover:bg-gray-200'}`}>
+                <button key={t.id} onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)} className={`w-full text-left p-4 rounded-2xl flex flex-col gap-1 ${activeThreadId === t.id ? 'bg-white shadow-md ring-1 ring-gray-200 scale-[1.02]' : 'hover:bg-gray-200'}`}>
                   <span className="font-black text-[15px] text-[#131921] truncate">{t.title}</span>
                   <span className="text-[10px] text-gray-600 font-black uppercase tracking-widest">{t.isDm ? 'Privat' : t.forening?.navn}</span>
                 </button>
@@ -239,19 +261,32 @@ function BeskederContent() {
                           <p className="text-[11px] text-gray-500 font-black uppercase tracking-widest">{activeThreadInfo.subtitle}</p>
                         </div>
                     </div>
-                    <button onClick={handleReport} className="text-orange-600 text-[11px] font-black uppercase flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-orange-50"><i className="fa-solid fa-triangle-exclamation"></i> Anmeld</button>
+                    
+                    {/* KNAPPER TIL HØJRE: ANMELD & SLET */}
+                    <div className="flex items-center gap-2">
+                        <button onClick={handleReport} className="text-orange-600 text-[11px] font-black uppercase flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-orange-50 transition-colors">
+                            <i className="fa-solid fa-triangle-exclamation"></i> Anmeld
+                        </button>
+                        <button onClick={handleDeleteThread} className="text-red-600 text-[11px] font-black uppercase flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+                            <i className="fa-regular fa-trash-can"></i> Slet chat
+                        </button>
+                    </div>
                 </div>
+
                 <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-8 bg-[#F9FBFC]">
-                  {messages.map(msg => (
-                    <div key={msg.id} className={`flex gap-4 items-end ${msg.user_id === userId ? 'flex-row-reverse' : 'flex-row'}`}>
+                  {messages.map(msg => {
+                    const isMe = msg.user_id === userId;
+                    return (
+                        <div key={msg.id} className={`flex gap-4 items-end ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                         <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md flex-shrink-0 bg-gray-200">
-                            <img src={msg.users?.avatar_url || `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}`} alt="" className="w-full h-full object-cover" />
+                            <img src={msg.users?.avatar_url || `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}&background=random`} alt="" className="w-full h-full object-cover" />
                         </div>
-                        <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${msg.user_id === userId ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'}`}>
+                        <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'}`}>
                             <p className="text-[15px] leading-relaxed font-semibold whitespace-pre-wrap">{formatTextWithLinks(msg.text)}</p>
                         </div>
-                    </div>
-                  ))}
+                        </div>
+                    );
+                  })}
                 </div>
                 <div className="p-6 bg-white border-t border-gray-100">
                   <div className="flex gap-4 bg-gray-50 p-2 rounded-2xl border border-gray-200">
