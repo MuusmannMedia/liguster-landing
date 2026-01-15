@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 // --- TYPER ---
 type ThreadItem = {
-  id: string; // thread_id
+  id: string; 
   title: string;
   created_at: string;
   forening_id?: string;
@@ -81,8 +81,8 @@ function BeskederContent() {
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // --- VI DEFINERER FUNKTIONEN HERUPPE FOR AT UNDGÅ BUILD-FEJL ---
-  const handleSelectThread = async (threadId: string, isDm: boolean, currentUserId: string, targetUserId?: string) => {
+  // --- VI BRUGER EN FUNCTION DEKLARATION HER (HOISTING) FOR AT UNDGÅ BUILD FEJL ---
+  async function handleSelectThread(threadId: string, isDm: boolean, currentUserId: string, targetUserId?: string) {
     setActiveThreadId(threadId);
     setIsDirectMessage(isDm);
     if (isDm && targetUserId) {
@@ -95,7 +95,7 @@ function BeskederContent() {
     if (isDm) {
       await supabase.from('messages').update({ is_read: true }).eq('thread_id', threadId).eq('receiver_id', currentUserId).eq('is_read', false);
     }
-  };
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -104,47 +104,69 @@ function BeskederContent() {
         router.push('/login');
         return;
       }
-      setUserId(session.user.id);
+      const currentUserId = session.user.id;
+      setUserId(currentUserId);
 
-      const { data: profile } = await supabase
-        .from('users')
-        .select('name, avatar_url, is_admin')
-        .eq('id', session.user.id)
-        .single();
-
+      const { data: profile } = await supabase.from('users').select('name, avatar_url, is_admin').eq('id', currentUserId).single();
       if (profile) {
         setMyProfile({ name: profile.name || 'Mig', avatar_url: getAvatarUrl(profile.avatar_url) });
         setIsAdmin(!!profile.is_admin);
       }
 
-      // Her bør din logik til at hente threads ligge (initialThreads)
-      // ... (Vi springer direkte til URL-logikken som fejlede)
+      // Hent alle tråde (Din fulde oprindelige logik)
+      const { data: memberships } = await supabase.from('foreningsmedlemmer').select('forening_id').eq('user_id', currentUserId).eq('status', 'approved');
+      const myForeningIds = memberships?.map((m: any) => m.forening_id) || [];
 
+      let initialThreads: ThreadItem[] = [];
+
+      // 1. Forenings tråde
+      if (myForeningIds.length > 0) {
+        const { data: tData } = await supabase.from('forening_threads').select(`id, title, created_at, forening_id, foreninger(navn)`).in('forening_id', myForeningIds);
+        if (tData) {
+          initialThreads = tData.map((t: any) => ({
+            id: t.id, title: t.title, created_at: t.created_at, forening_id: t.forening_id, forening: t.foreninger, isDm: false, unreadCount: 0
+          }));
+        }
+      }
+
+      // 2. DM tråde
+      const { data: dmData } = await supabase.from('messages').select('thread_id, sender_id, receiver_id, created_at').or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`).order('created_at', { ascending: false });
+      if (dmData && dmData.length > 0) {
+        const unique = new Map();
+        const otherIds = new Set<string>();
+        dmData.forEach((m: any) => {
+          if (!unique.has(m.thread_id)) {
+            const otherId = m.sender_id === currentUserId ? m.receiver_id : m.sender_id;
+            unique.set(m.thread_id, { ...m, otherId });
+            otherIds.add(otherId);
+          }
+        });
+        const { data: users } = await supabase.from('users').select('id, name, avatar_url').in('id', Array.from(otherIds));
+        const uMap = new Map();
+        users?.forEach(u => uMap.set(u.id, u));
+
+        const dmThreads: ThreadItem[] = Array.from(unique.values()).map((t: any) => {
+          const u = uMap.get(t.otherId);
+          return { id: t.thread_id, title: u?.name || 'Bruger', created_at: t.created_at, isDm: true, dmUserId: t.otherId, dmUserAvatar: getAvatarUrl(u?.avatar_url), unreadCount: 0 };
+        });
+        initialThreads = [...dmThreads, ...initialThreads];
+      }
+
+      initialThreads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setThreads(initialThreads);
+
+      // URL LOGIK (Admin / Link tjek)
       if (dmUserIdFromUrl) {
-        const { data: targetUser } = await supabase.from('users').select('*').eq('id', dmUserIdFromUrl).single();
-        if (targetUser) {
-          setDmTargetUser(targetUser);
+        const { data: target } = await supabase.from('users').select('*').eq('id', dmUserIdFromUrl).single();
+        if (target) {
+          setDmTargetUser(target);
           setIsDirectMessage(true);
-          
-          const { data: existingMsgs } = await supabase
-            .from('messages')
-            .select('thread_id')
-            .or(`and(sender_id.eq.${session.user.id},receiver_id.eq.${dmUserIdFromUrl}),and(sender_id.eq.${dmUserIdFromUrl},receiver_id.eq.${session.user.id})`)
-            .limit(1);
-          
-          if (existingMsgs && existingMsgs.length > 0) {
-            handleSelectThread(existingMsgs[0].thread_id, true, session.user.id, dmUserIdFromUrl);
+          const { data: existing } = await supabase.from('messages').select('thread_id').or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${dmUserIdFromUrl}),and(sender_id.eq.${dmUserIdFromUrl},receiver_id.eq.${currentUserId})`).limit(1);
+          if (existing && existing.length > 0) {
+            handleSelectThread(existing[0].thread_id, true, currentUserId, dmUserIdFromUrl);
           } else if (profile?.is_admin) {
-            const { data: adminFind } = await supabase
-                .from('messages')
-                .select('thread_id')
-                .or(`sender_id.eq.${dmUserIdFromUrl},receiver_id.eq.${dmUserIdFromUrl}`)
-                .limit(1);
-            if (adminFind && adminFind.length > 0) {
-                handleSelectThread(adminFind[0].thread_id, true, session.user.id, dmUserIdFromUrl);
-            }
-          } else {
-            setActiveThreadId(makeUuid());
+             const { data: adm } = await supabase.from('messages').select('thread_id').or(`sender_id.eq.${dmUserIdFromUrl},receiver_id.eq.${dmUserIdFromUrl}`).limit(1);
+             if (adm && adm.length > 0) handleSelectThread(adm[0].thread_id, true, currentUserId, dmUserIdFromUrl);
           }
         }
       }
@@ -154,17 +176,76 @@ function BeskederContent() {
     init();
   }, [dmUserIdFromUrl, router]);
 
-  // Resten af koden (fetchMessages, handleSend, render osv.)
-  // ... (Sørg for at indsætte resten af din BeskederContent her)
+  // Hent Beskeder
+  useEffect(() => {
+    if (!activeThreadId) return;
+    const fetchMsgs = async () => {
+      const table = isDirectMessage ? 'messages' : 'forening_messages';
+      const res = await supabase.from(table).select(isDirectMessage ? 'id, text, created_at, sender_id' : 'id, text, created_at, user_id').eq('thread_id', activeThreadId).order('created_at', { ascending: true });
+      const data = isDirectMessage ? (res.data?.map((m: any) => ({ ...m, user_id: m.sender_id })) ?? null) : res.data;
+      if (data) {
+        const uIds = [...new Set(data.map((m: any) => m.user_id))];
+        const { data: us } = await supabase.from('users').select('id, name, avatar_url').in('id', uIds);
+        const uMap: Record<string, any> = {};
+        us?.forEach(u => uMap[u.id] = { name: u.name, avatar_url: getAvatarUrl(u.avatar_url) });
+        setMessages(data.map((m: any) => ({ ...m, users: uMap[m.user_id] || { name: '?', avatar_url: null } })) as any);
+        scrollToBottom();
+      }
+    };
+    fetchMsgs();
+  }, [activeThreadId, isDirectMessage]);
+
+  const scrollToBottom = () => { setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, 100); };
+
+  if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
       <main className="flex-1 w-full max-w-6xl mx-auto p-4 pb-20">
-        {/* ... (Din render logik som i forrige svar) */}
-        <div className="bg-white rounded-[40px] shadow-2xl overflow-hidden min-h-[75vh] flex flex-col md:flex-row border border-gray-100 text-[#131921]">
-            {/* Sidebar og Chat vindue */}
-            <div className="p-8"><h2 className="text-2xl font-black">Indbakke</h2></div>
+        <div className="bg-white rounded-[40px] shadow-2xl overflow-hidden min-h-[75vh] flex flex-col md:flex-row border border-gray-100">
+          
+          <div className={`w-full md:w-80 bg-gray-50 border-r border-gray-100 flex flex-col ${activeThreadId ? 'hidden md:flex' : 'flex'}`}>
+            <div className="p-8 border-b border-gray-200">
+                <h2 className="text-2xl font-black text-[#131921]">Indbakke</h2>
+                {isAdmin && <span className="text-[9px] bg-black text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">Admin</span>}
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+              {threads.map(t => (
+                <button key={t.id} onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)} className={`w-full text-left p-4 rounded-2xl flex flex-col gap-1 transition-all ${activeThreadId === t.id ? 'bg-white shadow-md ring-1 ring-gray-200 scale-[1.02]' : 'hover:bg-gray-200'}`}>
+                  <span className="font-black text-[15px] text-[#131921] truncate">{t.title}</span>
+                  <span className="text-[10px] text-gray-600 font-black uppercase tracking-widest">{t.isDm ? 'Privat' : t.forening?.navn}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={`flex-1 flex flex-col bg-white ${!activeThreadId ? 'hidden md:flex' : 'flex'}`}>
+            {activeThreadId ? (
+              <>
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between shadow-sm bg-white">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setActiveThreadId(null)} className="md:hidden w-11 h-11 flex items-center justify-center bg-gray-50 rounded-2xl border"><i className="fa-solid fa-arrow-left"></i></button>
+                        <div><h3 className="font-black text-[#131921] text-xl">{activeThreadInfo?.title || 'Chat'}</h3><p className="text-[11px] text-gray-500 font-black uppercase tracking-widest">{activeThreadInfo?.subtitle || ''}</p></div>
+                    </div>
+                </div>
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-8 bg-[#F9FBFC]">
+                  {messages.map(msg => (
+                    <div key={msg.id} className={`flex gap-4 items-end ${msg.user_id === userId ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md flex-shrink-0 bg-gray-200">
+                            <img src={msg.users?.avatar_url || `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}`} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${msg.user_id === userId ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'}`}>
+                            <p className="text-[15px] leading-relaxed font-semibold whitespace-pre-wrap">{formatTextWithLinks(msg.text)}</p>
+                        </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-300 flex-col py-20"><i className="fa-regular fa-comments text-8xl mb-8 opacity-10"></i><p className="text-gray-400 font-black uppercase tracking-widest text-xs">Vælg en samtale</p></div>
+            )}
+          </div>
         </div>
       </main>
       <SiteFooter />
