@@ -151,6 +151,18 @@ export default function ForeningDetaljePage() {
   const [showFirstMessageModal, setShowFirstMessageModal] = useState(false);
   const [firstMessageText, setFirstMessageText] = useState("");
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
+
+  // ✅ GENINDSAT: Logik der mapper events til datoer i kalenderen
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, Event[]>();
+    calendarEvents.forEach(e => {
+      const key = toKey(new Date(e.start_at));
+      const list = map.get(key) || [];
+      list.push(e);
+      map.set(key, list);
+    });
+    return map;
+  }, [calendarEvents]);
   
   useEffect(() => {
     async function loadAllData() {
@@ -232,14 +244,12 @@ export default function ForeningDetaljePage() {
     if (!error) { setForening(prev => prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription } : null); setIsEditing(false); }
   };
 
-  // ✅ GENOPRETTET LOGIK: GØR OFFENTLIG / PRIVAT
   const togglePublic = async () => {
     if (!realForeningId || !isMeAdmin) return;
     const newValue = !forening?.is_public;
     setForening(prev => prev ? { ...prev, is_public: newValue } : null);
     const { error } = await supabase.from('foreninger').update({ is_public: newValue }).eq('id', realForeningId);
     if (error) {
-      // Rul tilbage ved fejl
       setForening(prev => prev ? { ...prev, is_public: !newValue } : null);
       alert("Kunne ikke opdatere synlighed.");
     }
@@ -285,7 +295,7 @@ export default function ForeningDetaljePage() {
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
         <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
 
-        {/* HERO KORT - ALTID SYNLIGT FOR ALLE */}
+        {/* HERO KORT */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">Ingen forside</div>}
@@ -307,7 +317,6 @@ export default function ForeningDetaljePage() {
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
                 <p className="text-[#444] text-sm whitespace-pre-wrap">{forening.beskrivelse}</p>
                 
-                {/* ADMINISTRATIVE KNAPPER - KUN FOR ADMINS/GODKENDTE */}
                 {isApprovedMember && (
                   <div className="flex flex-wrap gap-2 mt-4">
                     <button onClick={() => navigator.clipboard.writeText(window.location.href)} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Kopiér link</button>
@@ -316,14 +325,7 @@ export default function ForeningDetaljePage() {
                       <>
                         <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Rediger tekst</button>
                         <button className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Inviter</button>
-                        
-                        {/* ✅ GENOPRETTET KNAP: OFFENTLIG / PRIVAT */}
-                        <button 
-                          onClick={togglePublic} 
-                          className={`px-4 py-2 text-xs font-bold rounded-full uppercase ${forening.is_public ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}
-                        >
-                          {forening.is_public ? 'Offentlig' : 'Privat'}
-                        </button>
+                        <button onClick={togglePublic} className={`px-4 py-2 text-xs font-bold rounded-full uppercase ${forening.is_public ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>{forening.is_public ? 'Offentlig' : 'Privat'}</button>
                       </>
                     )}
                   </div>
@@ -331,18 +333,10 @@ export default function ForeningDetaljePage() {
               </div>
             )}
           </div>
-
-          {/* BLIV MEDLEM BJÆLKE - SYNLIG HVIS MAN IKKE ER GODKENDT ELLER PENDING */}
-          {!isApprovedMember && (
-            isPending ? (
-              <div className="w-full py-3 bg-gray-400 text-white rounded-full font-bold text-center">Anmodning sendt - afventer godkendelse</div>
-            ) : (
-              <button onClick={handleJoin} className="w-full py-3 bg-[#131921] text-white rounded-full font-bold">Bliv medlem</button>
-            )
-          )}
+          {!isApprovedMember && (isPending ? <div className="w-full py-3 bg-gray-400 text-white rounded-full font-bold text-center">Anmodning sendt - afventer godkendelse</div> : <button onClick={handleJoin} className="w-full py-3 bg-[#131921] text-white rounded-full font-bold">Bliv medlem</button>)}
         </div>
 
-        {/* --- ALT HERUNDER SKJULES HVIS MAN IKKE ER GODKENDT MEDLEM --- */}
+        {/* --- LÅST INDHOLD --- */}
         {isApprovedMember && (
           <>
             <button onClick={() => router.push(`/beskeder?id=${realForeningId}`)} className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors">
@@ -392,6 +386,7 @@ export default function ForeningDetaljePage() {
               )}
             </div>
 
+            {/* ✅ KALENDER SEKTION MED AKTIVITETER GENINDSAT */}
             <div className="bg-white rounded-[24px] p-4 shadow-sm">
               <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
               <div className="flex items-center justify-between mb-4 px-2">
@@ -400,11 +395,19 @@ export default function ForeningDetaljePage() {
                 <button onClick={(e) => { e.stopPropagation(); setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200">❯</button>
               </div>
               <div className="grid grid-cols-7 gap-1.5">
-                {buildMonthGrid(monthCursor).map((week) => week.map((day, idx) => (
-                  <div key={idx} className={`aspect-square flex items-center justify-center rounded-xl text-sm ${day.getMonth() !== monthCursor.getMonth() ? 'text-gray-300' : 'text-gray-800'}`}>
-                    {day.getDate()}
-                  </div>
-                )))}
+                {buildMonthGrid(monthCursor).map((week) => week.map((day, idx) => {
+                  const dayEvents = eventsByDate.get(toKey(day)) || [];
+                  const isCurrentMonth = day.getMonth() === monthCursor.getMonth();
+                  return (
+                    <div key={idx} className={`aspect-square flex flex-col items-center justify-center rounded-xl text-sm relative ${!isCurrentMonth ? 'text-gray-300' : 'text-gray-800'}`}>
+                      {day.getDate()}
+                      {/* Prik under datoen hvis der er et event */}
+                      {dayEvents.length > 0 && (
+                        <div className="w-1 h-1 bg-black rounded-full mt-0.5 absolute bottom-1.5"></div>
+                      )}
+                    </div>
+                  );
+                }))}
               </div>
             </div>
 
@@ -420,7 +423,7 @@ export default function ForeningDetaljePage() {
             </div>
 
             <div className="bg-white rounded-[24px] p-4 shadow-sm flex flex-col md:flex-row gap-3 mb-10">
-               <button onClick={handleLeave} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-full font-bold hover:bg-gray-200 transition-colors">Afslut medlemskab</button>
+               <button onClick={handleLeave} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-full font-bold hover:bg-gray-300 transition-colors">Afslut medlemskab</button>
                {isMeAdmin && <button onClick={() => fileInputRef.current?.click()} className="flex-1 py-3 bg-[#e9eef5] text-[#131921] rounded-full font-bold hover:bg-[#d0dbe9] transition-colors">Skift billede</button>}
                {isOwner && <button onClick={handleDeleteForening} className="flex-1 py-3 bg-red-100 text-red-600 rounded-full font-bold hover:bg-red-200 transition-colors">Slet forening</button>}
             </div>
@@ -428,7 +431,7 @@ export default function ForeningDetaljePage() {
         )}
       </main>
 
-      {/* MODALER (UBEVARET) */}
+      {/* MODALER */}
       {isApprovedMember && (
         <>
           {showFirstMessageModal && selectedMember && (
