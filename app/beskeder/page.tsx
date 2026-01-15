@@ -92,6 +92,19 @@ function BeskederContent() {
     return dmDeletedMap[threadId] ?? null;
   };
 
+  // ✅ FUNKTION TIL AT MARKERE SOM LÆST I DATABASEN
+  async function markAsRead(threadId: string, currentUserId: string) {
+    await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('thread_id', threadId)
+      .eq('receiver_id', currentUserId)
+      .eq('is_read', false);
+    
+    // Opdater lokalt state så prikken forsvinder med det samme
+    setThreads(prev => prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t));
+  }
+
   async function handleSelectThread(threadId: string, isDm: boolean, currentUserId: string, targetUserId?: string) {
     setActiveThreadId(threadId);
     setIsDirectMessage(isDm);
@@ -99,11 +112,11 @@ function BeskederContent() {
     if (isDm && targetUserId) {
       const { data: tUser } = await supabase.from('users').select('*').eq('id', targetUserId).single();
       if (tUser) setDmTargetUser(tUser);
+      // Marker som læst når tråden vælges
+      await markAsRead(threadId, currentUserId);
     } else {
       setDmTargetUser(null);
     }
-
-    setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, unreadCount: 0 } : t)));
   }
 
   const upsertThreadToTop = async (opts: { threadId: string; otherUserId: string; created_at: string; isIncoming: boolean }) => {
@@ -172,9 +185,6 @@ function BeskederContent() {
       return;
     }
     setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: res.data.id } : m)));
-    if (isDirectMessage && dmTargetUser) {
-      await upsertThreadToTop({ threadId: activeThreadId, otherUserId: dmTargetUser.id, created_at: res.data.created_at, isIncoming: false });
-    }
   };
 
   const handleReport = async () => {
@@ -225,41 +235,52 @@ function BeskederContent() {
       dmState?.forEach((r: any) => (deletedMap[r.thread_id] = r.deleted_at));
       setDmDeletedMap(deletedMap);
 
-      const { data: mems } = await supabase.from('foreningsmedlemmer').select('forening_id').eq('user_id', cId).eq('status', 'approved');
-      const fIds = mems?.map((m: any) => m.forening_id) || [];
-      let initT: ThreadItem[] = [];
+      const { data: dms } = await supabase
+        .from('messages')
+        .select('thread_id, sender_id, receiver_id, created_at, is_read')
+        .or(`sender_id.eq.${cId},receiver_id.eq.${cId}`)
+        .order('created_at', { ascending: false });
 
-      if (fIds.length > 0) {
-        const { data: td } = await supabase.from('forening_threads').select(`id, title, created_at, forening_id, foreninger(navn)`).in('forening_id', fIds);
-        if (td) initT = td.map((t: any) => ({ id: t.id, title: t.title, created_at: t.created_at, forening_id: t.forening_id, forening: t.foreninger, isDm: false, unreadCount: 0 }));
-      }
-
-      const { data: dms } = await supabase.from('messages').select('thread_id, sender_id, receiver_id, created_at').or(`sender_id.eq.${cId},receiver_id.eq.${cId}`).order('created_at', { ascending: false });
       if (dms && dms.length > 0) {
         const uniq = new Map<string, any>();
         const oIds = new Set<string>();
+        const unreadCounts: Record<string, number> = {};
+
         for (const m of dms) {
           const delAt = deletedMap[m.thread_id] ?? null;
           if (delAt && new Date(m.created_at).getTime() <= new Date(delAt).getTime()) continue;
+          
+          // Tæl ulæste (hvis modtageren er mig og is_read er false)
+          if (m.receiver_id === cId && !m.is_read) {
+            unreadCounts[m.thread_id] = (unreadCounts[m.thread_id] || 0) + 1;
+          }
+
           if (!uniq.has(m.thread_id)) {
             const oId = m.sender_id === cId ? m.receiver_id : m.sender_id;
             uniq.set(m.thread_id, { ...m, oId });
             oIds.add(oId);
           }
         }
+
         if (uniq.size > 0) {
           const { data: usrs } = await supabase.from('users').select('id, name, avatar_url').in('id', Array.from(oIds));
           const uMap = new Map<string, any>();
           usrs?.forEach((u: any) => uMap.set(u.id, u));
           const dmt: ThreadItem[] = Array.from(uniq.values()).map((t: any) => {
             const u = uMap.get(t.oId);
-            return { id: t.thread_id, title: u?.name || 'Bruger', created_at: t.created_at, isDm: true, dmUserId: t.oId, dmUserAvatar: getAvatarUrl(u?.avatar_url), unreadCount: 0 };
+            return { 
+              id: t.thread_id, 
+              title: u?.name || 'Bruger', 
+              created_at: t.created_at, 
+              isDm: true, 
+              dmUserId: t.oId, 
+              dmUserAvatar: getAvatarUrl(u?.avatar_url), 
+              unreadCount: unreadCounts[t.thread_id] || 0 
+            };
           });
-          initT = [...dmt, ...initT];
+          setThreads(dmt.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
         }
       }
-      initT.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setThreads(initT);
       setLoading(false);
     };
     init();
@@ -295,12 +316,17 @@ function BeskederContent() {
     fetchM();
   }, [activeThreadId, isDirectMessage, userId, dmDeletedMap]);
 
+  // ✅ REALTIME OPDATERING AF UNREAD STATUS
   useEffect(() => {
     if (!userId) return;
     const ch = supabase.channel(`inbox-dm-${userId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userId}` },
         async (payload) => {
           const m: any = payload.new;
+          // Hvis tråden er åben, marker den som læst med det samme
+          if (activeThreadId === m.thread_id) {
+            await markAsRead(m.thread_id, userId);
+          }
           await upsertThreadToTop({ threadId: m.thread_id, otherUserId: m.sender_id, created_at: m.created_at, isIncoming: true });
         }
       )
@@ -342,7 +368,6 @@ function BeskederContent() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-black text-[15px] text-[#131921] truncate">{t.title}</span>
-                    {/* ✅ NY: RØD PULSERENDE PRIK FOR ULÆSTE BESKEDER */}
                     {!!t.unreadCount && t.unreadCount > 0 && (
                       <div className="flex items-center gap-2">
                         <span className="relative flex h-3 w-3">
