@@ -51,10 +51,10 @@ const formatTextWithLinks = (text: string) => {
   const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\/forening\/[\w-]+)/ig;
   const cleanParts = text.split(/(\s+)/).map((word, i) => {
     if (word.startsWith('/forening/')) {
-        return <Link key={i} href={word} className="text-blue-300 underline hover:text-blue-100 break-all">{word}</Link>;
+        return <Link key={i} href={word} className="text-blue-500 underline hover:text-blue-700 break-all">{word}</Link>;
     }
     if (word.match(/^https?:\/\//)) {
-        return <a key={i} href={word} target="_blank" rel="noopener noreferrer" className="text-blue-300 underline hover:text-blue-100 break-all">{word}</a>;
+        return <a key={i} href={word} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline hover:text-blue-700 break-all">{word}</a>;
     }
     return word;
   });
@@ -193,7 +193,7 @@ function BeskederContent() {
       } else if (startId) {
         const match = initialThreads.find(t => t.forening_id === startId);
         if (match) handleSelectThread(match.id, false, session.user.id);
-      } else if (initialThreads.length > 0 && window.innerWidth >= 768) {
+      } else if (initialThreads.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) {
         const first = initialThreads[0];
         handleSelectThread(first.id, !!first.isDm, session.user.id, first.dmUserId);
       }
@@ -281,7 +281,6 @@ function BeskederContent() {
     else { setThreads(prev => prev.filter(t => t.id !== activeThreadId)); setActiveThreadId(null); setMessages([]); }
   };
 
-  /* ───────── ANMELD LOGIK (Matcher Appen) ───────── */
   const handleReport = async () => {
     if (!activeThreadId || !userId || !dmTargetUser) return;
     const reason = window.prompt("Hvorfor vil du anmelde denne samtale? (stødende, chikane, spam)");
@@ -325,61 +324,94 @@ function BeskederContent() {
       <SiteHeader />
       <main className="flex-1 w-full max-w-6xl mx-auto p-4 pb-20">
         <div className="bg-white rounded-[30px] shadow-xl overflow-hidden min-h-[70vh] flex flex-col md:flex-row">
+          
+          {/* SIDEBAR */}
           <div className={`w-full md:w-80 bg-gray-50 border-r border-gray-100 flex-shrink-0 flex flex-col ${activeThreadId ? 'hidden md:flex' : 'flex'}`}>
-            <div className="p-5 border-b border-gray-100"><h2 className="text-xl font-black text-[#131921]">Indbakke</h2></div>
+            <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-black text-[#131921]">Indbakke</h2>
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mt-1">Dine samtaler</p>
+            </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {threads.map(t => (
-                <button key={t.id} onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)} className={`w-full text-left p-3 rounded-xl flex flex-col gap-1 transition-all ${activeThreadId === t.id ? 'bg-white shadow-sm ring-1 ring-gray-100' : 'hover:bg-gray-100'}`}>
-                  <div className="flex justify-between items-center w-full"><span className="font-bold text-sm truncate">{t.title}</span>{t.unreadCount ? <span className="h-3 w-3 rounded-full bg-red-500 border border-white"></span> : null}</div>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">{t.isDm ? 'Privat' : t.forening?.navn}</span>
+                <button key={t.id} onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)} className={`w-full text-left p-3 rounded-2xl flex flex-col gap-1 transition-all ${activeThreadId === t.id ? 'bg-white shadow-sm ring-1 ring-gray-200' : 'hover:bg-gray-200'}`}>
+                  <div className="flex justify-between items-center w-full">
+                    <span className="font-black text-[14px] text-[#131921] truncate">{t.title}</span>
+                    {t.unreadCount ? <span className="h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white"></span> : null}
+                  </div>
+                  <span className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">{t.isDm ? 'Privat' : t.forening?.navn}</span>
                 </button>
               ))}
             </div>
           </div>
 
+          {/* CHAT OMRÅDE */}
           <div className={`flex-1 flex flex-col bg-white ${!activeThreadId ? 'hidden md:flex' : 'flex'}`}>
             {activeThreadId ? (
               <>
-                <div className="p-4 border-b border-gray-100 flex items-center justify-between shadow-sm bg-white">
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setActiveThreadId(null)} className="md:hidden w-10 h-10 flex items-center justify-center bg-white border border-gray-100 rounded-full"><i className="fa-solid fa-arrow-left"></i></button>
-                    <div><h3 className="font-bold text-[#131921]">{activeThreadInfo.title}</h3><p className="text-xs text-gray-500">{activeThreadInfo.subtitle}</p></div>
+                {/* TOPBAR */}
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between shadow-sm bg-white z-10">
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => setActiveThreadId(null)} className="md:hidden w-10 h-10 flex items-center justify-center bg-gray-50 text-[#131921] rounded-full border border-gray-200"><i className="fa-solid fa-arrow-left"></i></button>
+                    <div>
+                        <h3 className="font-black text-[#131921] text-lg leading-tight">{activeThreadInfo.title}</h3>
+                        <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{activeThreadInfo.subtitle}</p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     {isDirectMessage && (
-                      <button onClick={handleReport} disabled={submittingReport} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-orange-50 text-orange-600 transition-colors">
-                        <span className="text-xs font-bold uppercase tracking-wide">Anmeld</span>
+                      <button onClick={handleReport} disabled={submittingReport} className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-orange-50 text-orange-600 transition-colors border border-transparent hover:border-orange-100">
+                        <span className="text-[11px] font-black uppercase tracking-widest">Anmeld</span>
                         <i className="fa-solid fa-triangle-exclamation"></i>
                       </button>
                     )}
-                    <button onClick={handleDeleteThread} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-red-50 text-red-600 transition-colors">
-                      <span className="text-xs font-bold uppercase tracking-wide">Slet</span>
+                    <button onClick={handleDeleteThread} className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-red-50 text-red-600 transition-colors border border-transparent hover:border-red-100">
+                      <span className="text-[11px] font-black uppercase tracking-widest">Slet</span>
                       <i className="fa-regular fa-trash-can"></i>
                     </button>
                   </div>
                 </div>
 
-                <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F5F7FA]">
-                  {messages.map(msg => (
-                    <div key={msg.id} className={`flex gap-3 items-end ${msg.user_id === userId ? 'flex-row-reverse' : 'flex-row'}`}>
-                      <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-100 shadow-sm"><img src={msg.users?.avatar_url || `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}`} alt="" className="w-full h-full object-cover" /></div>
-                      <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm ${msg.user_id === userId ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none'}`}>
-                        <p className="text-sm whitespace-pre-wrap">{formatTextWithLinks(msg.text)}</p>
-                        <p className="text-[9px] mt-1 text-right opacity-60">{new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-                      </div>
-                    </div>
-                  ))}
+                {/* BESKEDER */}
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#F8FAFC]">
+                  {messages.map(msg => {
+                    const isMe = msg.user_id === userId;
+                    return (
+                        <div key={msg.id} className={`flex gap-3 items-end ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0 bg-gray-200">
+                            <img src={msg.users?.avatar_url || `https://ui-avatars.com/api/?name=${msg.users?.name || '?'}&background=random`} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className={`max-w-[75%] rounded-2xl p-4 shadow-sm ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-50'}`}>
+                            <p className="text-[14px] leading-relaxed font-medium whitespace-pre-wrap">{formatTextWithLinks(msg.text)}</p>
+                            <p className={`text-[10px] mt-2 text-right font-bold tracking-tight ${isMe ? 'text-gray-400' : 'text-gray-400'}`}>
+                                {new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                            </p>
+                        </div>
+                        </div>
+                    );
+                  })}
                 </div>
 
-                <div className="p-4 bg-white border-t border-gray-100">
-                  <div className="flex gap-2 bg-gray-50 p-1.5 rounded-full border border-gray-200">
-                    <input value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Skriv besked..." className="flex-1 bg-transparent px-4 py-2 outline-none text-sm" />
-                    <button onClick={handleSend} disabled={!newMessage.trim()} className="w-10 h-10 bg-[#131921] rounded-full text-white flex items-center justify-center hover:bg-black transition-colors shadow-md"><i className="fa-solid fa-paper-plane text-xs"></i></button>
+                {/* INPUT */}
+                <div className="p-5 bg-white border-t border-gray-100">
+                  <div className="flex gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-200 focus-within:border-[#131921] transition-all">
+                    <input 
+                        value={newMessage} 
+                        onChange={e => setNewMessage(e.target.value)} 
+                        onKeyDown={e => e.key === 'Enter' && handleSend()} 
+                        placeholder="Skriv din besked her..." 
+                        className="flex-1 bg-transparent px-4 py-2 outline-none text-[15px] text-[#131921] font-medium placeholder:text-gray-400" 
+                    />
+                    <button onClick={handleSend} disabled={!newMessage.trim()} className="w-12 h-12 bg-[#131921] rounded-xl text-white flex items-center justify-center hover:bg-black transition-all shadow-md active:scale-95 disabled:opacity-30 disabled:grayscale">
+                        <i className="fa-solid fa-paper-plane text-sm"></i>
+                    </button>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-300 flex-col"><i className="fa-regular fa-comments text-6xl mb-4 opacity-50"></i><p>Vælg en samtale</p></div>
+              <div className="flex-1 flex items-center justify-center text-gray-300 flex-col py-20">
+                <i className="fa-regular fa-comments text-7xl mb-6 opacity-20"></i>
+                <p className="text-gray-400 font-black uppercase tracking-[0.2em] text-sm">Vælg en samtale</p>
+              </div>
             )}
           </div>
         </div>
