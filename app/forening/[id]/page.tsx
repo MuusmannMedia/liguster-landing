@@ -232,13 +232,6 @@ export default function ForeningDetaljePage() {
     }
   };
 
-  const togglePublic = async () => {
-    if (!realForeningId || !isMeAdmin) return;
-    const newValue = !forening?.is_public;
-    setForening(prev => prev ? { ...prev, is_public: newValue } : null);
-    await supabase.from('foreninger').update({ is_public: newValue }).eq('id', realForeningId);
-  };
-
   const handleSaveInfo = async () => {
     if (!realForeningId) return;
     const { error } = await supabase.from('foreninger').update({ navn: editNavn, sted: editSted, beskrivelse: editDescription }).eq('id', realForeningId);
@@ -304,12 +297,15 @@ export default function ForeningDetaljePage() {
                 <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
                 <p className="text-[#444] text-sm whitespace-pre-wrap">{forening.beskrivelse}</p>
+                
+                {/* GENOPRETTEDE KNAPPER */}
                 <div className="flex flex-wrap gap-2 mt-4">
-                  <button onClick={() => navigator.clipboard.writeText(window.location.href)} className="px-4 py-2.5 bg-[#e9eef5] text-xs font-bold rounded-xl uppercase">Kopiér link</button>
+                  <button onClick={() => navigator.clipboard.writeText(window.location.href)} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Kopiér link</button>
+                  <button className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Del</button>
                   {isMeAdmin && (
                     <>
-                      <button onClick={() => setIsEditing(true)} className="px-4 py-2.5 bg-[#e9eef5] text-xs font-bold rounded-xl uppercase">Rediger</button>
-                      <button onClick={togglePublic} className="px-4 py-2.5 bg-[#e9eef5] text-xs font-bold rounded-xl uppercase">{forening.is_public ? 'Offentlig' : 'Privat'}</button>
+                      <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Rediger</button>
+                      <button className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Inviter</button>
                     </>
                   )}
                 </div>
@@ -340,7 +336,6 @@ export default function ForeningDetaljePage() {
           </div>
         </div>
 
-        {/* --- SAMTALER SEKTION --- */}
         <div onClick={() => router.push(`/forening/${realForeningId}/threads`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">SAMTALER</div>
           {threads.length === 0 ? <p className="text-sm text-gray-400">Ingen tråde endnu.</p> : (
@@ -354,7 +349,6 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* --- AKTIVITETER SEKTION --- */}
         <div onClick={() => router.push(`/forening/${realForeningId}/events`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">AKTIVITETER</div>
           {events.length === 0 ? <p className="text-sm text-gray-400">Ingen aktiviteter endnu.</p> : (
@@ -368,7 +362,6 @@ export default function ForeningDetaljePage() {
           )}
         </div>
 
-        {/* --- KALENDER SEKTION --- */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
           <div className="flex items-center justify-between mb-4 px-2">
@@ -385,7 +378,6 @@ export default function ForeningDetaljePage() {
           </div>
         </div>
 
-        {/* --- BILLEDER SEKTION --- */}
         <div onClick={() => router.push(`/forening/${realForeningId}/images`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
           <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">BILLEDER</div>
           <div className="flex gap-2 overflow-x-auto pb-2">
@@ -445,7 +437,7 @@ export default function ForeningDetaljePage() {
                 <p className="text-xs uppercase font-bold text-gray-400 mb-6">{selectedMember.rolle || 'MEDLEM'}</p>
                 <button 
                   onClick={() => handleOpenMessageModal(selectedMember)} 
-                  className="w-full py-3 bg-[#131921] text-white rounded-full font-bold mb-3 shadow-lg"
+                  className="w-full py-3 bg-[#131921] text-white rounded-full font-bold mb-3 shadow-lg hover:bg-gray-900 transition-colors"
                 >
                   Skriv til medlem
                 </button>
