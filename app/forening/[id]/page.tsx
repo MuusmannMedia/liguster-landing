@@ -128,6 +128,7 @@ export default function ForeningDetaljePage() {
   const [forening, setForening] = useState<Forening | null>(null);
   const [medlemmer, setMedlemmer] = useState<Medlem[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   
   const [isEditing, setIsEditing] = useState(false);
   const [editNavn, setEditNavn] = useState("");
@@ -194,6 +195,27 @@ export default function ForeningDetaljePage() {
     }
     loadAllData();
   }, [idOrSlug, router]);
+
+  // ✅ LOGIK TIL BILLEDUPLOAD
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !realForeningId) return;
+    const file = e.target.files[0];
+    setUploading(true);
+    const fileName = `${realForeningId}_${Date.now()}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('foreningsbilleder')
+      .upload(fileName, file);
+
+    if (!uploadError) {
+      const { data } = supabase.storage.from('foreningsbilleder').getPublicUrl(fileName);
+      await supabase.from('foreninger').update({ billede_url: data.publicUrl }).eq('id', realForeningId);
+      window.location.reload();
+    } else {
+      alert("Fejl ved upload: " + uploadError.message);
+    }
+    setUploading(false);
+  };
 
   const handleOpenMessageModal = (member: Medlem) => {
     setSelectedMember(member);
@@ -276,11 +298,23 @@ export default function ForeningDetaljePage() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
-        <input type="file" accept="image/*" ref={fileInputRef} className="hidden" />
+        {/* SKJULT FIL-INPUT TIL HERO BILLEDE */}
+        <input 
+          type="file" 
+          accept="image/*" 
+          ref={fileInputRef} 
+          className="hidden" 
+          onChange={handleImageUpload}
+        />
 
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">Ingen forside</div>}
+            {uploading && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-black">
+                Uploader...
+              </div>
+            )}
           </div>
           <div className="w-full">
             {isEditing ? (
@@ -298,13 +332,12 @@ export default function ForeningDetaljePage() {
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
                 <p className="text-[#444] text-sm whitespace-pre-wrap">{forening.beskrivelse}</p>
                 
-                {/* GENOPRETTEDE KNAPPER */}
                 <div className="flex flex-wrap gap-2 mt-4">
                   <button onClick={() => navigator.clipboard.writeText(window.location.href)} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Kopiér link</button>
                   <button className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Del</button>
                   {isMeAdmin && (
                     <>
-                      <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Rediger</button>
+                      <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Rediger tekst</button>
                       <button className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Inviter</button>
                     </>
                   )}
@@ -389,13 +422,32 @@ export default function ForeningDetaljePage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-[24px] p-4 shadow-sm space-y-3 mb-10">
-           {isMember && <button onClick={handleLeave} className="w-full py-3 bg-gray-200 text-gray-600 rounded-full font-bold hover:bg-gray-300 transition-colors">Afslut medlemskab</button>}
-           {isOwner && <button onClick={handleDeleteForening} className="w-full py-3 bg-red-100 text-red-600 rounded-full font-bold hover:bg-red-200 transition-colors">Slet forening</button>}
+        {/* ✅ BUND SEKTION MED "SKIFT HERO BILLEDE" KNAP */}
+        <div className="bg-white rounded-[24px] p-4 shadow-sm flex flex-col md:flex-row gap-3 mb-10">
+           {isMember && (
+             <button onClick={handleLeave} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-full font-bold hover:bg-gray-200 transition-colors">
+               Afslut medlemskab
+             </button>
+           )}
+           
+           {isMeAdmin && (
+             <button 
+               onClick={() => fileInputRef.current?.click()} 
+               className="flex-1 py-3 bg-[#e9eef5] text-[#131921] rounded-full font-bold hover:bg-[#d0dbe9] transition-colors"
+             >
+               Skift hero billede
+             </button>
+           )}
+
+           {isOwner && (
+             <button onClick={handleDeleteForening} className="flex-1 py-3 bg-red-100 text-red-600 rounded-full font-bold hover:bg-red-200 transition-colors">
+               Slet forening
+             </button>
+           )}
         </div>
       </main>
 
-      {/* MODAL: BESKED VED FØRSTE KONTAKT */}
+      {/* MODALER (UBEVARET) */}
       {showFirstMessageModal && selectedMember && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-6 relative">
@@ -423,7 +475,6 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* MODAL: MEDLEMSLISTE */}
       {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative max-h-[80vh] overflow-y-auto">
