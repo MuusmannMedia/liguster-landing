@@ -39,14 +39,6 @@ const getAvatarUrl = (path: string | null | undefined) => {
   return data.publicUrl;
 };
 
-const makeUuid = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
-
 const formatTextWithLinks = (text: string) => {
   const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\/forening\/[\w-]+)/ig;
   const cleanParts = text.split(/(\s+)/).map((word, i) => {
@@ -64,7 +56,6 @@ const formatTextWithLinks = (text: string) => {
 function BeskederContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const startId = searchParams.get('id');
   const dmUserIdFromUrl = searchParams.get('dmUser');
 
   const [userId, setUserId] = useState<string | null>(null);
@@ -77,9 +68,70 @@ function BeskederContent() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
-  const [submittingReport, setSubmittingReport] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll til bund hjælper
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }, 100);
+  };
+
+  // --- REALTIME LOGIK ---
+  useEffect(() => {
+    if (!activeThreadId || !userId) return;
+
+    const table = isDirectMessage ? 'messages' : 'forening_messages';
+    
+    // Opret kanal til at lytte efter nye beskeder
+    const channel = supabase
+      .channel(`room-${activeThreadId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: table,
+          filter: `thread_id=eq.${activeThreadId}`
+        },
+        async (payload) => {
+          const newMsg = payload.new;
+          
+          // Hvis beskeden ikke er fra os selv (vi har allerede tilføjet den optimistisk)
+          const senderField = isDirectMessage ? 'sender_id' : 'user_id';
+          if (newMsg[senderField] !== userId) {
+            // Hent bruger info for den nye besked
+            const { data: userData } = await supabase
+              .from('users')
+              .select('name, avatar_url')
+              .eq('id', newMsg[senderField])
+              .single();
+
+            const formattedMsg: ChatMessage = {
+              id: newMsg.id,
+              text: newMsg.text,
+              created_at: newMsg.created_at,
+              user_id: newMsg[senderField],
+              users: {
+                name: userData?.name || 'Bruger',
+                avatar_url: getAvatarUrl(userData?.avatar_url)
+              }
+            };
+
+            setMessages((prev) => [...prev, formattedMsg]);
+            scrollToBottom();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeThreadId, isDirectMessage, userId]);
 
   // --- FUNKTIONER ---
   async function handleSelectThread(threadId: string, isDm: boolean, currentUserId: string, targetUserId?: string) {
@@ -92,17 +144,25 @@ function BeskederContent() {
        setDmTargetUser(null);
     }
     setThreads(prev => prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t));
-    if (isDm) {
-      await supabase.from('messages').update({ is_read: true }).eq('thread_id', threadId).eq('receiver_id', currentUserId).eq('is_read', false);
-    }
   }
 
   const handleSend = async () => {
     if (!newMessage.trim() || !activeThreadId || !userId) return;
     const text = newMessage.trim();
     setNewMessage("");
+    
+    // Tilføj beskeden med det samme i UI (Optimistisk)
     const tempId = "temp-" + Date.now();
-    setMessages(prev => [...prev, { id: tempId, text, created_at: new Date().toISOString(), user_id: userId, users: { name: myProfile?.name || 'Mig', avatar_url: myProfile?.avatar_url } }]);
+    const optimisticMsg: ChatMessage = { 
+      id: tempId, 
+      text, 
+      created_at: new Date().toISOString(), 
+      user_id: userId, 
+      users: { name: myProfile?.name || 'Mig', avatar_url: myProfile?.avatar_url } 
+    };
+    
+    setMessages(prev => [...prev, optimisticMsg]);
+    scrollToBottom();
     
     let res;
     if (isDirectMessage && dmTargetUser) {
@@ -110,16 +170,19 @@ function BeskederContent() {
     } else {
       res = await supabase.from('forening_messages').insert([{ thread_id: activeThreadId, user_id: userId, text }]).select().single();
     }
-    if (res.error) { alert("Fejl: " + res.error.message); setMessages(prev => prev.filter(m => m.id !== tempId)); }
-    else if (res.data) setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: res.data.id } : m));
-    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
+    
+    if (res.error) {
+      alert("Fejl: " + res.error.message);
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+    } else {
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: res.data.id } : m));
+    }
   };
 
   const handleReport = async () => {
     if (!activeThreadId || !userId || !dmTargetUser) return;
     const reason = window.prompt("Hvorfor vil du anmelde?");
     if (!reason) return;
-    setSubmittingReport(true);
     try {
       const currentT = threads.find(t => t.id === activeThreadId);
       const { data: ins } = await supabase.from("reports").insert({ reporter_id: userId, thread_id: activeThreadId, reason, status: "pending" }).select("id").single();
@@ -130,31 +193,18 @@ function BeskederContent() {
         body: JSON.stringify({ source: "BESKEDER", reportId: ins?.id, reason, threadId: activeThreadId, postId: currentT?.forening_id, reporterId: userId, ownerId: dmTargetUser.id, beskedTekst: last }),
       });
       alert("Tak, anmeldelse modtaget.");
-    } catch (e) { alert("Modtaget i systemet."); } finally { setSubmittingReport(false); }
+    } catch (e) { alert("Anmeldelse sendt."); }
   };
 
-  // ✅ NY FUNKTION: SLET CHAT
   const handleDeleteThread = async () => {
-    if (!activeThreadId || !confirm("Er du sikker på, at du vil slette hele denne samtale?")) return;
-
-    let error;
-    if (isDirectMessage) {
-        // Slet alle beskeder i DM-tråden
-        const res = await supabase.from('messages').delete().eq('thread_id', activeThreadId);
-        error = res.error;
-    } else {
-        // Slet forenings-tråden (beskeder slettes via cascade hvis sat op, ellers slet dem manuelt)
-        const res = await supabase.from('forening_threads').delete().eq('id', activeThreadId);
-        error = res.error;
-    }
-
-    if (error) {
-        alert("Fejl ved sletning: " + error.message);
-    } else {
-        setThreads(prev => prev.filter(t => t.id !== activeThreadId));
-        setActiveThreadId(null);
-        setMessages([]);
-        alert("Samtalen er slettet.");
+    if (!activeThreadId || !confirm("Vil du slette denne samtale?")) return;
+    const table = isDirectMessage ? 'messages' : 'forening_threads';
+    const field = isDirectMessage ? 'thread_id' : 'id';
+    const { error } = await supabase.from(table).delete().eq(field, activeThreadId);
+    if (!error) {
+      setThreads(prev => prev.filter(t => t.id !== activeThreadId));
+      setActiveThreadId(null);
+      setMessages([]);
     }
   };
 
@@ -219,7 +269,7 @@ function BeskederContent() {
         const uMap: Record<string, any> = {}; 
         us?.forEach(u => uMap[u.id] = { name: u.name, avatar_url: getAvatarUrl(u.avatar_url) });
         setMessages(data.map((m: any) => ({ ...m, users: uMap[m.user_id] || { name: '?', avatar_url: null } })) as any);
-        setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 100);
+        scrollToBottom();
       }
     };
     fetchM();
@@ -261,8 +311,6 @@ function BeskederContent() {
                           <p className="text-[11px] text-gray-500 font-black uppercase tracking-widest">{activeThreadInfo.subtitle}</p>
                         </div>
                     </div>
-                    
-                    {/* KNAPPER TIL HØJRE: ANMELD & SLET */}
                     <div className="flex items-center gap-2">
                         <button onClick={handleReport} className="text-orange-600 text-[11px] font-black uppercase flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-orange-50 transition-colors">
                             <i className="fa-solid fa-triangle-exclamation"></i> Anmeld
