@@ -230,6 +230,7 @@ export default function ForeningDetaljePage() {
           thread_id: threadIdToUse,
           sender_id: userId,
           receiver_id: targetUserId,
+          text: "Hej! Jeg skriver til dig fra foreningen.",
           is_read: false
         }]);
       }
