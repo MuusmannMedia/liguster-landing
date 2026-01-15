@@ -145,7 +145,7 @@ const dayColorClass = (events: Event[]) => {
   const types = new Set(events.map(getEventType));
   if (types.has('paid')) return 'bg-purple-600 text-white';
   if (types.has('online')) return 'bg-emerald-600 text-white';
-  return 'bg-blue-600 text-white';
+  return 'bg-[#131921] text-white'; 
 };
 
 const typePill = (e: Event) => {
