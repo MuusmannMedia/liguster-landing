@@ -422,7 +422,7 @@ export default function ForeningDetaljePage() {
           </div>
         </div>
 
-        {/* ✅ BUND SEKTION MED "SKIFT HERO BILLEDE" KNAP */}
+        {/* ✅ BUND SEKTION MED "SKIFT BILLEDE" KNAP */}
         <div className="bg-white rounded-[24px] p-4 shadow-sm flex flex-col md:flex-row gap-3 mb-10">
            {isMember && (
              <button onClick={handleLeave} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-full font-bold hover:bg-gray-200 transition-colors">
@@ -435,7 +435,7 @@ export default function ForeningDetaljePage() {
                onClick={() => fileInputRef.current?.click()} 
                className="flex-1 py-3 bg-[#e9eef5] text-[#131921] rounded-full font-bold hover:bg-[#d0dbe9] transition-colors"
              >
-               Skift hero billede
+               Skift billede
              </button>
            )}
 
