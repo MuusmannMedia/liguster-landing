@@ -20,8 +20,30 @@ export default function SiteHeader() {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        setUserId(session.user.id);
-        fetchBadges(session.user.id);
+        const uid = session.user.id;
+        setUserId(uid);
+        fetchBadges(uid);
+
+        // --- REALTIME: Lyt efter nye beskeder ---
+        const channel = supabase
+          .channel('header-messages-count')
+          .on(
+            'postgres_changes',
+            {
+              event: '*', // Lytter efter både nye beskeder og når de markeres som læst
+              schema: 'public',
+              table: 'messages'
+            },
+            () => {
+              // Gen-hent antallet af ulæste når der sker ændringer i tabellen
+              fetchBadges(uid);
+            }
+          )
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
       }
     };
     init();
@@ -31,17 +53,15 @@ export default function SiteHeader() {
   const fetchBadges = async (uid: string) => {
     try {
       // --- A. MESSAGES: Count unread ---
-      // Requires running the SQL script to add 'is_read' column first!
       const { count: msgCount } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
         .eq('receiver_id', uid)
         .eq('is_read', false); 
       
-      if (msgCount) setUnreadMsgCount(msgCount);
+      setUnreadMsgCount(msgCount || 0);
 
       // --- B. FORENING: Count pending members (for admins) ---
-      // First, find associations where user is admin
       const { data: adminRoles } = await supabase
         .from('foreningsmedlemmer')
         .select('forening_id')
@@ -51,14 +71,15 @@ export default function SiteHeader() {
       if (adminRoles && adminRoles.length > 0) {
         const myForeningIds = adminRoles.map(r => r.forening_id);
         
-        // Count pending requests in these associations
         const { count: pendingCount } = await supabase
           .from('foreningsmedlemmer')
           .select('*', { count: 'exact', head: true })
           .in('forening_id', myForeningIds)
           .eq('status', 'pending');
           
-        if (pendingCount) setForeningBadgeCount(pendingCount || 0);
+        setForeningBadgeCount(pendingCount || 0);
+      } else {
+        setForeningBadgeCount(0);
       }
 
     } catch (error) {
@@ -116,7 +137,7 @@ export default function SiteHeader() {
                   <div className="relative">
                     <i className={`fa-solid ${item.icon} mb-1 text-sm md:text-lg`}></i>
                     
-                    {/* 🔴 RED BADGE DOT */}
+                    {/* 🔴 PULSERENDE RØD PRIK */}
                     {item.badge > 0 && (
                       <span className="absolute -top-1.5 -right-2 flex h-3 w-3">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
