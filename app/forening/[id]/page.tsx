@@ -128,7 +128,6 @@ export default function ForeningDetaljePage() {
   const [forening, setForening] = useState<Forening | null>(null);
   const [medlemmer, setMedlemmer] = useState<Medlem[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   
   const [isEditing, setIsEditing] = useState(false);
   const [editNavn, setEditNavn] = useState("");
@@ -144,22 +143,13 @@ export default function ForeningDetaljePage() {
 
   const [monthCursor, setMonthCursor] = useState(new Date());
   const [calendarEvents, setCalendarEvents] = useState<Event[]>([]);
-  const [selectedDateEvents, setSelectedDateEvents] = useState<{date: string, events: Event[]} | null>(null);
 
   const [showMembers, setShowMembers] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Medlem | null>(null);
 
-  // Nye states til Besked-Modal
   const [showFirstMessageModal, setShowFirstMessageModal] = useState(false);
   const [firstMessageText, setFirstMessageText] = useState("");
   const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
-
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [inviteMessage, setInviteMessage] = useState("");
-  const [invitingId, setInvitingId] = useState<string | null>(null);
   
   useEffect(() => {
     async function loadAllData() {
@@ -181,7 +171,9 @@ export default function ForeningDetaljePage() {
         setEditSted(foreningData.sted || "");
         setEditDescription(foreningData.beskrivelse || "");
         setEditIsPublic(foreningData.is_public || false);
-        if (!currentUserId) { if (foreningData.is_public) { setLoading(false); return; } else { router.replace('/login'); return; } }
+        
+        if (!currentUserId && !foreningData.is_public) { router.replace('/login'); return; }
+
         const fId = foreningData.id;
         const [res1, res2, res3, res4] = await Promise.all([
           supabase.from("foreningsmedlemmer").select("user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (name, username, avatar_url, email)").eq("forening_id", fId),
@@ -189,17 +181,20 @@ export default function ForeningDetaljePage() {
           supabase.from("forening_events").select("*").eq("forening_id", fId).order("start_at", { ascending: false }).limit(3),
           supabase.from("forening_events").select("id, title, start_at, end_at, location, price, description, image_url").eq("forening_id", fId)
         ]);
+
+        const { data: imgData } = await supabase.from("event_images").select("id, image_url").in("event_id", (res4.data || []).map(e => e.id)).order("created_at", { ascending: false }).limit(8);
+        
         if (res1.data) setMedlemmer(res1.data as unknown as Medlem[]);
         if (res2.data) setThreads(res2.data);
         if (res3.data) setEvents(res3.data);
         if (res4.data) setCalendarEvents(res4.data);
+        if (imgData) setImages(imgData);
         setLoading(false);
       } catch (err) { setLoading(false); }
     }
     loadAllData();
   }, [idOrSlug, router]);
 
-  // ✅ RETTET LOGIK: Åbner modal i stedet for direkte navigation
   const handleOpenMessageModal = (member: Medlem) => {
     setSelectedMember(member);
     setShowFirstMessageModal(true);
@@ -211,7 +206,6 @@ export default function ForeningDetaljePage() {
     const targetUserId = selectedMember.user_id;
 
     try {
-      // 1. Tjek om der findes en tråd
       const { data: existingThread } = await supabase
         .from('messages')
         .select('thread_id')
@@ -221,7 +215,6 @@ export default function ForeningDetaljePage() {
 
       const threadIdToUse = existingThread?.thread_id || makeUuid();
 
-      // 2. Indsæt den første besked
       const { error: sendErr } = await supabase.from('messages').insert([{
         thread_id: threadIdToUse,
         sender_id: userId,
@@ -231,8 +224,6 @@ export default function ForeningDetaljePage() {
       }]);
 
       if (sendErr) throw sendErr;
-
-      // 3. Send til indbakken
       router.push(`/beskeder?id=${threadIdToUse}&dmUser=${targetUserId}`);
     } catch (err) {
       alert("Kunne ikke sende besked.");
@@ -344,6 +335,63 @@ export default function ForeningDetaljePage() {
                   {getAvatarUrl(m.users?.avatar_url) ? <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>}
                 </div>
                 <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* --- SAMTALER SEKTION --- */}
+        <div onClick={() => router.push(`/forening/${realForeningId}/threads`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+          <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">SAMTALER</div>
+          {threads.length === 0 ? <p className="text-sm text-gray-400">Ingen tråde endnu.</p> : (
+            <div className="space-y-3">
+              {threads.map((t, idx) => (
+                <div key={t.id} className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
+                  <div><h4 className="font-bold text-[#131921] text-lg">{t.title}</h4><p className="text-xs text-gray-500 mt-1">Oprettet {fmtDate(t.created_at)}</p></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* --- AKTIVITETER SEKTION --- */}
+        <div onClick={() => router.push(`/forening/${realForeningId}/events`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+          <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">AKTIVITETER</div>
+          {events.length === 0 ? <p className="text-sm text-gray-400">Ingen aktiviteter endnu.</p> : (
+            <div className="space-y-3">
+              {events.map((e, idx) => (
+                <div key={e.id} className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
+                  <div><h4 className="font-bold text-[#131921] text-lg">{e.title}</h4><p className="text-xs text-gray-500 mt-1">{fmtDate(e.start_at)} {e.location && `• ${e.location}`}</p></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* --- KALENDER SEKTION --- */}
+        <div className="bg-white rounded-[24px] p-4 shadow-sm">
+          <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">KALENDER</div>
+          <div className="flex items-center justify-between mb-4 px-2">
+            <button onClick={(e) => { e.stopPropagation(); setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200">❮</button>
+            <h3 className="font-black text-[#131921] text-xl capitalize">{monthCursor.toLocaleDateString("da-DK", { month: 'long', year: 'numeric' })}</h3>
+            <button onClick={(e) => { e.stopPropagation(); setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200">❯</button>
+          </div>
+          <div className="grid grid-cols-7 gap-1.5">
+            {buildMonthGrid(monthCursor).map((week) => week.map((day, idx) => (
+              <div key={idx} className={`aspect-square flex items-center justify-center rounded-xl text-sm ${day.getMonth() !== monthCursor.getMonth() ? 'text-gray-300' : 'text-gray-800'}`}>
+                {day.getDate()}
+              </div>
+            )))}
+          </div>
+        </div>
+
+        {/* --- BILLEDER SEKTION --- */}
+        <div onClick={() => router.push(`/forening/${realForeningId}/images`)} className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+          <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">BILLEDER</div>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {images.length === 0 ? <p className="text-sm text-gray-400">Ingen billeder endnu.</p> : images.map(img => (
+              <div key={img.id} className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                <img src={getEventImageUrl(img.image_url)} className="w-full h-full object-cover" alt="Event" />
               </div>
             ))}
           </div>
