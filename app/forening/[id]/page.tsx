@@ -85,8 +85,7 @@ const makeUuid = () => {
   });
 };
 
-const fmtDate = (d: any) =>
-  new Date(d).toLocaleDateString('da-DK', { day: 'numeric', month: 'long' });
+const fmtDate = (d: any) => new Date(d).toLocaleDateString('da-DK', { day: 'numeric', month: 'long' });
 
 const fmtTime = (d: any) =>
   new Date(d).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
@@ -264,7 +263,6 @@ export default function ForeningDetaljePage() {
 
   const memberIdSet = useMemo(() => new Set(medlemmer.map((m) => m.user_id)), [medlemmer]);
 
-  // ✅ event-map pr dato
   const eventsByDate = useMemo(() => {
     const map = new Map<string, Event[]>();
     for (const e of calendarEvents) {
@@ -329,7 +327,6 @@ export default function ForeningDetaljePage() {
 
   const handleCopyLink = async () => {
     await navigator.clipboard.writeText(window.location.href);
-    // hold det simpelt
     alert('Link kopieret ✅');
   };
 
@@ -338,9 +335,7 @@ export default function ForeningDetaljePage() {
       try {
         await (navigator as any).share({ title: forening?.navn || 'Forening', url: window.location.href });
         return;
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     await handleCopyLink();
   };
@@ -364,7 +359,6 @@ export default function ForeningDetaljePage() {
 
     setInviteLoading(true);
     try {
-      // Antager I har en "users" tabel med disse felter (som du allerede joiner i foreningsmedlemmer)
       const { data, error } = await supabase
         .from('users')
         .select('id, name, username, avatar_url, email')
@@ -396,7 +390,6 @@ export default function ForeningDetaljePage() {
       ]);
 
       if (error) {
-        // typisk duplikat/unik constraint
         setInviteInfo('Kunne ikke invitere (måske er brugeren allerede inviteret).');
         return;
       }
@@ -465,20 +458,37 @@ export default function ForeningDetaljePage() {
   };
 
   const handleLeave = async () => {
-    if (!userId || !realForeningId || !confirm('Er du sikker?')) return;
+    if (!userId || !realForeningId || !confirm('Er du sikker på at du vil forlade foreningen?')) return;
     await supabase.from('foreningsmedlemmer').delete().eq('forening_id', realForeningId).eq('user_id', userId);
     window.location.reload();
   };
 
-  if (loading)
+  const handleDeleteForening = async () => {
+    if (!realForeningId) return;
+    const ok = confirm(
+      'SLET FORENING?\n\nDette sletter foreningen (og kan ikke fortrydes). Er du helt sikker?'
+    );
+    if (!ok) return;
+
+    const { error } = await supabase.from('foreninger').delete().eq('id', realForeningId);
+    if (error) {
+      alert('Kunne ikke slette foreningen.');
+      return;
+    }
+    router.push('/opslag');
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#869FB9] flex items-center justify-center font-black text-white">
         Indlæser...
       </div>
     );
+  }
 
-  if (!forening)
+  if (!forening) {
     return <div className="min-h-screen bg-[#869FB9] p-10 text-center text-white">Forening ikke fundet</div>;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
@@ -493,9 +503,7 @@ export default function ForeningDetaljePage() {
             {forening.billede_url ? (
               <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">
-                Ingen forside
-              </div>
+              <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">Ingen forside</div>
             )}
 
             {uploading && (
@@ -541,12 +549,9 @@ export default function ForeningDetaljePage() {
               </div>
             ) : (
               <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">
-                  {forening.navn}
-                </h1>
+                <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
 
-                {/* Beskrivelse + læs mere */}
                 <div className="text-[#444] text-sm whitespace-pre-wrap">
                   <p className={descExpanded ? '' : 'line-clamp-4'}>{forening.beskrivelse}</p>
 
@@ -560,7 +565,6 @@ export default function ForeningDetaljePage() {
                   )}
                 </div>
 
-                {/* Knapper */}
                 {isApprovedMember && (
                   <div className="flex flex-wrap gap-2 mt-4">
                     <button
@@ -598,7 +602,6 @@ export default function ForeningDetaljePage() {
             )}
           </div>
 
-          {/* Join-bar */}
           {!isApprovedMember &&
             (isPending ? (
               <div className="w-full py-3 bg-gray-400 text-white rounded-full font-bold text-center">
@@ -611,7 +614,6 @@ export default function ForeningDetaljePage() {
             ))}
         </div>
 
-        {/* ALT HERUNDER KUN FOR GODKENDTE */}
         {isApprovedMember && (
           <>
             <button
@@ -790,17 +792,12 @@ export default function ForeningDetaljePage() {
                   })}
                 </div>
 
-                {/* VALGT DAG: kort med aktiviteter */}
                 {selectedDayKey && selectedDayEvents.length > 0 && (
                   <div className="mt-4 bg-[#F9FBFC] border border-gray-100 rounded-2xl p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-[11px] font-black uppercase tracking-widest text-gray-500">
-                          Aktiviteter
-                        </p>
-                        <h4 className="text-base md:text-lg font-black text-[#131921] capitalize">
-                          {selectedDayLabel}
-                        </h4>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-gray-500">Aktiviteter</p>
+                        <h4 className="text-base md:text-lg font-black text-[#131921] capitalize">{selectedDayLabel}</h4>
                       </div>
                       <button
                         onClick={() => setSelectedDayKey(null)}
@@ -841,11 +838,7 @@ export default function ForeningDetaljePage() {
 
                               {e.image_url ? (
                                 <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                                  <img
-                                    src={getEventImageUrl(e.image_url)}
-                                    className="w-full h-full object-cover"
-                                    alt=""
-                                  />
+                                  <img src={getEventImageUrl(e.image_url)} className="w-full h-full object-cover" alt="" />
                                 </div>
                               ) : null}
                             </div>
@@ -890,11 +883,7 @@ export default function ForeningDetaljePage() {
                   <div className="grid grid-cols-3 gap-2">
                     {images.slice(0, 9).map((img) => (
                       <div key={img.id} className="aspect-square rounded-xl overflow-hidden bg-gray-100">
-                        <img
-                          src={getEventImageUrl(img.image_url)}
-                          className="w-full h-full object-cover"
-                          alt="Event"
-                        />
+                        <img src={getEventImageUrl(img.image_url)} className="w-full h-full object-cover" alt="Event" />
                       </div>
                     ))}
                   </div>
@@ -902,7 +891,7 @@ export default function ForeningDetaljePage() {
               </div>
             </div>
 
-            {/* Footer-actions */}
+            {/* Footer-actions (inkl. Slet forening for owner) */}
             <div className="bg-white rounded-[24px] p-4 shadow-sm flex flex-col md:flex-row gap-3 mb-10">
               <button
                 onClick={handleLeave}
@@ -910,12 +899,22 @@ export default function ForeningDetaljePage() {
               >
                 Afslut medlemskab
               </button>
+
               {isMeAdmin && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="flex-1 py-3 bg-[#e9eef5] text-[#131921] rounded-full font-bold hover:bg-[#d0dbe9] transition-colors"
                 >
                   Skift billede
+                </button>
+              )}
+
+              {isOwner && (
+                <button
+                  onClick={handleDeleteForening}
+                  className="flex-1 py-3 bg-red-100 text-red-700 rounded-full font-bold hover:bg-red-200 transition-colors"
+                >
+                  Slet forening
                 </button>
               )}
             </div>
@@ -955,9 +954,7 @@ export default function ForeningDetaljePage() {
             </div>
 
             <div className="mt-5">
-              <p className="text-[11px] font-black uppercase tracking-widest text-gray-500 mb-2">
-                Invitér bruger
-              </p>
+              <p className="text-[11px] font-black uppercase tracking-widest text-gray-500 mb-2">Invitér bruger</p>
 
               <input
                 value={inviteQuery}
@@ -977,10 +974,7 @@ export default function ForeningDetaljePage() {
                   </p>
                 ) : (
                   inviteResults.map((u) => (
-                    <div
-                      key={u.id}
-                      className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-gray-50"
-                    >
+                    <div key={u.id} className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-gray-50">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden flex-shrink-0">
                           {getAvatarUrl(u.avatar_url) ? (
@@ -991,9 +985,7 @@ export default function ForeningDetaljePage() {
                           <p className="font-black text-sm text-[#131921] truncate">
                             {u.name || u.username || (u.email ? u.email.split('@')[0] : 'Ukendt')}
                           </p>
-                          <p className="text-[11px] text-gray-500 font-bold truncate">
-                            {u.username ? `@${u.username}` : u.email}
-                          </p>
+                          <p className="text-[11px] text-gray-500 font-bold truncate">{u.username ? `@${u.username}` : u.email}</p>
                         </div>
                       </div>
 
@@ -1031,9 +1023,7 @@ export default function ForeningDetaljePage() {
                 {getAvatarUrl(selectedMember.users?.avatar_url) ? (
                   <img src={getAvatarUrl(selectedMember.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
                 ) : (
-                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl font-black">
-                    ?
-                  </div>
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl font-black">?</div>
                 )}
               </div>
               <h3 className="text-xl font-bold text-[#131921]">Skriv til {getDisplayName(selectedMember)}</h3>
@@ -1071,9 +1061,7 @@ export default function ForeningDetaljePage() {
                   {getAvatarUrl(selectedMember.users?.avatar_url) ? (
                     <img src={getAvatarUrl(selectedMember.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
                   ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl font-black">
-                      ?
-                    </div>
+                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl font-black">?</div>
                   )}
                 </div>
 
