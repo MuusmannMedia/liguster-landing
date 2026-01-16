@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '../lib/supabaseClient'; // Ensure this path is correct for your project structure
 
 type Post = {
   id: string;
@@ -21,21 +23,33 @@ type Props = {
   currentUserId: string | null;
 };
 
+// Helper for unique IDs
+const makeUuid = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 export default function PostDetailModal({ isOpen, post, onClose, currentUserId }: Props) {
+  const router = useRouter();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isStartingChat, setIsStartingChat] = useState(false);
 
-  // Nulstil når modal åbnes med nyt opslag
+  // Reset when modal opens with a new post
   useEffect(() => {
     if (isOpen) {
       setActiveImageIndex(0);
       setLightboxOpen(false);
+      setIsStartingChat(false);
     }
   }, [isOpen, post]);
 
   if (!isOpen || !post) return null;
 
-  // 1. Normaliser billeder
+  // 1. Normalize images
   const images: string[] = [];
   if (post.images && post.images.length > 0) {
     post.images.forEach(img => images.push(img));
@@ -57,27 +71,76 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
   };
 
   const handleShare = async () => {
+    // @ts-ignore - navigator.share might not be in all TS definitions
     if (navigator.share) {
       try {
+        // @ts-ignore
         await navigator.share({
           title: post.overskrift,
           text: `Se dette opslag på Liguster: ${post.overskrift}`,
           url: shareUrl,
         });
       } catch (err) {
-        // Bruger annullerede deling
+        // User cancelled share
       }
     } else {
       handleCopyLink(); // Fallback
     }
   };
 
-  const handleContact = () => {
+  const handleContact = async () => {
+    if (!currentUserId) {
+      alert("Du skal være logget ind for at skrive en besked.");
+      return;
+    }
+
     if (isOwnPost) return;
-    alert("Chat-funktionen kommer snart!");
+
+    setIsStartingChat(true);
+
+    try {
+      // 1. Check if a thread already exists between these two users
+      const { data: existingThreads } = await supabase
+        .from('messages')
+        .select('thread_id')
+        .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${post.user_id}),and(sender_id.eq.${post.user_id},receiver_id.eq.${currentUserId})`)
+        .limit(1);
+
+      let threadId = existingThreads && existingThreads.length > 0 
+        ? existingThreads[0].thread_id 
+        : makeUuid();
+
+      // 2. If no thread exists, create it by sending the first message
+      if (!existingThreads || existingThreads.length === 0) {
+        const initialMessage = `Hej! Jeg skriver angående dit opslag: "${post.overskrift}"`;
+        
+        const { error } = await supabase
+          .from('messages')
+          .insert({
+            thread_id: threadId,
+            sender_id: currentUserId,
+            receiver_id: post.user_id,
+            text: initialMessage,
+            is_read: false
+          });
+
+        if (error) throw error;
+      }
+
+      // 3. Navigate to messages page with the correct thread
+      // Close modal first to avoid UI clutter
+      onClose(); 
+      router.push(`/beskeder?id=${threadId}&dmUser=${post.user_id}`);
+      
+    } catch (error: any) {
+      console.error("Fejl ved start af chat:", error);
+      alert("Kunne ikke starte samtalen. Prøv igen senere.");
+    } finally {
+      setIsStartingChat(false);
+    }
   };
 
-  // Navigations-funktioner (Brugt både i kort og lightbox)
+  // Navigation functions
   const nextImage = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     setActiveImageIndex(prev => (prev + 1) % images.length);
@@ -135,7 +198,7 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
                   </div>
                 )}
                 
-                {/* PILE TIL GALLERI - Nu synlige på mobil! */}
+                {/* PILE TIL GALLERI */}
                 {images.length > 1 && (
                   <>
                     <button 
@@ -212,9 +275,18 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
           ) : (
             <button 
               onClick={handleContact}
-              className="flex-1 md:flex-none px-6 py-3 bg-[#131921] hover:bg-gray-900 text-white text-xs font-bold rounded-xl transition-colors uppercase tracking-wide shadow-md flex items-center justify-center gap-2"
+              disabled={isStartingChat}
+              className={`flex-1 md:flex-none px-6 py-3 text-white text-xs font-bold rounded-xl transition-all uppercase tracking-wide shadow-md flex items-center justify-center gap-2
+                ${isStartingChat ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#131921] hover:bg-gray-900'}
+              `}
             >
-              <i className="fa-solid fa-comment"></i> Skriv besked
+              {isStartingChat ? (
+                <span>Starter samtale...</span>
+              ) : (
+                <>
+                  <i className="fa-solid fa-comment"></i> Skriv besked
+                </>
+              )}
             </button>
           )}
         </div>
