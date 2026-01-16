@@ -465,9 +465,7 @@ export default function ForeningDetaljePage() {
 
   const handleDeleteForening = async () => {
     if (!realForeningId) return;
-    const ok = confirm(
-      'SLET FORENING?\n\nDette sletter foreningen (og kan ikke fortrydes). Er du helt sikker?'
-    );
+    const ok = confirm('SLET FORENING?\n\nDette sletter foreningen (og kan ikke fortrydes). Er du helt sikker?');
     if (!ok) return;
 
     const { error } = await supabase.from('foreninger').delete().eq('id', realForeningId);
@@ -616,8 +614,9 @@ export default function ForeningDetaljePage() {
 
         {isApprovedMember && (
           <>
+            {/* ✅ FIX: ÅBN INBOX (ingen id=...) */}
             <button
-              onClick={() => router.push(`/beskeder?id=${realForeningId}`)}
+              onClick={() => router.push('/beskeder')}
               className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
             >
               <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider uppercase">
@@ -838,7 +837,11 @@ export default function ForeningDetaljePage() {
 
                               {e.image_url ? (
                                 <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                                  <img src={getEventImageUrl(e.image_url)} className="w-full h-full object-cover" alt="" />
+                                  <img
+                                    src={getEventImageUrl(e.image_url)}
+                                    className="w-full h-full object-cover"
+                                    alt=""
+                                  />
                                 </div>
                               ) : null}
                             </div>
@@ -985,7 +988,9 @@ export default function ForeningDetaljePage() {
                           <p className="font-black text-sm text-[#131921] truncate">
                             {u.name || u.username || (u.email ? u.email.split('@')[0] : 'Ukendt')}
                           </p>
-                          <p className="text-[11px] text-gray-500 font-bold truncate">{u.username ? `@${u.username}` : u.email}</p>
+                          <p className="text-[11px] text-gray-500 font-bold truncate">
+                            {u.username ? `@${u.username}` : u.email}
+                          </p>
                         </div>
                       </div>
 
@@ -1021,7 +1026,11 @@ export default function ForeningDetaljePage() {
             <div className="text-center mb-6">
               <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden mx-auto mb-3">
                 {getAvatarUrl(selectedMember.users?.avatar_url) ? (
-                  <img src={getAvatarUrl(selectedMember.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                  <img
+                    src={getAvatarUrl(selectedMember.users?.avatar_url)!}
+                    className="w-full h-full object-cover"
+                    alt=""
+                  />
                 ) : (
                   <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl font-black">?</div>
                 )}
@@ -1051,7 +1060,10 @@ export default function ForeningDetaljePage() {
       {isApprovedMember && showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative max-h-[80vh] overflow-y-auto">
-            <button onClick={() => setShowMembers(false)} className="absolute top-4 right-4 text-gray-400 text-xl font-black">
+            <button
+              onClick={() => setShowMembers(false)}
+              className="absolute top-4 right-4 text-gray-400 text-xl font-black"
+            >
               ✕
             </button>
 
@@ -1059,7 +1071,11 @@ export default function ForeningDetaljePage() {
               <div className="flex flex-col items-center pt-4">
                 <div className="w-24 h-24 rounded-2xl bg-gray-100 overflow-hidden mb-4">
                   {getAvatarUrl(selectedMember.users?.avatar_url) ? (
-                    <img src={getAvatarUrl(selectedMember.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                    <img
+                      src={getAvatarUrl(selectedMember.users?.avatar_url)!}
+                      className="w-full h-full object-cover"
+                      alt=""
+                    />
                   ) : (
                     <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl font-black">?</div>
                   )}
@@ -1075,7 +1091,10 @@ export default function ForeningDetaljePage() {
                   Skriv til medlem
                 </button>
 
-                <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 mt-2 hover:text-black">
+                <button
+                  onClick={() => setSelectedMember(null)}
+                  className="text-sm font-bold text-gray-400 mt-2 hover:text-black"
+                >
                   ← Tilbage
                 </button>
               </div>

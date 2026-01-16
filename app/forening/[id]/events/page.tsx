@@ -6,10 +6,6 @@ import { supabase } from '../../../../lib/supabaseClient';
 import SiteHeader from '../../../../components/SiteHeader';
 import ForeningEvents from '../../../../components/ForeningEvents';
 
-/**
- * EventsPage - Websiden der viser aktiviteter for en specifik forening.
- * Inkluderer rettelse til håndtering af unikke constraints ved tilmelding.
- */
 export default function EventsPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -21,17 +17,20 @@ export default function EventsPage() {
 
   useEffect(() => {
     async function checkAccess() {
+      // Hent session for at få den nuværende brugers ID
       const { data: { session } } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id || null;
       setUserId(currentUserId);
 
       if (currentUserId && id) {
+        // Tjek medlemskab og rolle. 
+        // maybeSingle() returnerer null i stedet for fejl, hvis rækken ikke findes.
         const { data: m } = await supabase
           .from('foreningsmedlemmer')
           .select('rolle, status')
           .eq('forening_id', id)
           .eq('user_id', currentUserId)
-          .maybeSingle(); // Brug maybeSingle for at undgå fejl hvis rækken ikke findes
+          .maybeSingle();
 
         setIsAdmin(m?.rolle === 'admin' || m?.rolle === 'administrator');
         setIsMember(m?.status === 'approved');
@@ -66,16 +65,12 @@ export default function EventsPage() {
           <button 
             onClick={handleClose}
             className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-[#131921] rounded-full text-gray-500 hover:text-white transition-all shadow-sm"
-            title="Gå tilbage"
           >
             <span className="font-black text-xl">✕</span>
           </button>
         </div>
 
-        {/* Komponenten nedenfor skal håndtere tilmeldingen. 
-          Fejlen 'duplicate key' i din popup skyldes, at koden i ForeningEvents 
-          forsøger at køre en .insert() på en bruger, der allerede er tilmeldt.
-        */}
+        {/* ForeningEvents håndterer selve listen og tilmeldingerne */}
         <ForeningEvents 
            foreningId={id as string} 
            userId={userId} 
