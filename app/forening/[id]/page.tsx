@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
+// Vi behøver ikke next/image, når vi bruger standard <img> tag som failsafe
+// import Image from 'next/image'; 
 
 // --- TYPER ---
 type Forening = {
@@ -14,14 +16,12 @@ type Forening = {
   beskrivelse: string;
   billede_url?: string;
   oprettet_af?: string;
-  slug?: string;
-  is_public?: boolean;
 };
 
 type Medlem = {
   user_id: string;
   rolle?: string | null;
-  status?: 'pending' | 'approved' | 'declined' | null;
+  status?: "pending" | "approved" | "declined" | null;
   users?: {
     name?: string | null;
     username?: string | null;
@@ -31,64 +31,38 @@ type Medlem = {
 };
 
 type Thread = { id: string; title: string; created_at: string; created_by: string };
-
-type Event = {
-  id: string;
-  title: string;
-  start_at: string;
-  end_at: string;
-  location?: string;
-  price?: number;
-  description?: string;
-  image_url?: string;
-};
-
+type Event = { id: string; title: string; start_at: string; end_at: string; location?: string; price?: number };
 type ImagePreview = { id: number; image_url: string };
-
-type UserSearchResult = {
-  id: string;
-  name: string | null;
-  username: string | null;
-  avatar_url: string | null;
-};
 
 // --- HJÆLPERE ---
 const getDisplayName = (m: any) => {
-  const user = m?.users || m;
+  const user = m?.users || m; 
   const n = user?.name?.trim() || user?.username?.trim();
   if (n) return n;
-  const email = user?.email || '';
-  return email.includes('@') ? email.split('@')[0] : 'Ukendt';
+  const email = user?.email || "";
+  return email.includes("@") ? email.split("@")[0] : "Ukendt";
 };
 
 const getAvatarUrl = (path: string | null | undefined) => {
   if (!path) return null;
-  if (path.startsWith('http')) return path;
+  if (path.startsWith('http')) return path; 
   const { data } = supabase.storage.from('avatars').getPublicUrl(path);
   return data.publicUrl;
 };
 
+// ✅ HJÆLPER: Sikrer korrekt URL til event-billeder
 const getEventImageUrl = (path: string | null | undefined) => {
-  if (!path) return '';
+  if (!path) return null;
   if (path.startsWith('http')) return path;
+  // Henter public URL fra din bucket (ret 'event_images' hvis din bucket hedder noget andet)
   const { data } = supabase.storage.from('event_images').getPublicUrl(path);
   return data.publicUrl;
 };
 
-const makeUuid = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
+const fmtDate = (d: string) => new Date(d).toLocaleDateString("da-DK", { day: 'numeric', month: 'short' });
+const fmtTime = (d: string) => new Date(d).toLocaleTimeString("da-DK", { hour: '2-digit', minute: '2-digit' });
 
-const fmtDate = (d: any) =>
-  new Date(d).toLocaleDateString('da-DK', { day: 'numeric', month: 'long' });
-
-const fmtTime = (d: any) =>
-  new Date(d).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
-
+// --- KALENDER HJÆLPERE ---
 const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
 const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
 const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
@@ -97,886 +71,670 @@ const toKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 const buildMonthGrid = (base: Date) => {
   const first = startOfMonth(base);
   const last = endOfMonth(base);
-  const firstWeekday = (first.getDay() + 6) % 7; // Monday=0
+  const firstWeekday = (first.getDay() + 6) % 7; 
   const daysInMonth = last.getDate();
   const cells: Date[] = [];
-
+  
   for (let i = 0; i < firstWeekday; i++) {
     const d = new Date(first);
     d.setDate(first.getDate() - (firstWeekday - i));
     cells.push(d);
   }
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(base.getFullYear(), base.getMonth(), d));
-
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(new Date(base.getFullYear(), base.getMonth(), d));
+  }
   while (cells.length < 42) {
     const lastCell = cells[cells.length - 1];
     const next = new Date(lastCell);
     next.setDate(lastCell.getDate() + 1);
     cells.push(next);
   }
-
+  
   const weeks: Date[][] = [];
   for (let i = 0; i < 6; i++) weeks.push(cells.slice(i * 7, i * 7 + 7));
   return weeks;
 };
 
-// --- EVENT "TYPE" ---
-const getEventType = (e: Event): 'paid' | 'online' | 'normal' => {
-  const price = typeof e.price === 'number' ? e.price : 0;
-  const loc = (e.location || '').toLowerCase();
-  const isOnline = loc.includes('online') || loc.includes('zoom') || loc.includes('teams') || loc.includes('meet');
-
-  if (price > 0) return 'paid';
-  if (isOnline) return 'online';
-  return 'normal';
-};
-
-const dayColorClass = (events: Event[]) => {
-  if (!events || events.length === 0) return '';
-  const types = new Set(events.map(getEventType));
-  if (types.has('paid')) return 'bg-purple-600 text-white';
-  if (types.has('online')) return 'bg-emerald-600 text-white';
-  return 'bg-[#131921] text-white'; 
-};
-
-const typePill = (e: Event) => {
-  const t = getEventType(e);
-  if (t === 'paid') return { label: 'Betalt', cls: 'bg-purple-100 text-purple-700' };
-  if (t === 'online') return { label: 'Online', cls: 'bg-emerald-100 text-emerald-700' };
-  return { label: 'Aktivitet', cls: 'bg-blue-100 text-blue-700' };
-};
-
 export default function ForeningDetaljePage() {
   const params = useParams();
   const router = useRouter();
-
-  const idOrSlug = params.id as string;
-  const [realForeningId, setRealForeningId] = useState<string | null>(null);
-
+  const id = params.id as string;
+  
   const [loading, setLoading] = useState(true);
   const [forening, setForening] = useState<Forening | null>(null);
   const [medlemmer, setMedlemmer] = useState<Medlem[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-
+  
+  // STATE TIL REDIGERING
   const [isEditing, setIsEditing] = useState(false);
-  const [editNavn, setEditNavn] = useState('');
-  const [editSted, setEditSted] = useState('');
-  const [editDescription, setEditDescription] = useState('');
+  const [editDescription, setEditDescription] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Previews Data
   const [threads, setThreads] = useState<Thread[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [images, setImages] = useState<ImagePreview[]>([]);
 
+  // Kalender State
   const [monthCursor, setMonthCursor] = useState(new Date());
   const [calendarEvents, setCalendarEvents] = useState<Event[]>([]);
+  const [selectedDateEvents, setSelectedDateEvents] = useState<{date: string, events: Event[]} | null>(null);
 
+  // Modal State
   const [showMembers, setShowMembers] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Medlem | null>(null);
-
-  const [showFirstMessageModal, setShowFirstMessageModal] = useState(false);
-  const [firstMessageText, setFirstMessageText] = useState('');
-  const [isSendingFirstMessage, setIsSendingFirstMessage] = useState(false);
-
-  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) setUserId(session.user.id);
+      await Promise.all([
+        fetchForening(), 
+        fetchMedlemmer(),
+        fetchThreads(),
+        fetchEvents(),
+        fetchImages()
+      ]);
+      setLoading(false);
+    };
+    init();
+  }, [id]);
 
   useEffect(() => {
-    async function loadAllData() {
-      setLoading(true);
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+    fetchCalendarEvents(monthCursor);
+  }, [id, monthCursor]);
 
-        const currentUserId = session?.user?.id || null;
-        setUserId(currentUserId);
-
-        if (!idOrSlug) return;
-
-        const isUuid =
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-
-        let query = supabase.from('foreninger').select('*');
-        if (isUuid) query = query.eq('id', idOrSlug);
-        else query = query.eq('slug', idOrSlug);
-
-        const { data: foreningData, error } = await query.single();
-        if (error || !foreningData) {
-          setForening(null);
-          setLoading(false);
-          return;
-        }
-
-        setForening(foreningData);
-        setRealForeningId(foreningData.id);
-        setEditNavn(foreningData.navn || '');
-        setEditSted(foreningData.sted || '');
-        setEditDescription(foreningData.beskrivelse || '');
-
-        const fId = foreningData.id;
-
-        const [res1, res2, res3, res4] = await Promise.all([
-          supabase
-            .from('foreningsmedlemmer')
-            .select(
-              'user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (name, username, avatar_url, email)'
-            )
-            .eq('forening_id', fId),
-          supabase
-            .from('forening_threads')
-            .select('*')
-            .eq('forening_id', fId)
-            .order('created_at', { ascending: false })
-            .limit(3),
-          supabase
-            .from('forening_events')
-            .select('*')
-            .eq('forening_id', fId)
-            .order('start_at', { ascending: false })
-            .limit(3),
-          supabase
-            .from('forening_events')
-            .select('id, title, start_at, end_at, location, price, description, image_url')
-            .eq('forening_id', fId),
-        ]);
-
-        const eventIds = (res4.data || []).map((e: any) => e.id);
-        let imgData: any[] | null = null;
-
-        if (eventIds.length > 0) {
-          const imgRes = await supabase
-            .from('event_images')
-            .select('id, image_url')
-            .in('event_id', eventIds)
-            .order('created_at', { ascending: false })
-            .limit(8);
-          imgData = imgRes.data || null;
-        }
-
-        if (res1.data) setMedlemmer(res1.data as unknown as Medlem[]);
-        if (res2.data) setThreads(res2.data);
-        if (res3.data) setEvents(res3.data);
-        if (res4.data) setCalendarEvents(res4.data as any);
-        if (imgData) setImages(imgData as any);
-
-        setLoading(false);
-      } catch (err) {
-        setLoading(false);
-      }
-    }
-
-    loadAllData();
-  }, [idOrSlug, router]);
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !realForeningId) return;
-    const file = e.target.files[0];
-
-    setUploading(true);
-    const fileName = `${realForeningId}_${Date.now()}`;
-    const { error: uploadError } = await supabase.storage.from('foreningsbilleder').upload(fileName, file);
-
-    if (!uploadError) {
-      const { data } = supabase.storage.from('foreningsbilleder').getPublicUrl(fileName);
-      await supabase.from('foreninger').update({ billede_url: data.publicUrl }).eq('id', realForeningId);
-      window.location.reload();
-    }
-    setUploading(false);
+  const fetchForening = async () => {
+    const { data } = await supabase.from("foreninger").select("*").eq("id", id).single();
+    setForening(data);
+    if (data) setEditDescription(data.beskrivelse || "");
   };
 
-  const handleOpenMessageModal = (member: Medlem) => {
-    setSelectedMember(member);
-    setShowFirstMessageModal(true);
+  const fetchMedlemmer = async () => {
+    const { data } = await supabase
+      .from("foreningsmedlemmer")
+      .select("user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (name, username, avatar_url, email)")
+      .eq("forening_id", id);
+    if (data) setMedlemmer(data as unknown as Medlem[]);
   };
 
-  const handleSendFirstMessage = async () => {
-    if (!userId || !selectedMember || !firstMessageText.trim()) return;
+  const fetchThreads = async () => {
+    const { data } = await supabase.from("forening_threads").select("*").eq("forening_id", id).order("created_at", { ascending: false }).limit(3);
+    if (data) setThreads(data);
+  };
 
-    setIsSendingFirstMessage(true);
-    const targetUserId = selectedMember.user_id;
+  const fetchEvents = async () => {
+    const { data } = await supabase.from("forening_events").select("*").eq("forening_id", id).order("start_at", { ascending: false }).limit(3);
+    if (data) setEvents(data);
+  };
 
+  const fetchCalendarEvents = async (base: Date) => {
+    const first = startOfMonth(base);
+    const last = endOfMonth(base);
+    const bufferStart = new Date(first); bufferStart.setDate(first.getDate() - 7);
+    const bufferEnd = new Date(last); bufferEnd.setDate(last.getDate() + 7);
+
+    const { data } = await supabase
+      .from("forening_events")
+      .select("id, title, start_at, end_at, location, price")
+      .eq("forening_id", id)
+      .gte("start_at", bufferStart.toISOString())
+      .lte("start_at", bufferEnd.toISOString());
+    
+    if (data) setCalendarEvents(data);
+  };
+
+  // ✅ OPDATERET BILLEDE HENTNING: Finder de seneste 8 billeder
+  const fetchImages = async () => {
     try {
-      const { data: existingThread } = await supabase
-        .from('messages')
-        .select('thread_id')
-        .or(
-          `and(sender_id.eq.${userId},receiver_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},receiver_id.eq.${userId})`
-        )
-        .limit(1)
-        .maybeSingle();
+      const { data: allEvents, error: evErr } = await supabase
+        .from("forening_events")
+        .select("id")
+        .eq("forening_id", id);
 
-      const threadIdToUse = existingThread?.thread_id || makeUuid();
+      if (evErr || !allEvents || allEvents.length === 0) {
+        setImages([]);
+        return;
+      }
 
-      const { error: sendErr } = await supabase.from('messages').insert([
-        {
-          thread_id: threadIdToUse,
-          sender_id: userId,
-          receiver_id: targetUserId,
-          text: firstMessageText.trim(),
-          is_read: false,
-        },
-      ]);
+      const eventIds = allEvents.map(e => e.id);
 
-      if (sendErr) throw sendErr;
+      const { data: latestImages, error: imgErr } = await supabase
+        .from("event_images")
+        .select("id, image_url, created_at")
+        .in("event_id", eventIds)
+        .order("created_at", { ascending: false })
+        .limit(8); // ✅ Hent 8 billeder (viser færre på mobil)
 
-      router.push(`/beskeder?id=${threadIdToUse}&dmUser=${targetUserId}`);
+      if (imgErr) {
+        console.error("Fejl ved hentning af billeder:", imgErr);
+        setImages([]);
+        return;
+      }
+
+      setImages((latestImages || []) as any);
     } catch (err) {
-      alert('Kunne ikke sende besked.');
-    } finally {
-      setIsSendingFirstMessage(false);
-      setShowFirstMessageModal(false);
-      setFirstMessageText('');
+      console.error("Fejl ved hentning af billeder:", err);
+      setImages([]);
     }
   };
 
-  const handleSaveInfo = async () => {
-    if (!realForeningId) return;
+  // --- HANDLINGS-FUNKTIONER ---
+
+  const handleSaveDescription = async () => {
+    if (!forening) return;
+    
     const { error } = await supabase
       .from('foreninger')
-      .update({ navn: editNavn, sted: editSted, beskrivelse: editDescription })
-      .eq('id', realForeningId);
+      .update({ beskrivelse: editDescription })
+      .eq('id', id);
 
-    if (!error) {
-      setForening((prev) =>
-        prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription } : null
-      );
+    if (error) {
+      alert("Fejl ved opdatering: " + error.message);
+    } else {
+      setForening({ ...forening, beskrivelse: editDescription });
       setIsEditing(false);
     }
   };
 
-  const togglePublic = async () => {
-    if (!realForeningId || !isMeAdmin) return;
-    const newValue = !forening?.is_public;
-    setForening((prev) => (prev ? { ...prev, is_public: newValue } : null));
-    const { error } = await supabase.from('foreninger').update({ is_public: newValue }).eq('id', realForeningId);
-    if (error) {
-      setForening((prev) => (prev ? { ...prev, is_public: !newValue } : null));
-      alert('Kunne ikke opdatere synlighed.');
-    }
-  };
-
   const handleJoin = async () => {
-    if (!userId || !realForeningId) {
-      router.push('/opret');
-      return;
-    }
-    await supabase
+    if (!userId) return alert("Du skal være logget ind for at blive medlem.");
+    const { error } = await supabase
       .from('foreningsmedlemmer')
-      .insert([{ forening_id: realForeningId, user_id: userId, rolle: 'medlem', status: 'pending' }]);
-    window.location.reload();
+      .insert([{ forening_id: id, user_id: userId, rolle: 'medlem', status: 'pending' }]);
+
+    if (error) {
+      alert('Fejl ved tilmelding: ' + error.message);
+    } else {
+      alert('Din anmodning er sendt! Du afventer nu godkendelse.');
+      fetchMedlemmer(); 
+    }
   };
 
   const handleLeave = async () => {
-    if (!userId || !realForeningId || !confirm('Er du sikker?')) return;
-    await supabase.from('foreningsmedlemmer').delete().eq('forening_id', realForeningId).eq('user_id', userId);
-    window.location.reload();
+    if (!confirm("Er du sikker på, at du vil melde dig ud af foreningen?")) return;
+    
+    const { error } = await supabase
+      .from('foreningsmedlemmer')
+      .delete()
+      .eq('forening_id', id)
+      .eq('user_id', userId);
+
+    if (error) {
+      alert("Fejl: " + error.message);
+    } else {
+      alert("Du har forladt foreningen.");
+      fetchMedlemmer(); 
+    }
+  };
+
+  const triggerImageSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setUploading(true);
+    const fileName = `${id}_${Date.now()}`;
+    
+    const { data, error: uploadError } = await supabase.storage
+      .from('foreningsbilleder') 
+      .upload(fileName, file);
+
+    if (uploadError) {
+      alert("Kunne ikke uploade billede: " + uploadError.message);
+      setUploading(false);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('foreningsbilleder')
+      .getPublicUrl(fileName);
+
+    const { error: dbError } = await supabase
+      .from('foreninger')
+      .update({ billede_url: publicUrlData.publicUrl })
+      .eq('id', id);
+
+    if (dbError) {
+      alert("Fejl ved opdatering af database: " + dbError.message);
+    } else {
+      fetchForening();
+    }
+    setUploading(false);
   };
 
   const handleDeleteForening = async () => {
-    if (!realForeningId || !confirm('Er du sikker?')) return;
-    await supabase.from('foreninger').delete().eq('id', realForeningId);
-    router.push('/opslag');
+    if (!confirm("ADVARSEL: Er du sikker på, at du vil slette denne forening permanent? Dette kan ikke fortrydes.")) return;
+    
+    const { error } = await supabase
+      .from('foreninger')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert("Kunne ikke slette forening: " + error.message);
+    } else {
+      alert("Foreningen er slettet.");
+      router.push('/opslag'); 
+    }
   };
 
   const promoteToAdmin = async (targetUserId: string) => {
-    if (!realForeningId || !confirm('Er du sikker?')) return;
-    await supabase
+    if (!confirm("Er du sikker på, at du vil give denne person administrator-rettigheder?")) return;
+
+    const { error } = await supabase
       .from('foreningsmedlemmer')
       .update({ rolle: 'admin' })
-      .eq('forening_id', realForeningId)
+      .eq('forening_id', id)
       .eq('user_id', targetUserId);
-    window.location.reload();
+
+    if (error) {
+      alert("Fejl: " + error.message);
+    } else {
+      alert("Brugeren er nu administrator.");
+      fetchMedlemmer(); 
+      setSelectedMember(null); 
+      setShowMembers(false);
+    }
   };
 
-  const approved = medlemmer.filter((m) => m.status === 'approved');
-  const myMembership = medlemmer.find((m) => m.user_id === userId);
-  const isApprovedMember = myMembership?.status === 'approved';
-  const isPending = myMembership?.status === 'pending';
+  // Beregn status
+  const approved = medlemmer.filter(m => m.status === "approved");
+  const pending = medlemmer.filter(m => m.status === "pending");
+  
+  const myMembership = medlemmer.find(m => m.user_id === userId);
+  const isMember = myMembership?.status === "approved";
+  const isPending = myMembership?.status === "pending";
   const isOwner = forening?.oprettet_af === userId;
-  const isMeAdmin = isOwner || myMembership?.rolle === 'admin';
+  const isMeAdmin = isOwner || myMembership?.rolle === 'admin'; 
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, Event[]>();
-    for (const e of calendarEvents) {
+    calendarEvents.forEach(e => {
       const key = toKey(new Date(e.start_at));
       const list = map.get(key) || [];
       list.push(e);
       map.set(key, list);
-    }
-    for (const [k, list] of map.entries()) {
-      list.sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
-      map.set(k, list);
-    }
+    });
     return map;
   }, [calendarEvents]);
 
-  const todayKey = useMemo(() => toKey(new Date()), []);
+  const changeMonth = (delta: number) => {
+    setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+  };
 
-  const selectedDayEvents = useMemo(() => {
-    if (!selectedDayKey) return [];
-    return eventsByDate.get(selectedDayKey) || [];
-  }, [eventsByDate, selectedDayKey]);
-
-  const selectedDayLabel = useMemo(() => {
-    if (!selectedDayKey) return '';
-    const [y, m, d] = selectedDayKey.split('-').map((x) => parseInt(x, 10));
-    const dt = new Date(y, m - 1, d);
-    return dt.toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' });
-  }, [selectedDayKey]);
-
-  if (loading)
-    return (
-      <div className="min-h-screen bg-[#869FB9] flex items-center justify-center font-black text-white">
-        Indlæser...
-      </div>
-    );
-  if (!forening)
-    return (
-      <div className="min-h-screen bg-[#869FB9] p-10 text-center text-white">Forening ikke fundet</div>
-    );
+  if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>;
+  if (!forening) return <div className="min-h-screen bg-[#869FB9] p-10 text-center text-white">Forening ikke fundet</div>;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
 
       <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20 space-y-6">
-        <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
+        
+        <input 
+          type="file" 
+          accept="image/*" 
+          ref={fileInputRef} 
+          className="hidden" 
+          onChange={handleImageUpload}
+        />
 
+        {/* --- FORENING INFO KORT --- */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
             {forening.billede_url ? (
               <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">
-                Ingen forside
-              </div>
-            )}
-            {uploading && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-black">
-                Uploader...
-              </div>
+              <div className="w-full h-full flex items-center justify-center text-gray-400">Intet billede</div>
             )}
           </div>
 
+          <div>
+            <h1 className="text-2xl font-black text-[#131921] mb-1 underline decoration-gray-300">{forening.navn}</h1>
+            <p className="text-gray-700 font-bold">{forening.sted}</p>
+          </div>
+          
+          {/* BESKRIVELSE */}
           <div className="w-full">
             {isEditing ? (
               <div className="flex flex-col gap-3">
-                <input
-                  value={editNavn}
-                  onChange={(e) => setEditNavn(e.target.value)}
-                  className="w-full p-3 border rounded-xl text-black font-black"
-                />
-                <input
-                  value={editSted}
-                  onChange={(e) => setEditSted(e.target.value)}
-                  className="w-full p-3 border rounded-xl text-black font-black"
-                  placeholder="Sted"
-                />
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  className="w-full min-h-[120px] p-3 border rounded-xl text-black"
+                  style={{ color: '#000000' }}
+                  className="w-full min-h-[150px] p-3 border border-gray-300 rounded-xl focus:outline-none focus:border-[#131921] text-sm text-gray-900 placeholder-gray-500 bg-white"
+                  placeholder="Skriv foreningens beskrivelse her..."
                 />
-                <div className="flex gap-2 justify-end pt-2">
-                  <button
+                <div className="flex gap-2 justify-end">
+                  <button 
                     onClick={() => setIsEditing(false)}
-                    className="px-4 py-2 bg-gray-100 rounded-full text-xs font-bold text-gray-700"
+                    className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-full text-xs font-bold hover:bg-gray-200 transition-colors"
                   >
                     ANNULLER
                   </button>
-                  <button
-                    onClick={handleSaveInfo}
-                    className="px-4 py-2 bg-[#131921] text-white rounded-full text-xs font-bold"
+                  <button 
+                    onClick={handleSaveDescription}
+                    className="px-4 py-2.5 bg-[#131921] text-white rounded-full text-xs font-bold hover:bg-gray-900 transition-colors"
                   >
-                    GEM
+                    GEM ÆNDRINGER
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">
-                  {forening.navn}
-                </h1>
-                <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
-                <p className="text-[#444] text-sm whitespace-pre-wrap">{forening.beskrivelse}</p>
-
-                {isApprovedMember && (
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    <button
-                      onClick={() => navigator.clipboard.writeText(window.location.href)}
-                      className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase"
-                    >
-                      Kopiér link
-                    </button>
-                    {isMeAdmin && (
-                      <>
-                        <button
-                          onClick={() => setIsEditing(true)}
-                          className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase"
-                        >
-                          Rediger tekst
-                        </button>
-                        <button
-                          onClick={togglePublic}
-                          className={`px-4 py-2 text-xs font-bold rounded-full uppercase ${
-                            forening.is_public
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-orange-100 text-orange-700'
-                          }`}
-                        >
-                          {forening.is_public ? 'Offentlig' : 'Privat'}
-                        </button>
-                      </>
-                    )}
-                  </div>
+              <div className="flex flex-col gap-2">
+                <p className="text-[#444] text-sm leading-relaxed whitespace-pre-wrap">
+                  {forening.beskrivelse}
+                </p>
+                {isMeAdmin && (
+                  <button 
+                    onClick={() => setIsEditing(true)}
+                    className="self-start px-4 py-2 bg-[#131921] text-white text-[10px] font-bold rounded-full uppercase tracking-wider hover:bg-gray-900 transition-colors"
+                  >
+                    Rediger tekst
+                  </button>
                 )}
               </div>
             )}
           </div>
 
-          {!isApprovedMember &&
-            (isPending ? (
-              <div className="w-full py-3 bg-gray-400 text-white rounded-full font-bold text-center">
-                Anmodning sendt - afventer godkendelse
-              </div>
+          {!isMember && (
+            isPending ? (
+               <div className="w-full py-3 bg-gray-400 text-white rounded-full font-bold text-center cursor-default">
+                 Afventer godkendelse...
+               </div>
             ) : (
-              <button
+              <button 
                 onClick={handleJoin}
-                className="w-full py-3 bg-[#131921] text-white rounded-full font-bold"
+                className="w-full py-3 bg-[#131921] text-white rounded-full font-bold shadow-md hover:bg-gray-900 transition-colors"
               >
                 Bliv medlem
               </button>
-            ))}
+            )
+          )}
         </div>
 
-        {isApprovedMember && (
-          <>
-            <button
-              onClick={() => router.push(`/beskeder?id=${realForeningId}`)}
-              className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
-            >
-              <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">
-                BESKEDER
-              </div>
-            </button>
+        {/* --- BESKEDER KNAP --- */}
+        <button 
+          onClick={() => router.push(`/beskeder?id=${id}`)}
+          className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
+        >
+           <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">
+             BESKEDER
+           </div>
+        </button>
 
-            <div className="bg-white rounded-[24px] p-4 shadow-sm relative">
-              <div className="flex justify-between items-center mb-3 px-2">
-                <h3 className="font-black text-[#131921]">MEDLEMMER</h3>
-                <button onClick={() => setShowMembers(true)} className="text-xs font-bold text-gray-500">
-                  Se alle
-                </button>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-2 px-2 scrollbar-hide">
-                {approved.map((m) => (
-                  <div
-                    key={m.user_id}
-                    className="flex flex-col items-center min-w-[64px] cursor-pointer"
-                    onClick={() => {
-                      setSelectedMember(m);
-                      setShowMembers(true);
-                    }}
-                  >
-                    <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
-                      {getAvatarUrl(m.users?.avatar_url) ? (
-                        <img
-                          src={getAvatarUrl(m.users?.avatar_url)!}
-                          className="w-full h-full object-cover"
-                          alt=""
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">
-                          ?
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-xs font-bold text-black truncate w-16 text-center">
-                      {getDisplayName(m)}
-                    </span>
+        {/* --- MEDLEMMER PREVIEW --- */}
+        <div className="bg-white rounded-[24px] p-4 shadow-sm">
+          <div className="flex justify-between items-center mb-3 px-2">
+            <h3 className="font-black text-[#131921]">MEDLEMMER</h3>
+            <button onClick={() => setShowMembers(true)} className="text-xs font-bold text-gray-500 hover:text-black">Se alle</button>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-2 px-2 scrollbar-hide">
+            {approved.map(m => {
+              const avatarSrc = getAvatarUrl(m.users?.avatar_url);
+              return (
+                <div key={m.user_id} className="flex flex-col items-center min-w-[64px] cursor-pointer" onClick={() => { setSelectedMember(m); setShowMembers(true); }}>
+                  <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
+                    {avatarSrc ? <img src={avatarSrc} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div
-              onClick={() => router.push(`/forening/${realForeningId}/threads`)}
-              className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            >
-              <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
-                SAMTALER
-              </div>
-              {threads.length === 0 ? (
-                <p className="text-sm text-gray-400">Ingen tråde endnu.</p>
-              ) : (
-                <div className="space-y-3">
-                  {threads.map((t, idx) => (
-                    <div
-                      key={t.id}
-                      className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}
-                    >
-                      <div>
-                        <h4 className="font-bold text-[#131921] text-lg">{t.title}</h4>
-                        <p className="text-xs text-gray-500 mt-1">Oprettet {fmtDate(t.created_at)}</p>
-                      </div>
-                    </div>
-                  ))}
+                  <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
                 </div>
-              )}
-            </div>
-
-            <div
-              onClick={() => router.push(`/forening/${realForeningId}/events`)}
-              className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            >
-              <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
-                AKTIVITETER
-              </div>
-              {events.length === 0 ? (
-                <p className="text-sm text-gray-400">Ingen aktiviteter endnu.</p>
-              ) : (
-                <div className="space-y-3">
-                  {events.map((e, idx) => (
-                    <div
-                      key={e.id}
-                      className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}
-                    >
-                      <div>
-                        <h4 className="font-bold text-[#131921] text-lg">{e.title}</h4>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {fmtDate(e.start_at)} {e.location && `• ${e.location}`}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* KALENDER */}
-            <div className="bg-white rounded-[24px] p-4 shadow-sm">
-              <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
-                KALENDER
-              </div>
-
-              <div className="flex items-center justify-between mb-3 px-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-                    setSelectedDayKey(null);
-                  }}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200"
-                >
-                  ❮
-                </button>
-                <h3 className="font-black text-[#131921] text-xl capitalize">
-                  {monthCursor.toLocaleDateString('da-DK', { month: 'long', year: 'numeric' })}
-                </h3>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-                    setSelectedDayKey(null);
-                  }}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200"
-                >
-                  ❯
-                </button>
-              </div>
-
-              <div className="grid grid-cols-7 gap-1.5 px-1 mb-2 text-[10px] font-black text-gray-400 uppercase tracking-wider">
-                {['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'].map((d) => (
-                  <div key={d} className="text-center">
-                    {d}
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7 gap-1.5">
-                {buildMonthGrid(monthCursor).map((week) =>
-                  week.map((day, idx) => {
-                    const key = toKey(day);
-                    const dayEvents = eventsByDate.get(key) || [];
-                    const hasEvents = dayEvents.length > 0;
-                    const isOtherMonth = day.getMonth() !== monthCursor.getMonth();
-                    const isToday = key === todayKey;
-                    const isSelected = key === selectedDayKey;
-
-                    const colored = hasEvents ? dayColorClass(dayEvents) : '';
-                    const baseBg = hasEvents ? colored : 'bg-transparent';
-                    const baseText = hasEvents ? '' : isOtherMonth ? 'text-gray-300' : 'text-gray-800';
-
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!hasEvents) {
-                            setSelectedDayKey(null);
-                            return;
-                          }
-                          setSelectedDayKey(key);
-                        }}
-                        className={[
-                          'aspect-square rounded-xl relative flex items-center justify-center text-sm font-bold transition-all',
-                          baseBg,
-                          baseText,
-                          hasEvents ? 'shadow-sm hover:shadow-md' : '',
-                          hasEvents ? 'hover:scale-[1.02]' : '',
-                          isToday && !hasEvents ? 'ring-2 ring-[#131921]' : '',
-                          isSelected ? 'ring-4 ring-white/70' : '',
-                        ].join(' ')}
-                        title={hasEvents ? `${dayEvents.length} aktivitet(er)` : ''}
-                      >
-                        <span>{day.getDate()}</span>
-
-                        {hasEvents && dayEvents.length > 1 && (
-                          <span className="absolute top-1 right-1 text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">
-                            {dayEvents.length}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-
-              {selectedDayKey && selectedDayEvents.length > 0 && (
-                <div className="mt-4 bg-[#F9FBFC] border border-gray-100 rounded-2xl p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-black uppercase tracking-widest text-gray-500">
-                        Aktiviteter
-                      </p>
-                      <h4 className="text-lg font-black text-[#131921] capitalize">{selectedDayLabel}</h4>
-                    </div>
-                    <button
-                      onClick={() => setSelectedDayKey(null)}
-                      className="text-gray-400 font-black text-xl leading-none hover:text-black"
-                      aria-label="Luk"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <div className="mt-3 space-y-3">
-                    {selectedDayEvents.map((e) => {
-                      const pill = typePill(e);
-                      const time = `${fmtTime(e.start_at)}–${fmtTime(e.end_at)}`;
-                      const price = typeof e.price === 'number' && e.price > 0 ? `${e.price} kr.` : 'Gratis';
-
-                      return (
-                        <div key={e.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full ${pill.cls}`}>
-                                  {pill.label}
-                                </span>
-                                <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                                  {time}
-                                </span>
-                              </div>
-                              <h5 className="font-black text-[#131921] text-base truncate">{e.title}</h5>
-                              <p className="text-xs text-gray-600 font-bold mt-1">
-                                {e.location ? e.location : 'Lokation ikke angivet'} • {price}
-                              </p>
-                              {e.description && (
-                                <p className="text-sm text-gray-700 mt-2 line-clamp-3 whitespace-pre-wrap">
-                                  {e.description}
-                                </p>
-                              )}
-                            </div>
-
-                            {e.image_url ? (
-                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                                <img src={getEventImageUrl(e.image_url)} className="w-full h-full object-cover" alt="" />
-                              </div>
-                            ) : null}
-                          </div>
-
-                          <div className="mt-3 flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => router.push(`/forening/${realForeningId}/events?event=${e.id}`)}
-                              className="px-4 py-2 rounded-full bg-[#131921] text-white font-black text-xs hover:bg-black transition-colors"
-                            >
-                              Åbn aktivitet / join
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-3 flex justify-end">
-                    <button
-                      onClick={() => router.push(`/forening/${realForeningId}/events`)}
-                      className="text-xs font-black text-[#131921] underline"
-                    >
-                      Se alle aktiviteter →
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div
-              onClick={() => router.push(`/forening/${realForeningId}/images`)}
-              className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            >
-              <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
-                BILLEDER
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {images.length === 0 ? (
-                  <p className="text-sm text-gray-400">Ingen billeder endnu.</p>
-                ) : (
-                  images.map((img) => (
-                    <div key={img.id} className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                      <img src={getEventImageUrl(img.image_url)} className="w-full h-full object-cover" alt="Event" />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-[24px] p-4 shadow-sm flex flex-col md:flex-row gap-3 mb-10">
-              <button
-                onClick={handleLeave}
-                className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-full font-bold hover:bg-gray-200 transition-colors"
-              >
-                Afslut medlemskab
-              </button>
-              {isMeAdmin && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 py-3 bg-[#e9eef5] text-[#131921] rounded-full font-bold hover:bg-[#d0dbe9] transition-colors"
-                >
-                  Skift billede
-                </button>
-              )}
-              {isOwner && (
-                <button
-                  onClick={handleDeleteForening}
-                  className="flex-1 py-3 bg-red-100 text-red-600 rounded-full font-bold hover:bg-red-200 transition-colors"
-                >
-                  Slet forening
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </main>
-
-      {/* MODALER... (uændret herfra) */}
-      {isApprovedMember && showFirstMessageModal && selectedMember && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-6 relative">
-            <button
-              onClick={() => {
-                setShowFirstMessageModal(false);
-                setFirstMessageText('');
-              }}
-              className="absolute top-4 right-4 text-gray-400 text-xl font-black"
-            >
-              ✕
-            </button>
-            <div className="text-center mb-6">
-              <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden mx-auto mb-3">
-                {getAvatarUrl(selectedMember.users?.avatar_url) ? (
-                  <img src={getAvatarUrl(selectedMember.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
-                ) : (
-                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl font-black">?</div>
-                )}
-              </div>
-              <h3 className="text-xl font-bold text-[#131921]">Skriv til {getDisplayName(selectedMember)}</h3>
-            </div>
-            <textarea
-              value={firstMessageText}
-              onChange={(e) => setFirstMessageText(e.target.value)}
-              placeholder="Skriv din første besked her..."
-              className="w-full h-32 p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-[#131921] transition-all font-medium text-black"
-            />
-            <button
-              onClick={handleSendFirstMessage}
-              disabled={isSendingFirstMessage || !firstMessageText.trim()}
-              className="w-full py-4 mt-4 bg-[#131921] text-white rounded-full font-black shadow-lg hover:bg-black transition-all active:scale-95 disabled:opacity-50"
-            >
-              {isSendingFirstMessage ? 'Sender...' : 'Send besked'}
-            </button>
+              );
+            })}
+            {approved.length === 0 && <p className="text-sm text-gray-400">Ingen medlemmer endnu.</p>}
           </div>
         </div>
-      )}
 
-      {isApprovedMember && showMembers && (
+        {/* --- SAMTALER PREVIEW --- */}
+        <div 
+          onClick={() => router.push(`/forening/${id}/threads`)} 
+          className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+        >
+          <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
+            SAMTALER
+          </div>
+          {threads.length === 0 ? <p className="text-sm text-gray-400">Ingen tråde endnu.</p> : (
+            <div className="space-y-3">
+              {threads.map((t, idx) => (
+                <div key={t.id} className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
+                  <div>
+                    <h4 className="font-bold text-[#131921] text-lg">{t.title}</h4>
+                    <p className="text-xs text-gray-500 mt-1">Oprettet {fmtDate(t.created_at)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* --- AKTIVITETER PREVIEW --- */}
+        <div 
+          onClick={() => router.push(`/forening/${id}/events`)} 
+          className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+        >
+          <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
+            AKTIVITETER
+          </div>
+          {events.length === 0 ? <p className="text-sm text-gray-400">Ingen aktiviteter endnu.</p> : (
+            <div className="space-y-3">
+              {events.map((e, idx) => (
+                <div key={e.id} className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
+                  <div>
+                    <h4 className="font-bold text-[#131921] text-lg">{e.title}</h4>
+                    <p className="text-xs text-gray-500 mt-1">{fmtDate(e.start_at)} {e.location && `• ${e.location}`}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* --- KALENDER SEKTION --- */}
+        <div className="bg-white rounded-[24px] p-4 shadow-sm">
+          <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
+            KALENDER
+          </div>
+          
+          <div className="flex items-center justify-between mb-4 px-2">
+            <button onClick={() => changeMonth(-1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">‹</button>
+            <h3 className="font-bold text-[#131921] capitalize">
+              {monthCursor.toLocaleDateString("da-DK", { month: 'long', year: 'numeric' })}
+            </h3>
+            <button onClick={() => changeMonth(1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">›</button>
+          </div>
+
+          <div className="grid grid-cols-7 text-center mb-2">
+            {['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'].map(d => (
+              <span key={d} className="text-xs font-bold text-gray-400 uppercase">{d}</span>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {buildMonthGrid(monthCursor).map((week, wIdx) => (
+              week.map((day, dIdx) => {
+                const isCurrentMonth = day.getMonth() === monthCursor.getMonth();
+                const key = toKey(day);
+                const dayEvents = eventsByDate.get(key) || [];
+                const hasEvents = dayEvents.length > 0;
+
+                return (
+                  <div 
+                    key={`${wIdx}-${dIdx}`} 
+                    onClick={() => hasEvents && setSelectedDateEvents({ date: key, events: dayEvents })}
+                    className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm relative cursor-pointer ${
+                      isCurrentMonth ? 'text-gray-800' : 'text-gray-300'
+                    } ${hasEvents ? 'bg-blue-50 font-bold hover:bg-blue-100' : ''}`}
+                  >
+                    {day.getDate()}
+                    {hasEvents && (
+                      <div className="absolute bottom-1.5 w-1.5 h-1.5 bg-[#131921] rounded-full"></div>
+                    )}
+                  </div>
+                );
+              })
+            ))}
+          </div>
+        </div>
+
+        {/* --- BILLEDER PREVIEW --- */}
+        <div 
+          onClick={() => router.push(`/forening/${id}/images`)} 
+          className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+        >
+          <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
+            BILLEDER
+          </div>
+          {images.length === 0 ? <p className="text-sm text-gray-400">Ingen billeder endnu.</p> : (
+            // ✅ RETTET LAYOUT: Flex wrap med responsiv visning
+            <div className="flex gap-2 mt-2 overflow-x-auto pb-2 scrollbar-hide md:flex-wrap md:overflow-visible">
+              {images.map((img, index) => {
+                const src = getEventImageUrl(img.image_url);
+                return (
+                  // ✅ Vis kun de første 4 på mobil, men alle 8 på desktop (md:block)
+                  <div 
+                    key={img.id} 
+                    className={`w-24 h-24 flex-shrink-0 rounded-[14px] overflow-hidden bg-gray-100 relative ${index >= 4 ? 'hidden md:block' : ''}`}
+                  >
+                    {src ? (
+                      <img 
+                        src={src} 
+                        alt="" 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold">?</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* --- BUND HANDLINGER --- */}
+        <div className="bg-white rounded-[24px] p-4 shadow-sm space-y-3 mb-10">
+           {isMember && (
+             <button 
+               onClick={handleLeave}
+               className="w-full py-3 bg-gray-200 text-gray-600 rounded-full font-bold hover:bg-gray-300 transition-colors"
+             >
+               Afslut medlemskab
+             </button>
+           )}
+           {isOwner && (
+             <>
+               <button 
+                 onClick={triggerImageSelect}
+                 disabled={uploading}
+                 className="w-full py-3 bg-[#131921] text-white rounded-full font-bold hover:bg-gray-900 transition-colors disabled:opacity-50"
+               >
+                 {uploading ? "Uploader..." : "Upload foreningsbillede"}
+               </button>
+               
+               <button 
+                 onClick={handleDeleteForening}
+                 className="w-full py-3 bg-red-100 text-red-600 rounded-full font-bold hover:bg-red-200 transition-colors"
+               >
+                 Slet forening
+               </button>
+             </>
+           )}
+        </div>
+
+      </main>
+      <SiteFooter />
+
+      {/* MEDLEMS MODAL */}
+      {showMembers && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative max-h-[80vh] overflow-y-auto">
-            <button onClick={() => setShowMembers(false)} className="absolute top-4 right-4 text-gray-400 text-xl font-black">
-              ✕
-            </button>
+          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
+            <button onClick={() => setShowMembers(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black text-xl">✕</button>
+            
             {selectedMember ? (
               <div className="flex flex-col items-center pt-4">
-                <div className="w-24 h-24 rounded-2xl bg-gray-100 overflow-hidden mb-4">
-                  {getAvatarUrl(selectedMember.users?.avatar_url) ? (
-                    <img src={getAvatarUrl(selectedMember.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl font-black">?</div>
-                  )}
+                <div className="w-32 h-32 rounded-[20px] bg-gray-100 overflow-hidden mb-4 relative">
+                  {(() => {
+                    const src = getAvatarUrl(selectedMember.users?.avatar_url);
+                    return src ? <img src={src} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-200 flex items-center justify-center text-4xl">?</div>;
+                  })()}
                 </div>
                 <h3 className="text-xl font-bold text-[#131921]">{getDisplayName(selectedMember)}</h3>
-                <p className="text-xs uppercase font-bold text-gray-400 mb-6">{selectedMember.rolle || 'MEDLEM'}</p>
-                <button
-                  onClick={() => handleOpenMessageModal(selectedMember)}
-                  className="w-full py-3 bg-[#131921] text-white rounded-full font-bold mb-3 shadow-lg hover:bg-gray-900 transition-colors"
+                <p className="text-[10px] uppercase font-bold text-[#131921] mb-1">{selectedMember.rolle || 'MEDLEM'}</p>
+                <p className="text-sm text-gray-500 mb-6 font-bold">{selectedMember.users?.email}</p> 
+                
+                <button 
+                  onClick={() => router.push(`/beskeder?dmUser=${selectedMember.user_id}`)}
+                  className="w-full py-3 bg-[#131921] text-white rounded-full font-bold mb-3 hover:bg-gray-900 transition-colors"
                 >
                   Skriv til medlem
                 </button>
+
+                {/* VIS KUN HVIS: Jeg er admin, og den valgte person IKKE er admin */}
                 {isMeAdmin && selectedMember.rolle !== 'admin' && (
-                  <button
+                  <button 
                     onClick={() => promoteToAdmin(selectedMember.user_id)}
                     className="w-full py-3 bg-blue-100 text-blue-700 rounded-full font-bold mb-3 hover:bg-blue-200 transition-colors"
                   >
                     Gør til admin
                   </button>
                 )}
-                <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 mt-2 hover:text-black">
-                  ← Tilbage
-                </button>
+
+                <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 hover:text-black mt-2">← Tilbage til liste</button>
               </div>
             ) : (
-              <div>
-                <h3 className="font-black text-[#131921] mb-4 uppercase tracking-widest text-sm">
-                  MEDLEMMER ({approved.length})
-                </h3>
-                <div className="space-y-2">
-                  {approved.map((m) => (
-                    <div
-                      key={m.user_id}
-                      onClick={() => setSelectedMember(m)}
-                      className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
-                    >
+              <div className="max-h-[60vh] overflow-y-auto">
+                <h3 className="font-black text-[#131921] mb-4">MEDLEMMER ({approved.length})</h3>
+                {approved.map(m => {
+                  const avatarSrc = getAvatarUrl(m.users?.avatar_url);
+                  return (
+                    <div key={m.user_id} onClick={() => setSelectedMember(m)} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-xl cursor-pointer">
                       <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden">
-                        {getAvatarUrl(m.users?.avatar_url) ? (
-                          <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
-                        ) : null}
+                        {avatarSrc ? <img src={avatarSrc} className="w-full h-full object-cover" /> : null}
                       </div>
                       <div>
-                        <p className="font-bold text-sm text-black">{getDisplayName(m)}</p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase">{m.rolle || 'MEDLEM'}</p>
+                        <p className="font-bold text-sm">{getDisplayName(m)}</p>
+                        <p className="text-[10px] text-gray-500 uppercase font-bold text-[#131921]">{m.rolle || 'MEDLEM'}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       )}
 
-      <SiteFooter />
+      {/* KALENDER EVENT MODAL */}
+      {selectedDateEvents && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-5 relative">
+            <button onClick={() => setSelectedDateEvents(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black text-xl">✕</button>
+            
+            <h3 className="font-black text-[#131921] mb-1 capitalize">
+              {new Date(selectedDateEvents.date).toLocaleDateString("da-DK", { weekday: 'long', day: 'numeric', month: 'long' })}
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">{selectedDateEvents.events.length} aktiviteter</p>
+
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+              {selectedDateEvents.events.map(e => (
+                <div key={e.id} className="bg-gray-50 p-3 rounded-xl">
+                  <h4 className="font-bold text-[#131921]">{e.title}</h4>
+                  <p className="text-xs text-gray-600 mt-1">
+                    {fmtTime(e.start_at)} {e.end_at ? `- ${fmtTime(e.end_at)}` : ''}
+                  </p>
+                  {e.location && <p className="text-xs text-gray-500 mt-0.5">📍 {e.location}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
