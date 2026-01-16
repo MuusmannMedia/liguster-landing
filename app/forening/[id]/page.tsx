@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
@@ -23,6 +23,7 @@ type Medlem = {
   rolle?: string | null;
   status?: 'pending' | 'approved' | 'declined' | null;
   users?: {
+    id?: string | null;
     name?: string | null;
     username?: string | null;
     avatar_url?: string | null;
@@ -44,6 +45,14 @@ type Event = {
 };
 
 type ImagePreview = { id: number; image_url: string };
+
+type UserSearchResult = {
+  id: string;
+  name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  email: string | null;
+};
 
 // --- HJÆLPERE ---
 const getDisplayName = (m: any) => {
@@ -76,7 +85,8 @@ const makeUuid = () => {
   });
 };
 
-const fmtDate = (d: any) => new Date(d).toLocaleDateString('da-DK', { day: 'numeric', month: 'long' });
+const fmtDate = (d: any) =>
+  new Date(d).toLocaleDateString('da-DK', { day: 'numeric', month: 'long' });
 
 const fmtTime = (d: any) =>
   new Date(d).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
@@ -112,11 +122,7 @@ const buildMonthGrid = (base: Date) => {
   return weeks;
 };
 
-// ✅ Én type aktivitet -> én farve (meget mørk blå)
-const dayColorClass = (events: Event[]) => {
-  if (!events || events.length === 0) return '';
-  return 'bg-[#131921] text-white';
-};
+const dayColorClass = (hasEvents: boolean) => (hasEvents ? 'bg-[#131921] text-white' : '');
 
 export default function ForeningDetaljePage() {
   const params = useParams();
@@ -154,8 +160,14 @@ export default function ForeningDetaljePage() {
 
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
 
-  // ✅ Læs mere / mindre
   const [descExpanded, setDescExpanded] = useState(false);
+
+  // Invite modal
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteQuery, setInviteQuery] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteResults, setInviteResults] = useState<UserSearchResult[]>([]);
+  const [inviteInfo, setInviteInfo] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadAllData() {
@@ -196,11 +208,21 @@ export default function ForeningDetaljePage() {
           supabase
             .from('foreningsmedlemmer')
             .select(
-              'user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (name, username, avatar_url, email)'
+              'user_id, rolle, status, users:users!foreningsmedlemmer_user_id_fkey (id, name, username, avatar_url, email)'
             )
             .eq('forening_id', fId),
-          supabase.from('forening_threads').select('*').eq('forening_id', fId).order('created_at', { ascending: false }).limit(3),
-          supabase.from('forening_events').select('*').eq('forening_id', fId).order('start_at', { ascending: false }).limit(3),
+          supabase
+            .from('forening_threads')
+            .select('*')
+            .eq('forening_id', fId)
+            .order('created_at', { ascending: false })
+            .limit(3),
+          supabase
+            .from('forening_events')
+            .select('*')
+            .eq('forening_id', fId)
+            .order('start_at', { ascending: false })
+            .limit(3),
           supabase
             .from('forening_events')
             .select('id, title, start_at, end_at, location, price, description, image_url')
@@ -208,7 +230,6 @@ export default function ForeningDetaljePage() {
         ]);
 
         const eventIds = (res4.data || []).map((e: any) => e.id);
-        let imgData: any[] | null = null;
 
         if (eventIds.length > 0) {
           const imgRes = await supabase
@@ -216,24 +237,64 @@ export default function ForeningDetaljePage() {
             .select('id, image_url')
             .in('event_id', eventIds)
             .order('created_at', { ascending: false })
-            .limit(8);
-          imgData = imgRes.data || null;
+            .limit(9);
+          if (imgRes.data) setImages(imgRes.data as any);
         }
 
         if (res1.data) setMedlemmer(res1.data as unknown as Medlem[]);
         if (res2.data) setThreads(res2.data);
         if (res3.data) setEvents(res3.data);
         if (res4.data) setCalendarEvents(res4.data as any);
-        if (imgData) setImages(imgData as any);
 
         setLoading(false);
-      } catch (err) {
+      } catch {
         setLoading(false);
       }
     }
 
     loadAllData();
   }, [idOrSlug, router]);
+
+  const approved = useMemo(() => medlemmer.filter((m) => m.status === 'approved'), [medlemmer]);
+  const myMembership = useMemo(() => medlemmer.find((m) => m.user_id === userId), [medlemmer, userId]);
+  const isApprovedMember = myMembership?.status === 'approved';
+  const isPending = myMembership?.status === 'pending';
+  const isOwner = forening?.oprettet_af === userId;
+  const isMeAdmin = isOwner || myMembership?.rolle === 'admin';
+
+  const memberIdSet = useMemo(() => new Set(medlemmer.map((m) => m.user_id)), [medlemmer]);
+
+  // ✅ event-map pr dato
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, Event[]>();
+    for (const e of calendarEvents) {
+      const key = toKey(new Date(e.start_at));
+      const list = map.get(key) || [];
+      list.push(e);
+      map.set(key, list);
+    }
+    for (const [k, list] of map.entries()) {
+      list.sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+      map.set(k, list);
+    }
+    return map;
+  }, [calendarEvents]);
+
+  const todayKey = useMemo(() => toKey(new Date()), []);
+
+  const selectedDayEvents = useMemo(() => {
+    if (!selectedDayKey) return [];
+    return eventsByDate.get(selectedDayKey) || [];
+  }, [eventsByDate, selectedDayKey]);
+
+  const selectedDayLabel = useMemo(() => {
+    if (!selectedDayKey) return '';
+    const [y, m, d] = selectedDayKey.split('-').map((x) => parseInt(x, 10));
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' });
+  }, [selectedDayKey]);
+
+  const hasLongDesc = (forening?.beskrivelse || '').trim().length > 220;
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !realForeningId) return;
@@ -249,6 +310,102 @@ export default function ForeningDetaljePage() {
       window.location.reload();
     }
     setUploading(false);
+  };
+
+  const handleSaveInfo = async () => {
+    if (!realForeningId) return;
+    const { error } = await supabase
+      .from('foreninger')
+      .update({ navn: editNavn, sted: editSted, beskrivelse: editDescription })
+      .eq('id', realForeningId);
+
+    if (!error) {
+      setForening((prev) => (prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription } : null));
+      setIsEditing(false);
+    } else {
+      alert('Kunne ikke gemme.');
+    }
+  };
+
+  const handleCopyLink = async () => {
+    await navigator.clipboard.writeText(window.location.href);
+    // hold det simpelt
+    alert('Link kopieret ✅');
+  };
+
+  const handleShare = async () => {
+    if (typeof navigator !== 'undefined' && (navigator as any).share) {
+      try {
+        await (navigator as any).share({ title: forening?.navn || 'Forening', url: window.location.href });
+        return;
+      } catch {
+        // ignore
+      }
+    }
+    await handleCopyLink();
+  };
+
+  const handleOpenInvite = () => {
+    setInviteInfo(null);
+    setInviteQuery('');
+    setInviteResults([]);
+    setShowInviteModal(true);
+  };
+
+  const runInviteSearch = async (q: string) => {
+    const query = q.trim();
+    setInviteQuery(q);
+    setInviteInfo(null);
+
+    if (query.length < 2) {
+      setInviteResults([]);
+      return;
+    }
+
+    setInviteLoading(true);
+    try {
+      // Antager I har en "users" tabel med disse felter (som du allerede joiner i foreningsmedlemmer)
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, username, avatar_url, email')
+        .or(`username.ilike.%${query}%,email.ilike.%${query}%,name.ilike.%${query}%`)
+        .limit(10);
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((u: any) => u?.id && !memberIdSet.has(u.id));
+      setInviteResults(filtered as UserSearchResult[]);
+    } catch {
+      setInviteResults([]);
+      setInviteInfo('Kunne ikke søge efter brugere.');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const inviteUser = async (targetUserId: string) => {
+    if (!realForeningId) return;
+    try {
+      const { error } = await supabase.from('foreningsmedlemmer').insert([
+        {
+          forening_id: realForeningId,
+          user_id: targetUserId,
+          rolle: 'medlem',
+          status: 'pending',
+        },
+      ]);
+
+      if (error) {
+        // typisk duplikat/unik constraint
+        setInviteInfo('Kunne ikke invitere (måske er brugeren allerede inviteret).');
+        return;
+      }
+
+      setInviteInfo('Invitation sendt ✅');
+      setInviteResults((prev) => prev.filter((u) => u.id !== targetUserId));
+    } catch {
+      setInviteInfo('Kunne ikke invitere.');
+    }
   };
 
   const handleOpenMessageModal = (member: Medlem) => {
@@ -287,27 +444,12 @@ export default function ForeningDetaljePage() {
       if (sendErr) throw sendErr;
 
       router.push(`/beskeder?id=${threadIdToUse}&dmUser=${targetUserId}`);
-    } catch (err) {
+    } catch {
       alert('Kunne ikke sende besked.');
     } finally {
       setIsSendingFirstMessage(false);
       setShowFirstMessageModal(false);
       setFirstMessageText('');
-    }
-  };
-
-  const handleSaveInfo = async () => {
-    if (!realForeningId) return;
-    const { error } = await supabase
-      .from('foreninger')
-      .update({ navn: editNavn, sted: editSted, beskrivelse: editDescription })
-      .eq('id', realForeningId);
-
-    if (!error) {
-      setForening((prev) =>
-        prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription } : null
-      );
-      setIsEditing(false);
     }
   };
 
@@ -328,97 +470,13 @@ export default function ForeningDetaljePage() {
     window.location.reload();
   };
 
-  const handleDeleteForening = async () => {
-    if (!realForeningId || !confirm('Er du sikker?')) return;
-    await supabase.from('foreninger').delete().eq('id', realForeningId);
-    router.push('/opslag');
-  };
-
-  const promoteToAdmin = async (targetUserId: string) => {
-    if (!realForeningId || !confirm('Er du sikker?')) return;
-    await supabase
-      .from('foreningsmedlemmer')
-      .update({ rolle: 'admin' })
-      .eq('forening_id', realForeningId)
-      .eq('user_id', targetUserId);
-    window.location.reload();
-  };
-
-  // ✅ Kopiér / Del / Inviter
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      alert('Link kopieret ✅');
-    } catch {
-      alert('Kunne ikke kopiere link.');
-    }
-  };
-
-  const handleShare = async () => {
-    const url = window.location.href;
-    try {
-      // @ts-ignore
-      if (navigator.share) {
-        // @ts-ignore
-        await navigator.share({ title: forening?.navn || 'Forening', url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        alert('Link kopieret ✅ (del manuelt)');
-      }
-    } catch {
-      // brugeren kan annullere share — ingen alarm nødvendig
-    }
-  };
-
-  const handleInvite = async () => {
-    // Samme link som foreningen (simpelt og sikkert)
-    await handleShare();
-  };
-
-  const approved = medlemmer.filter((m) => m.status === 'approved');
-  const myMembership = medlemmer.find((m) => m.user_id === userId);
-  const isApprovedMember = myMembership?.status === 'approved';
-  const isPending = myMembership?.status === 'pending';
-  const isOwner = forening?.oprettet_af === userId;
-  const isMeAdmin = isOwner || myMembership?.rolle === 'admin';
-
-  const eventsByDate = useMemo(() => {
-    const map = new Map<string, Event[]>();
-    for (const e of calendarEvents) {
-      const key = toKey(new Date(e.start_at));
-      const list = map.get(key) || [];
-      list.push(e);
-      map.set(key, list);
-    }
-    for (const [k, list] of map.entries()) {
-      list.sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
-      map.set(k, list);
-    }
-    return map;
-  }, [calendarEvents]);
-
-  const todayKey = useMemo(() => toKey(new Date()), []);
-
-  const selectedDayEvents = useMemo(() => {
-    if (!selectedDayKey) return [];
-    return eventsByDate.get(selectedDayKey) || [];
-  }, [eventsByDate, selectedDayKey]);
-
-  const selectedDayLabel = useMemo(() => {
-    if (!selectedDayKey) return '';
-    const [y, m, d] = selectedDayKey.split('-').map((x) => parseInt(x, 10));
-    const dt = new Date(y, m - 1, d);
-    return dt.toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' });
-  }, [selectedDayKey]);
-
-  const hasLongDesc = (forening?.beskrivelse || '').trim().length > 220;
-
   if (loading)
     return (
       <div className="min-h-screen bg-[#869FB9] flex items-center justify-center font-black text-white">
         Indlæser...
       </div>
     );
+
   if (!forening)
     return <div className="min-h-screen bg-[#869FB9] p-10 text-center text-white">Forening ikke fundet</div>;
 
@@ -439,6 +497,7 @@ export default function ForeningDetaljePage() {
                 Ingen forside
               </div>
             )}
+
             {uploading && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-black">
                 Uploader...
@@ -482,15 +541,17 @@ export default function ForeningDetaljePage() {
               </div>
             ) : (
               <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">{forening.navn}</h1>
+                <h1 className="text-2xl font-black text-[#131921] underline decoration-gray-300">
+                  {forening.navn}
+                </h1>
                 <p className="text-gray-700 font-bold mb-3">{forening.sted}</p>
 
-                {/* ✅ Beskrivelse med Læs mere / mindre */}
+                {/* Beskrivelse + læs mere */}
                 <div className="text-[#444] text-sm whitespace-pre-wrap">
                   <p className={descExpanded ? '' : 'line-clamp-4'}>{forening.beskrivelse}</p>
+
                   {hasLongDesc && (
                     <button
-                      type="button"
                       onClick={() => setDescExpanded((v) => !v)}
                       className="mt-2 text-xs font-black text-[#131921] underline"
                     >
@@ -499,7 +560,7 @@ export default function ForeningDetaljePage() {
                   )}
                 </div>
 
-                {/* ✅ Knapper: Kopiér / Del / Rediger / Inviter */}
+                {/* Knapper */}
                 {isApprovedMember && (
                   <div className="flex flex-wrap gap-2 mt-4">
                     <button
@@ -508,7 +569,6 @@ export default function ForeningDetaljePage() {
                     >
                       Kopiér link
                     </button>
-
                     <button
                       onClick={handleShare}
                       className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase"
@@ -524,9 +584,8 @@ export default function ForeningDetaljePage() {
                         >
                           Rediger
                         </button>
-
                         <button
-                          onClick={handleInvite}
+                          onClick={handleOpenInvite}
                           className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase"
                         >
                           Inviter
@@ -559,8 +618,8 @@ export default function ForeningDetaljePage() {
               onClick={() => router.push(`/beskeder?id=${realForeningId}`)}
               className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
             >
-              <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider">
-                BESKEDER
+              <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider uppercase">
+                Beskeder
               </div>
             </button>
 
@@ -572,6 +631,7 @@ export default function ForeningDetaljePage() {
                   Se alle
                 </button>
               </div>
+
               <div className="flex gap-4 overflow-x-auto pb-2 px-2 scrollbar-hide">
                 {approved.map((m) => (
                   <div
@@ -595,52 +655,48 @@ export default function ForeningDetaljePage() {
               </div>
             </div>
 
-            {/* ✅ Samtaler + Aktiviteter side om side */}
+            {/* SIDE OM SIDE: SAMTALER & AKTIVITETER */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* SAMTALER */}
               <div
                 onClick={() => router.push(`/forening/${realForeningId}/threads`)}
                 className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
               >
-                <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
-                  SAMTALER
+                <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3 uppercase">
+                  Samtaler
                 </div>
+
                 {threads.length === 0 ? (
                   <p className="text-sm text-gray-400">Ingen tråde endnu.</p>
                 ) : (
                   <div className="space-y-3">
                     {threads.map((t, idx) => (
-                      <div key={t.id} className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
-                        <div>
-                          <h4 className="font-bold text-[#131921] text-lg">{t.title}</h4>
-                          <p className="text-xs text-gray-500 mt-1">Oprettet {fmtDate(t.created_at)}</p>
-                        </div>
+                      <div key={t.id} className={`${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
+                        <h4 className="font-bold text-[#131921] text-lg">{t.title}</h4>
+                        <p className="text-xs text-gray-500 mt-1">Oprettet {fmtDate(t.created_at)}</p>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* AKTIVITETER */}
               <div
                 onClick={() => router.push(`/forening/${realForeningId}/events`)}
                 className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
               >
-                <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
-                  AKTIVITETER
+                <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3 uppercase">
+                  Aktiviteter
                 </div>
+
                 {events.length === 0 ? (
                   <p className="text-sm text-gray-400">Ingen aktiviteter endnu.</p>
                 ) : (
                   <div className="space-y-3">
                     {events.map((e, idx) => (
-                      <div key={e.id} className={`flex justify-between ${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
-                        <div>
-                          <h4 className="font-bold text-[#131921] text-lg">{e.title}</h4>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {fmtDate(e.start_at)} {e.location && `• ${e.location}`}
-                          </p>
-                        </div>
+                      <div key={e.id} className={`${idx !== 0 ? 'border-t border-gray-100 pt-3' : ''}`}>
+                        <h4 className="font-bold text-[#131921] text-lg">{e.title}</h4>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {fmtDate(e.start_at)} {e.location && `• ${e.location}`}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -648,35 +704,35 @@ export default function ForeningDetaljePage() {
               </div>
             </div>
 
-            {/* ✅ Kalender + Billeder side om side */}
+            {/* SIDE OM SIDE: KALENDER & BILLEDER */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* KALENDER */}
               <div className="bg-white rounded-[24px] p-4 shadow-sm">
-                <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
-                  KALENDER
+                <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3 uppercase">
+                  Kalender
                 </div>
 
                 <div className="flex items-center justify-between mb-3 px-2">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
                       setSelectedDayKey(null);
                     }}
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200"
+                    className="w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200"
                   >
                     ❮
                   </button>
-                  <h3 className="font-black text-[#131921] text-xl capitalize">
+
+                  <h3 className="font-black text-[#131921] text-sm md:text-base capitalize">
                     {monthCursor.toLocaleDateString('da-DK', { month: 'long', year: 'numeric' })}
                   </h3>
+
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
                       setSelectedDayKey(null);
                     }}
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200"
+                    className="w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 text-[#131921] text-lg font-bold border-2 border-gray-200"
                   >
                     ❯
                   </button>
@@ -691,62 +747,60 @@ export default function ForeningDetaljePage() {
                 </div>
 
                 <div className="grid grid-cols-7 gap-1.5">
-                  {buildMonthGrid(monthCursor).map((week) =>
-                    week.map((day, idx) => {
-                      const key = toKey(day);
-                      const dayEvents = eventsByDate.get(key) || [];
-                      const hasEvents = dayEvents.length > 0;
-                      const isOtherMonth = day.getMonth() !== monthCursor.getMonth();
-                      const isToday = key === todayKey;
-                      const isSelected = key === selectedDayKey;
+                  {buildMonthGrid(monthCursor).flat().map((day, idx) => {
+                    const key = toKey(day);
+                    const dayEvents = eventsByDate.get(key) || [];
+                    const hasEvents = dayEvents.length > 0;
+                    const isOtherMonth = day.getMonth() !== monthCursor.getMonth();
+                    const isToday = key === todayKey;
+                    const isSelected = key === selectedDayKey;
 
-                      const colored = hasEvents ? dayColorClass(dayEvents) : '';
-                      const baseBg = hasEvents ? colored : 'bg-transparent';
-                      const baseText = hasEvents ? '' : isOtherMonth ? 'text-gray-300' : 'text-gray-800';
+                    const baseText = hasEvents ? '' : isOtherMonth ? 'text-gray-300' : 'text-gray-800';
 
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!hasEvents) {
-                              setSelectedDayKey(null);
-                              return;
-                            }
-                            setSelectedDayKey(key);
-                          }}
-                          className={[
-                            'aspect-square rounded-xl relative flex items-center justify-center text-sm font-bold transition-all',
-                            baseBg,
-                            baseText,
-                            hasEvents ? 'shadow-sm hover:shadow-md' : '',
-                            hasEvents ? 'hover:scale-[1.02]' : '',
-                            isToday && !hasEvents ? 'ring-2 ring-[#131921]' : '',
-                            isSelected ? 'ring-4 ring-white/70' : '',
-                          ].join(' ')}
-                          title={hasEvents ? `${dayEvents.length} aktivitet(er)` : ''}
-                        >
-                          <span>{day.getDate()}</span>
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          if (!hasEvents) {
+                            setSelectedDayKey(null);
+                            return;
+                          }
+                          setSelectedDayKey(key);
+                        }}
+                        className={[
+                          'aspect-square rounded-xl relative flex items-center justify-center text-sm font-bold transition-all',
+                          hasEvents ? dayColorClass(true) : 'bg-transparent',
+                          baseText,
+                          hasEvents ? 'shadow-sm hover:shadow-md hover:scale-[1.02]' : '',
+                          isToday && !hasEvents ? 'ring-2 ring-[#131921]' : '',
+                          isSelected ? 'ring-4 ring-white/70' : '',
+                        ].join(' ')}
+                        title={hasEvents ? `${dayEvents.length} aktivitet(er)` : ''}
+                      >
+                        <span>{day.getDate()}</span>
 
-                          {hasEvents && dayEvents.length > 1 && (
-                            <span className="absolute top-1 right-1 text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">
-                              {dayEvents.length}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
+                        {hasEvents && dayEvents.length > 1 && (
+                          <span className="absolute top-1 right-1 text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">
+                            {dayEvents.length}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* ✅ Kort under kalender – uden chips */}
+                {/* VALGT DAG: kort med aktiviteter */}
                 {selectedDayKey && selectedDayEvents.length > 0 && (
                   <div className="mt-4 bg-[#F9FBFC] border border-gray-100 rounded-2xl p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-[11px] font-black uppercase tracking-widest text-gray-500">Aktiviteter</p>
-                        <h4 className="text-lg font-black text-[#131921] capitalize">{selectedDayLabel}</h4>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-gray-500">
+                          Aktiviteter
+                        </p>
+                        <h4 className="text-base md:text-lg font-black text-[#131921] capitalize">
+                          {selectedDayLabel}
+                        </h4>
                       </div>
                       <button
                         onClick={() => setSelectedDayKey(null)}
@@ -773,12 +827,15 @@ export default function ForeningDetaljePage() {
                                 </div>
 
                                 <h5 className="font-black text-[#131921] text-base truncate">{e.title}</h5>
+
                                 <p className="text-xs text-gray-600 font-bold mt-1">
                                   {e.location ? e.location : 'Lokation ikke angivet'} • {price}
                                 </p>
 
                                 {e.description && (
-                                  <p className="text-sm text-gray-700 mt-2 line-clamp-3 whitespace-pre-wrap">{e.description}</p>
+                                  <p className="text-sm text-gray-700 mt-2 line-clamp-3 whitespace-pre-wrap">
+                                    {e.description}
+                                  </p>
                                 )}
                               </div>
 
@@ -823,20 +880,25 @@ export default function ForeningDetaljePage() {
                 onClick={() => router.push(`/forening/${realForeningId}/images`)}
                 className="bg-white rounded-[24px] p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
               >
-                <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3">
-                  BILLEDER
+                <div className="bg-[#131921] text-white px-4 py-1.5 rounded-full font-black text-sm tracking-wider inline-block mb-3 uppercase">
+                  Billeder
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {images.length === 0 ? (
-                    <p className="text-sm text-gray-400">Ingen billeder endnu.</p>
-                  ) : (
-                    images.map((img) => (
-                      <div key={img.id} className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                        <img src={getEventImageUrl(img.image_url)} className="w-full h-full object-cover" alt="Event" />
+
+                {images.length === 0 ? (
+                  <p className="text-sm text-gray-400">Ingen billeder.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {images.slice(0, 9).map((img) => (
+                      <div key={img.id} className="aspect-square rounded-xl overflow-hidden bg-gray-100">
+                        <img
+                          src={getEventImageUrl(img.image_url)}
+                          className="w-full h-full object-cover"
+                          alt="Event"
+                        />
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -856,18 +918,99 @@ export default function ForeningDetaljePage() {
                   Skift billede
                 </button>
               )}
-              {isOwner && (
-                <button
-                  onClick={handleDeleteForening}
-                  className="flex-1 py-3 bg-red-100 text-red-600 rounded-full font-bold hover:bg-red-200 transition-colors"
-                >
-                  Slet forening
-                </button>
-              )}
             </div>
           </>
         )}
       </main>
+
+      {/* MODAL: Invite */}
+      {isApprovedMember && isMeAdmin && showInviteModal && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-6 relative">
+            <button
+              onClick={() => setShowInviteModal(false)}
+              className="absolute top-4 right-4 text-gray-400 text-xl font-black"
+            >
+              ✕
+            </button>
+
+            <div className="mb-4">
+              <h3 className="text-xl font-black text-[#131921]">Inviter</h3>
+              <p className="text-xs text-gray-500 font-bold mt-1">Kopiér link eller invitér en bruger.</p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleCopyLink}
+                className="flex-1 px-4 py-3 bg-[#131921] text-white rounded-full font-black text-xs"
+              >
+                Kopiér invite-link
+              </button>
+              <button
+                onClick={handleShare}
+                className="flex-1 px-4 py-3 bg-gray-100 text-[#131921] rounded-full font-black text-xs"
+              >
+                Del link
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <p className="text-[11px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                Invitér bruger
+              </p>
+
+              <input
+                value={inviteQuery}
+                onChange={(e) => runInviteSearch(e.target.value)}
+                placeholder="Søg på navn, brugernavn eller email..."
+                className="w-full p-3 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-[#131921] transition-all font-bold text-black"
+              />
+
+              {inviteInfo && <p className="mt-2 text-xs font-bold text-gray-600">{inviteInfo}</p>}
+
+              <div className="mt-3 space-y-2 max-h-[260px] overflow-y-auto">
+                {inviteLoading ? (
+                  <p className="text-sm text-gray-400">Søger...</p>
+                ) : inviteResults.length === 0 ? (
+                  <p className="text-sm text-gray-400">
+                    {inviteQuery.trim().length < 2 ? 'Skriv mindst 2 tegn for at søge.' : 'Ingen resultater.'}
+                  </p>
+                ) : (
+                  inviteResults.map((u) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-[10px] bg-gray-100 overflow-hidden flex-shrink-0">
+                          {getAvatarUrl(u.avatar_url) ? (
+                            <img src={getAvatarUrl(u.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-black text-sm text-[#131921] truncate">
+                            {u.name || u.username || (u.email ? u.email.split('@')[0] : 'Ukendt')}
+                          </p>
+                          <p className="text-[11px] text-gray-500 font-bold truncate">
+                            {u.username ? `@${u.username}` : u.email}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => inviteUser(u.id)}
+                        className="px-3 py-2 rounded-full bg-[#131921] text-white font-black text-xs hover:bg-black"
+                      >
+                        Inviter
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: Første besked */}
       {isApprovedMember && showFirstMessageModal && selectedMember && (
@@ -888,7 +1031,9 @@ export default function ForeningDetaljePage() {
                 {getAvatarUrl(selectedMember.users?.avatar_url) ? (
                   <img src={getAvatarUrl(selectedMember.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
                 ) : (
-                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl font-black">?</div>
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl font-black">
+                    ?
+                  </div>
                 )}
               </div>
               <h3 className="text-xl font-bold text-[#131921]">Skriv til {getDisplayName(selectedMember)}</h3>
@@ -926,7 +1071,9 @@ export default function ForeningDetaljePage() {
                   {getAvatarUrl(selectedMember.users?.avatar_url) ? (
                     <img src={getAvatarUrl(selectedMember.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
                   ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl font-black">?</div>
+                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl font-black">
+                      ?
+                    </div>
                   )}
                 </div>
 
@@ -940,15 +1087,6 @@ export default function ForeningDetaljePage() {
                   Skriv til medlem
                 </button>
 
-                {isMeAdmin && selectedMember.rolle !== 'admin' && (
-                  <button
-                    onClick={() => promoteToAdmin(selectedMember.user_id)}
-                    className="w-full py-3 bg-blue-100 text-blue-700 rounded-full font-bold mb-3 hover:bg-blue-200 transition-colors"
-                  >
-                    Gør til admin
-                  </button>
-                )}
-
                 <button onClick={() => setSelectedMember(null)} className="text-sm font-bold text-gray-400 mt-2 hover:text-black">
                   ← Tilbage
                 </button>
@@ -958,6 +1096,7 @@ export default function ForeningDetaljePage() {
                 <h3 className="font-black text-[#131921] mb-4 uppercase tracking-widest text-sm">
                   MEDLEMMER ({approved.length})
                 </h3>
+
                 <div className="space-y-2">
                   {approved.map((m) => (
                     <div
@@ -970,8 +1109,8 @@ export default function ForeningDetaljePage() {
                           <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
                         ) : null}
                       </div>
-                      <div>
-                        <p className="font-bold text-sm text-black">{getDisplayName(m)}</p>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-black truncate">{getDisplayName(m)}</p>
                         <p className="text-[10px] text-gray-400 font-bold uppercase">{m.rolle || 'MEDLEM'}</p>
                       </div>
                     </div>
