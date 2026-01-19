@@ -6,7 +6,8 @@ import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
 
-// --- TYPER ---
+// ... (Existing Type definitions: Forening, Medlem, Thread, Event, ImagePreview, UserSearchResult) ...
+// (Keep all your existing type definitions here)
 type Forening = {
   id: string;
   navn: string;
@@ -54,7 +55,8 @@ type UserSearchResult = {
   email: string | null;
 };
 
-// --- HJÆLPERE ---
+// ... (Existing Helpers: getDisplayName, getAvatarUrl, etc.) ...
+// (Keep all your existing helper functions here)
 const getDisplayName = (m: any) => {
   const user = m?.users || m;
   const n = user?.name?.trim() || user?.username?.trim();
@@ -168,6 +170,7 @@ export default function ForeningDetaljePage() {
   const [inviteResults, setInviteResults] = useState<UserSearchResult[]>([]);
   const [inviteInfo, setInviteInfo] = useState<string | null>(null);
 
+  // --- USE EFFECT TO LOAD DATA (Same as provided) ---
   useEffect(() => {
     async function loadAllData() {
       setLoading(true);
@@ -254,6 +257,7 @@ export default function ForeningDetaljePage() {
     loadAllData();
   }, [idOrSlug, router]);
 
+  // --- MEMOS (Same as provided) ---
   const approved = useMemo(() => medlemmer.filter((m) => m.status === 'approved'), [medlemmer]);
   const myMembership = useMemo(() => medlemmer.find((m) => m.user_id === userId), [medlemmer, userId]);
   const isApprovedMember = myMembership?.status === 'approved';
@@ -294,6 +298,7 @@ export default function ForeningDetaljePage() {
 
   const hasLongDesc = (forening?.beskrivelse || '').trim().length > 220;
 
+  // --- HANDLERS (Same image/save handlers) ---
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !realForeningId) return;
     const file = e.target.files[0];
@@ -325,6 +330,7 @@ export default function ForeningDetaljePage() {
     }
   };
 
+  // --- COPY / SHARE / INVITE ---
   const handleCopyLink = async () => {
     await navigator.clipboard.writeText(window.location.href);
     alert('Link kopieret ✅');
@@ -401,6 +407,7 @@ export default function ForeningDetaljePage() {
     }
   };
 
+  // --- MESSAGE MODAL HANDLERS ---
   const handleOpenMessageModal = (member: Medlem) => {
     setSelectedMember(member);
     setShowFirstMessageModal(true);
@@ -457,25 +464,81 @@ export default function ForeningDetaljePage() {
     window.location.reload();
   };
 
+  // --- ✅ FIXED: Handle Leave ---
   const handleLeave = async () => {
-    if (!userId || !realForeningId || !confirm('Er du sikker på at du vil forlade foreningen?')) return;
-    await supabase.from('foreningsmedlemmer').delete().eq('forening_id', realForeningId).eq('user_id', userId);
-    window.location.reload();
+    if (!userId || !realForeningId) return;
+    
+    const confirmed = confirm('Er du sikker på at du vil forlade foreningen?');
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('foreningsmedlemmer')
+        .delete()
+        .eq('forening_id', realForeningId)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error("Fejl ved udmeldelse:", error);
+        alert('Kunne ikke forlade foreningen. Prøv igen senere.');
+        return;
+      }
+
+      // Successful deletion
+      alert("Du har forladt foreningen.");
+      
+      // Update local state to reflect change immediately without full reload if preferred,
+      // or redirect to a neutral page.
+      setMedlemmer(prev => prev.filter(m => m.user_id !== userId));
+      router.push('/opslag'); // Redirect to home/feed after leaving
+      router.refresh(); // Ensure server components refresh if needed
+
+    } catch (err) {
+      console.error("Uventet fejl:", err);
+      alert('Der skete en fejl.');
+    }
   };
 
+  // --- ✅ FIXED: Handle Delete Forening ---
   const handleDeleteForening = async () => {
     if (!realForeningId) return;
+    
     const ok = confirm('SLET FORENING?\n\nDette sletter foreningen (og kan ikke fortrydes). Er du helt sikker?');
     if (!ok) return;
 
-    const { error } = await supabase.from('foreninger').delete().eq('id', realForeningId);
-    if (error) {
-      alert('Kunne ikke slette foreningen.');
-      return;
+    try {
+      // 1. Optional: Delete related data manually if cascades aren't set up in DB.
+      // Ideally, your DB schema should have ON DELETE CASCADE.
+      // Example: await supabase.from('foreningsmedlemmer').delete().eq('forening_id', realForeningId);
+      
+      // 2. Delete the forening
+      const { error } = await supabase
+        .from('foreninger')
+        .delete()
+        .eq('id', realForeningId);
+
+      if (error) {
+        console.error("Fejl ved sletning af forening:", error);
+        // Inform user about potential foreign key constraint
+        if (error.code === '23503') { // ForeignKeyViolation
+             alert('Kunne ikke slette foreningen fordi der er tilknyttede data (medlemmer, events, tråde). Slet venligst disse først eller kontakt support.');
+        } else {
+             alert(`Kunne ikke slette foreningen: ${error.message}`);
+        }
+        return;
+      }
+
+      alert("Foreningen er slettet.");
+      router.push('/opslag'); // Redirect to main feed
+      router.refresh();
+
+    } catch (err) {
+      console.error("Uventet fejl under sletning:", err);
+      alert('Der skete en uventet fejl.');
     }
-    router.push('/opslag');
   };
 
+  // --- RENDER ---
   if (loading) {
     return (
       <div className="min-h-screen bg-[#869FB9] flex items-center justify-center font-black text-white">
@@ -614,7 +677,6 @@ export default function ForeningDetaljePage() {
 
         {isApprovedMember && (
           <>
-            {/* ✅ FIX: ÅBN INBOX (ingen id=...) */}
             <button
               onClick={() => router.push('/beskeder')}
               className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors"
@@ -925,6 +987,8 @@ export default function ForeningDetaljePage() {
         )}
       </main>
 
+      {/* ... (Existing Modals: Invite, First Message, Members) ... */}
+      {/* (Keep all your existing modal JSX here, unchanged from previous examples) */}
       {/* MODAL: Invite */}
       {isApprovedMember && isMeAdmin && showInviteModal && (
         <div className="fixed inset-0 z-[260] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
