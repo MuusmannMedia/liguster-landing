@@ -7,20 +7,18 @@ import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
 
 // --- TYPER ---
-// ... (Samme typer som før) ...
 type Forening = {
   id: string;
   navn: string;
   sted: string;
   beskrivelse: string;
   billede_url?: string;
-  images?: string[]; // Vigtigt: Dette felt skal findes i DB for at gemme flere
+  images?: string[];
   oprettet_af?: string;
   slug?: string;
   is_public?: boolean;
 };
 
-// ... (Resten af typerne er uændrede) ...
 type Medlem = {
   user_id: string;
   rolle?: string | null;
@@ -41,7 +39,6 @@ type UserSearchResult = { id: string; name: string | null; username: string | nu
 type ConfirmModalState = { isOpen: boolean; title: string; message: string; actionType: 'leave' | 'delete'; isLoading: boolean; };
 
 // --- HJÆLPERE ---
-// ... (Samme hjælpere som før) ...
 const getDisplayName = (m: any) => { const user = m?.users || m; const n = user?.name?.trim() || user?.username?.trim(); if (n) return n; const email = user?.email || ''; return email.includes('@') ? email.split('@')[0] : 'Ukendt'; };
 const getAvatarUrl = (path: string | null | undefined) => { if (!path) return null; if (path.startsWith('http')) return path; const { data } = supabase.storage.from('avatars').getPublicUrl(path); return data.publicUrl; };
 const getEventImageUrl = (path: string | null | undefined) => { if (!path) return ''; if (path.startsWith('http')) return path; const { data } = supabase.storage.from('event_images').getPublicUrl(path); return data.publicUrl; };
@@ -60,7 +57,6 @@ export default function ForeningDetaljePage() {
   const router = useRouter();
   const idOrSlug = params.id as string;
 
-  // States
   const [realForeningId, setRealForeningId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [forening, setForening] = useState<Forening | null>(null);
@@ -68,26 +64,21 @@ export default function ForeningDetaljePage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Edit States
   const [isEditing, setIsEditing] = useState(false);
   const [editNavn, setEditNavn] = useState('');
   const [editSted, setEditSted] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
-  // Hero Image States
   const [heroImages, setHeroImages] = useState<string[]>([]);
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Data Arrays
   const [threads, setThreads] = useState<Thread[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [images, setImages] = useState<ImagePreview[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<Event[]>([]);
 
-  // UI / Modal States
-  const [monthCursor, setMonthCursor] = useState(new Date());
   const [showMembers, setShowMembers] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Medlem | null>(null);
   const [showFirstMessageModal, setShowFirstMessageModal] = useState(false);
@@ -96,19 +87,16 @@ export default function ForeningDetaljePage() {
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
 
-  // Invite modal
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteQuery, setInviteQuery] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteResults, setInviteResults] = useState<UserSearchResult[]>([]);
   const [inviteInfo, setInviteInfo] = useState<string | null>(null);
 
-  // Confirm Modal
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({
     isOpen: false, title: '', message: '', actionType: 'leave', isLoading: false,
   });
 
-  // --- LOAD DATA ---
   useEffect(() => {
     async function loadAllData() {
       setLoading(true);
@@ -131,7 +119,6 @@ export default function ForeningDetaljePage() {
         setEditSted(foreningData.sted || '');
         setEditDescription(foreningData.beskrivelse || '');
 
-        // Indlæs billeder: Bruger 'images' array hvis det findes, ellers fallback til 'billede_url'
         const imgs = foreningData.images && Array.isArray(foreningData.images) && foreningData.images.length > 0 
           ? foreningData.images 
           : foreningData.billede_url ? [foreningData.billede_url] : [];
@@ -162,7 +149,6 @@ export default function ForeningDetaljePage() {
     loadAllData();
   }, [idOrSlug, router]);
 
-  // --- MEMOS ---
   const approved = useMemo(() => medlemmer.filter((m) => m.status === 'approved'), [medlemmer]);
   const myMembership = useMemo(() => medlemmer.find((m) => m.user_id === userId), [medlemmer, userId]);
   const isApprovedMember = myMembership?.status === 'approved';
@@ -171,7 +157,6 @@ export default function ForeningDetaljePage() {
   const isMeAdmin = isOwner || myMembership?.rolle === 'admin';
   const memberIdSet = useMemo(() => new Set(medlemmer.map((m) => m.user_id)), [medlemmer]);
 
-  // --- CALENDAR LOGIC ---
   const eventsByDate = useMemo(() => {
     const map = new Map<string, Event[]>();
     for (const e of calendarEvents) {
@@ -191,17 +176,9 @@ export default function ForeningDetaljePage() {
 
   const hasLongDesc = (forening?.beskrivelse || '').trim().length > 220;
 
-  // --- HERO NAVIGATION ---
-  const nextHeroImage = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setActiveHeroIndex((prev) => (prev + 1) % heroImages.length);
-  };
-  const prevHeroImage = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setActiveHeroIndex((prev) => (prev === 0 ? heroImages.length - 1 : prev - 1));
-  };
+  const nextHeroImage = (e?: React.MouseEvent) => { e?.stopPropagation(); setActiveHeroIndex((prev) => (prev + 1) % heroImages.length); };
+  const prevHeroImage = (e?: React.MouseEvent) => { e?.stopPropagation(); setActiveHeroIndex((prev) => (prev === 0 ? heroImages.length - 1 : prev - 1)); };
 
-  // --- UPLOAD IMAGE (ADD TO GALLERY) ---
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !realForeningId) return;
     const file = e.target.files[0];
@@ -218,63 +195,34 @@ export default function ForeningDetaljePage() {
     if (!uploadError) {
       const { data } = supabase.storage.from('foreningsbilleder').getPublicUrl(fileName);
       const newUrl = data.publicUrl;
-      
-      // Opdater lokalt
       const newImages = [...heroImages, newUrl];
       setHeroImages(newImages);
-      setActiveHeroIndex(newImages.length - 1); // Hop til det nye billede
+      setActiveHeroIndex(newImages.length - 1);
 
-      // Gem i DB (Forudsætter at du har 'images' kolonne, ellers gemmer vi kun i 'billede_url')
-      await supabase.from('foreninger')
-        .update({ 
-            billede_url: newUrl, // Sætter nyeste som main
-            images: newImages    // Gemmer array (kræver DB understøttelse)
-        })
-        .eq('id', realForeningId);
+      await supabase.from('foreninger').update({ billede_url: newUrl, images: newImages }).eq('id', realForeningId);
     }
     setUploading(false);
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // --- DELETE IMAGE FROM GALLERY ---
   const handleDeleteHeroImage = async (indexToDelete: number) => {
     if (!realForeningId) return;
-    if (!confirm("Er du sikker på, at du vil slette dette billede?")) return;
-
+    if (!confirm("Slet billede?")) return;
     const newImages = heroImages.filter((_, idx) => idx !== indexToDelete);
     setHeroImages(newImages);
-    
-    // Juster index hvis nødvendigt
-    if (activeHeroIndex >= newImages.length) {
-        setActiveHeroIndex(Math.max(0, newImages.length - 1));
-    }
-
-    // Gem i DB
-    await supabase.from('foreninger')
-        .update({ 
-            images: newImages, 
-            billede_url: newImages.length > 0 ? newImages[0] : null // Fallback hvis alle slettes
-        })
-        .eq('id', realForeningId);
+    if (activeHeroIndex >= newImages.length) setActiveHeroIndex(Math.max(0, newImages.length - 1));
+    await supabase.from('foreninger').update({ images: newImages, billede_url: newImages.length > 0 ? newImages[0] : null }).eq('id', realForeningId);
   };
 
-  // --- SAVE INFO ---
   const handleSaveInfo = async () => {
     if (!realForeningId) return;
-    const { error } = await supabase
-      .from('foreninger')
-      .update({ navn: editNavn, sted: editSted, beskrivelse: editDescription })
-      .eq('id', realForeningId);
+    const { error } = await supabase.from('foreninger').update({ navn: editNavn, sted: editSted, beskrivelse: editDescription }).eq('id', realForeningId);
     if (!error) {
       setForening((prev) => (prev ? { ...prev, navn: editNavn, sted: editSted, beskrivelse: editDescription } : null));
       setIsEditing(false);
-    } else {
-      alert('Kunne ikke gemme.');
-    }
+    } else { alert('Kunne ikke gemme.'); }
   };
 
-  // --- ACTIONS ---
   const handleCopyLink = async () => { await navigator.clipboard.writeText(window.location.href); alert('Link kopieret ✅'); };
   const handleShare = async () => { if (typeof navigator !== 'undefined' && (navigator as any).share) { try { await (navigator as any).share({ title: forening?.navn || 'Forening', url: window.location.href }); return; } catch {} } await handleCopyLink(); };
   
@@ -303,13 +251,10 @@ export default function ForeningDetaljePage() {
         {/* HERO */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           
-          {/* ✅ Opdateret Hero Container: aspect-square på mobil, aspect-[21/9] på desktop */}
           <div className="relative w-full aspect-square md:aspect-[21/9] rounded-[18px] overflow-hidden bg-gray-100 group">
             {heroImages.length > 0 ? (
               <>
                 <img src={heroImages[activeHeroIndex]} className="w-full h-full object-cover transition-opacity duration-300" alt="Cover" />
-                
-                {/* Pile (hvis flere billeder) */}
                 {heroImages.length > 1 && (
                   <>
                     <button onClick={prevHeroImage} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm">❮</button>
@@ -328,38 +273,26 @@ export default function ForeningDetaljePage() {
             {uploading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-black">Uploader...</div>}
           </div>
 
-          {/* EDIT FORM / CONTENT */}
           <div className="w-full">
             {isEditing ? (
               <div className="flex flex-col gap-3">
-                {/* ✅ Billed-manager i edit mode */}
                 <div className="mb-2">
                     <p className="text-xs font-bold text-gray-500 uppercase mb-2">Billeder ({heroImages.length}/6)</p>
                     <div className="flex gap-2 overflow-x-auto pb-2">
                         {heroImages.map((img, idx) => (
                             <div key={idx} className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden group">
                                 <img src={img} className="w-full h-full object-cover" />
-                                <button 
-                                    onClick={() => handleDeleteHeroImage(idx)}
-                                    className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-lg text-xs font-bold"
-                                >✕</button>
+                                <button onClick={() => handleDeleteHeroImage(idx)} className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-lg text-xs font-bold">✕</button>
                             </div>
                         ))}
                         {heroImages.length < 6 && (
-                            <button 
-                                onClick={() => fileInputRef.current?.click()}
-                                className="w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:bg-gray-50 font-bold text-2xl"
-                            >
-                                +
-                            </button>
+                            <button onClick={() => fileInputRef.current?.click()} className="w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:bg-gray-50 font-bold text-2xl">+</button>
                         )}
                     </div>
                 </div>
-
                 <input value={editNavn} onChange={(e) => setEditNavn(e.target.value)} className="w-full p-3 border rounded-xl text-black font-black" placeholder="Foreningens navn" />
                 <input value={editSted} onChange={(e) => setEditSted(e.target.value)} className="w-full p-3 border rounded-xl text-black font-black" placeholder="Sted" />
                 <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full min-h-[120px] p-3 border rounded-xl text-black" placeholder="Beskrivelse" />
-                
                 <div className="flex gap-2 justify-end pt-2">
                   <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-gray-100 rounded-full text-xs font-bold text-gray-700">ANNULLER</button>
                   <button onClick={handleSaveInfo} className="px-4 py-2 bg-[#131921] text-white rounded-full text-xs font-bold">GEM</button>
@@ -397,7 +330,6 @@ export default function ForeningDetaljePage() {
             ))}
         </div>
 
-        {/* ... (RESTEN AF INDHOLDET: BESKEDER, MEDLEMMER, SAMTALER, EVENTS, KALENDER, BILLEDER, FOOTER) ... */}
         {isApprovedMember && (
           <>
             <button onClick={() => router.push('/beskeder')} className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors">
@@ -486,7 +418,20 @@ export default function ForeningDetaljePage() {
             {/* Footer-actions */}
             <div className="bg-white rounded-[24px] p-4 shadow-sm flex flex-col md:flex-row gap-3 mb-10">
               <button onClick={handleClickLeave} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-full font-bold hover:bg-gray-200 transition-colors">Afslut medlemskab</button>
-              {/* NOTE: 'Skift billede' knappen er fjernet herfra, da upload nu sker i 'Rediger' mode for at håndtere galleriet */}
+              {isMeAdmin && (
+                <button
+                  onClick={() => {
+                     if (heroImages.length >= 6) {
+                       alert("Der er allerede 6 billeder. Gå til 'Rediger' for at slette nogen først.");
+                       return;
+                     }
+                     fileInputRef.current?.click();
+                  }}
+                  className="flex-1 py-3 bg-[#e9eef5] text-[#131921] rounded-full font-bold hover:bg-[#d0dbe9] transition-colors"
+                >
+                  Tilføj billede
+                </button>
+              )}
               {isOwner && <button onClick={handleClickDelete} className="flex-1 py-3 bg-red-100 text-red-700 rounded-full font-bold hover:bg-red-200 transition-colors">Slet forening</button>}
             </div>
           </>
