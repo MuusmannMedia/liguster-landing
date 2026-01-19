@@ -14,7 +14,7 @@ type Forening = {
   sted: string;
   beskrivelse: string;
   billede_url?: string;
-  images?: string[];
+  images?: string[]; // Vigtigt: Dette felt skal findes i DB for at gemme flere
   oprettet_af?: string;
   slug?: string;
   is_public?: boolean;
@@ -77,7 +77,6 @@ export default function ForeningDetaljePage() {
   // Hero Image States
   const [heroImages, setHeroImages] = useState<string[]>([]);
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
-  const [lightboxOpen, setLightboxOpen] = useState(false); // Ny state til lightbox
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -308,12 +307,7 @@ export default function ForeningDetaljePage() {
           <div className="relative w-full aspect-square md:aspect-[21/9] rounded-[18px] overflow-hidden bg-gray-100 group">
             {heroImages.length > 0 ? (
               <>
-                <img 
-                  src={heroImages[activeHeroIndex]} 
-                  className="w-full h-full object-cover transition-opacity duration-300 cursor-zoom-in" 
-                  alt="Cover" 
-                  onClick={() => setLightboxOpen(true)} // Åbn lightbox ved klik
-                />
+                <img src={heroImages[activeHeroIndex]} className="w-full h-full object-cover transition-opacity duration-300" alt="Cover" />
                 
                 {/* Pile (hvis flere billeder) */}
                 {heroImages.length > 1 && (
@@ -334,6 +328,7 @@ export default function ForeningDetaljePage() {
             {uploading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-black">Uploader...</div>}
           </div>
 
+          {/* EDIT FORM / CONTENT */}
           <div className="w-full">
             {isEditing ? (
               <div className="flex flex-col gap-3">
@@ -497,39 +492,6 @@ export default function ForeningDetaljePage() {
           </>
         )}
       </main>
-
-      {/* --- LIGHTBOX (Fuldskærm) --- */}
-      {lightboxOpen && heroImages.length > 0 && (
-        <div className="fixed inset-0 z-[400] bg-black flex items-center justify-center animate-in fade-in duration-200">
-          <button 
-            onClick={() => setLightboxOpen(false)}
-            className="absolute top-6 right-6 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-colors z-20"
-          >
-            <i className="fa-solid fa-xmark text-xl"></i>
-          </button>
-          
-          <img 
-            src={heroImages[activeHeroIndex]} 
-            alt="Fuldskærm" 
-            className="max-w-full max-h-full object-contain p-4 select-none"
-            draggable="false"
-          />
-
-           {/* Pile i Lightbox */}
-           {heroImages.length > 1 && (
-              <>
-                <button 
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4 z-20"
-                  onClick={prevHeroImage}
-                >‹</button>
-                <button 
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4 z-20"
-                  onClick={nextHeroImage}
-                >›</button>
-              </>
-            )}
-        </div>
-      )}
 
       {/* MODALER (Bekræft, Invite, Besked, Medlemmer) */}
       {confirmModal.isOpen && (
