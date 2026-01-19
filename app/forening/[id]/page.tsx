@@ -12,7 +12,8 @@ type Forening = {
   navn: string;
   sted: string;
   beskrivelse: string;
-  billede_url?: string;
+  billede_url?: string; // Hovedbillede (bagudkompatibilitet)
+  images?: string[];    // Nyt felt til galleri (hvis understøttet i DB)
   oprettet_af?: string;
   slug?: string;
   is_public?: boolean;
@@ -176,6 +177,10 @@ export default function ForeningDetaljePage() {
   const [inviteResults, setInviteResults] = useState<UserSearchResult[]>([]);
   const [inviteInfo, setInviteInfo] = useState<string | null>(null);
 
+  // ✅ Hero Gallery State
+  const [heroImages, setHeroImages] = useState<string[]>([]);
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+
   // ✅ NYT: State til bekræftelses-modal
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({
     isOpen: false,
@@ -216,6 +221,14 @@ export default function ForeningDetaljePage() {
         setEditNavn(foreningData.navn || '');
         setEditSted(foreningData.sted || '');
         setEditDescription(foreningData.beskrivelse || '');
+
+        // Håndter billeder til galleri (prioriterer 'images' array hvis det findes, ellers 'billede_url')
+        const imgs = foreningData.images && foreningData.images.length > 0 
+          ? foreningData.images 
+          : foreningData.billede_url 
+            ? [foreningData.billede_url] 
+            : [];
+        setHeroImages(imgs);
 
         const fId = foreningData.id;
 
@@ -288,14 +301,39 @@ export default function ForeningDetaljePage() {
 
   const hasLongDesc = (forening?.beskrivelse || '').trim().length > 220;
 
+  // ✅ Galleri navigation
+  const nextHeroImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setActiveHeroIndex((prev) => (prev + 1) % heroImages.length);
+  };
+
+  const prevHeroImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setActiveHeroIndex((prev) => (prev === 0 ? heroImages.length - 1 : prev - 1));
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !realForeningId) return;
     const file = e.target.files[0];
+    
+    // Begrænsning på 6 billeder (hvis du implementerer fuld galleri-upload logik i DB)
+    if (heroImages.length >= 6) {
+        alert("Du kan maksimalt uploade 6 billeder til galleriet.");
+        return;
+    }
+
     setUploading(true);
     const fileName = `${realForeningId}_${Date.now()}`;
     const { error: uploadError } = await supabase.storage.from('foreningsbilleder').upload(fileName, file);
     if (!uploadError) {
       const { data } = supabase.storage.from('foreningsbilleder').getPublicUrl(fileName);
+      
+      // Her opdaterer vi foreningens billeder. 
+      // OBS: Dette overskriver det gamle billede i nuværende DB struktur.
+      // Hvis du har et 'images' array i DB, skal du bruge: 
+      // const newImages = [...heroImages, data.publicUrl];
+      // await supabase.from('foreninger').update({ images: newImages }).eq('id', realForeningId);
+      
       await supabase.from('foreninger').update({ billede_url: data.publicUrl }).eq('id', realForeningId);
       window.location.reload();
     }
@@ -494,12 +532,49 @@ export default function ForeningDetaljePage() {
 
         {/* HERO */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
-          <div className="relative w-full aspect-square rounded-[18px] overflow-hidden bg-gray-100">
-            {forening.billede_url ? (
-              <img src={forening.billede_url} className="w-full h-full object-cover" alt="Cover" />
+          {/* ✅ Opdateret hero-container: Kvadratisk på mobil (aspect-square), 1/4 lavere på desktop (md:aspect-[21/9] eller lignende) */}
+          <div className="relative w-full aspect-square md:aspect-[21/9] rounded-[18px] overflow-hidden bg-gray-100 group">
+            
+            {heroImages.length > 0 ? (
+              <>
+                <img 
+                  src={heroImages[activeHeroIndex]} 
+                  className="w-full h-full object-cover transition-opacity duration-500" 
+                  alt="Cover" 
+                />
+                
+                {/* Pile til navigation (kun hvis flere billeder) */}
+                {heroImages.length > 1 && (
+                  <>
+                    <button 
+                      onClick={prevHeroImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all"
+                    >
+                      ❮
+                    </button>
+                    <button 
+                      onClick={nextHeroImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm transition-all"
+                    >
+                      ❯
+                    </button>
+                    
+                    {/* Dots indikator */}
+                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                      {heroImages.map((_, idx) => (
+                        <div 
+                          key={idx}
+                          className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeHeroIndex ? 'bg-white w-3' : 'bg-white/50'}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">Ingen forside</div>
             )}
+
             {uploading && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-black">
                 Uploader...
