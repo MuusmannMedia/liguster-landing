@@ -7,20 +7,18 @@ import SiteHeader from '../../../components/SiteHeader';
 import SiteFooter from '../../../components/SiteFooter';
 
 // --- TYPER ---
-// ... (Samme typer som før) ...
 type Forening = {
   id: string;
   navn: string;
   sted: string;
   beskrivelse: string;
   billede_url?: string;
-  images?: string[]; // Vigtigt: Dette felt skal findes i DB for at gemme flere
+  images?: string[]; // Sørg for at denne kolonne er JSONB i Supabase
   oprettet_af?: string;
   slug?: string;
   is_public?: boolean;
 };
 
-// ... (Resten af typerne er uændrede) ...
 type Medlem = {
   user_id: string;
   rolle?: string | null;
@@ -41,7 +39,6 @@ type UserSearchResult = { id: string; name: string | null; username: string | nu
 type ConfirmModalState = { isOpen: boolean; title: string; message: string; actionType: 'leave' | 'delete'; isLoading: boolean; };
 
 // --- HJÆLPERE ---
-// ... (Samme hjælpere som før) ...
 const getDisplayName = (m: any) => { const user = m?.users || m; const n = user?.name?.trim() || user?.username?.trim(); if (n) return n; const email = user?.email || ''; return email.includes('@') ? email.split('@')[0] : 'Ukendt'; };
 const getAvatarUrl = (path: string | null | undefined) => { if (!path) return null; if (path.startsWith('http')) return path; const { data } = supabase.storage.from('avatars').getPublicUrl(path); return data.publicUrl; };
 const getEventImageUrl = (path: string | null | undefined) => { if (!path) return ''; if (path.startsWith('http')) return path; const { data } = supabase.storage.from('event_images').getPublicUrl(path); return data.publicUrl; };
@@ -77,6 +74,12 @@ export default function ForeningDetaljePage() {
   // Hero Image States
   const [heroImages, setHeroImages] = useState<string[]>([]);
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  
+  // Swipe States
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const minSwipeDistance = 50; // Minimum pixel distance for a swipe
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -131,11 +134,14 @@ export default function ForeningDetaljePage() {
         setEditSted(foreningData.sted || '');
         setEditDescription(foreningData.beskrivelse || '');
 
-        // Indlæs billeder: Bruger 'images' array hvis det findes, ellers fallback til 'billede_url'
-        const imgs = foreningData.images && Array.isArray(foreningData.images) && foreningData.images.length > 0 
-          ? foreningData.images 
-          : foreningData.billede_url ? [foreningData.billede_url] : [];
-        setHeroImages(imgs);
+        // Indlæs billeder: Tjekker om 'images' er et array, ellers fallback til enkelt url
+        let loadedImages: string[] = [];
+        if (foreningData.images && Array.isArray(foreningData.images) && foreningData.images.length > 0) {
+            loadedImages = foreningData.images;
+        } else if (foreningData.billede_url) {
+            loadedImages = [foreningData.billede_url];
+        }
+        setHeroImages(loadedImages);
 
         const fId = foreningData.id;
         const [res1, res2, res3, res4] = await Promise.all([
@@ -201,6 +207,23 @@ export default function ForeningDetaljePage() {
     setActiveHeroIndex((prev) => (prev === 0 ? heroImages.length - 1 : prev - 1));
   };
 
+  // --- SWIPE LOGIC ---
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe) nextHeroImage();
+    if (isRightSwipe) prevHeroImage();
+  };
+
   // --- UPLOAD IMAGE (ADD TO GALLERY) ---
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !realForeningId) return;
@@ -222,18 +245,18 @@ export default function ForeningDetaljePage() {
       // Opdater lokalt
       const newImages = [...heroImages, newUrl];
       setHeroImages(newImages);
-      setActiveHeroIndex(newImages.length - 1); // Hop til det nye billede
+      setActiveHeroIndex(newImages.length - 1);
 
-      // Gem i DB (Forudsætter at du har 'images' kolonne, ellers gemmer vi kun i 'billede_url')
+      // Gem i DB 
+      // VIGTIGT: Dette kræver at du har en kolonne ved navn 'images' af typen JSONB i din database
       await supabase.from('foreninger')
         .update({ 
-            billede_url: newUrl, // Sætter nyeste som main
-            images: newImages    // Gemmer array (kræver DB understøttelse)
+            billede_url: newUrl, 
+            images: newImages 
         })
         .eq('id', realForeningId);
     }
     setUploading(false);
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -245,16 +268,14 @@ export default function ForeningDetaljePage() {
     const newImages = heroImages.filter((_, idx) => idx !== indexToDelete);
     setHeroImages(newImages);
     
-    // Juster index hvis nødvendigt
     if (activeHeroIndex >= newImages.length) {
         setActiveHeroIndex(Math.max(0, newImages.length - 1));
     }
 
-    // Gem i DB
     await supabase.from('foreninger')
         .update({ 
             images: newImages, 
-            billede_url: newImages.length > 0 ? newImages[0] : null // Fallback hvis alle slettes
+            billede_url: newImages.length > 0 ? newImages[0] : null 
         })
         .eq('id', realForeningId);
   };
@@ -303,18 +324,28 @@ export default function ForeningDetaljePage() {
         {/* HERO */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           
-          {/* ✅ Opdateret Hero Container: aspect-square på mobil, aspect-[21/9] på desktop */}
-          <div className="relative w-full aspect-square md:aspect-[21/9] rounded-[18px] overflow-hidden bg-gray-100 group">
+          {/* HERO BILLED CONTAINER 
+             - Mobile: aspect-square (Kvadratisk)
+             - Desktop: aspect-[16/13] (Ca 25-30% højere end 16/10)
+          */}
+          <div 
+            className="relative w-full aspect-square md:aspect-[16/13] rounded-[18px] overflow-hidden bg-gray-100 group"
+            onClick={() => heroImages.length > 0 && setLightboxOpen(true)}
+          >
             {heroImages.length > 0 ? (
               <>
-                <img src={heroImages[activeHeroIndex]} className="w-full h-full object-cover transition-opacity duration-300" alt="Cover" />
-                
+                <img 
+                  src={heroImages[activeHeroIndex]} 
+                  className="w-full h-full object-cover transition-opacity duration-300 cursor-zoom-in" 
+                  alt="Cover" 
+                />
+               
                 {/* Pile (hvis flere billeder) */}
                 {heroImages.length > 1 && (
                   <>
-                    <button onClick={prevHeroImage} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm">❮</button>
-                    <button onClick={nextHeroImage} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm">❯</button>
-                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                    <button onClick={prevHeroImage} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm z-10">❮</button>
+                    <button onClick={nextHeroImage} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-sm z-10">❯</button>
+                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10">
                       {heroImages.map((_, idx) => (
                         <div key={idx} className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeHeroIndex ? 'bg-white w-3' : 'bg-white/50'}`} />
                       ))}
@@ -328,11 +359,10 @@ export default function ForeningDetaljePage() {
             {uploading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-black">Uploader...</div>}
           </div>
 
-          {/* EDIT FORM / CONTENT */}
           <div className="w-full">
             {isEditing ? (
               <div className="flex flex-col gap-3">
-                {/* ✅ Billed-manager i edit mode */}
+                {/* Edit Billeder */}
                 <div className="mb-2">
                     <p className="text-xs font-bold text-gray-500 uppercase mb-2">Billeder ({heroImages.length}/6)</p>
                     <div className="flex gap-2 overflow-x-auto pb-2">
@@ -359,7 +389,7 @@ export default function ForeningDetaljePage() {
                 <input value={editNavn} onChange={(e) => setEditNavn(e.target.value)} className="w-full p-3 border rounded-xl text-black font-black" placeholder="Foreningens navn" />
                 <input value={editSted} onChange={(e) => setEditSted(e.target.value)} className="w-full p-3 border rounded-xl text-black font-black" placeholder="Sted" />
                 <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="w-full min-h-[120px] p-3 border rounded-xl text-black" placeholder="Beskrivelse" />
-                
+               
                 <div className="flex gap-2 justify-end pt-2">
                   <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-gray-100 rounded-full text-xs font-bold text-gray-700">ANNULLER</button>
                   <button onClick={handleSaveInfo} className="px-4 py-2 bg-[#131921] text-white rounded-full text-xs font-bold">GEM</button>
@@ -397,7 +427,6 @@ export default function ForeningDetaljePage() {
             ))}
         </div>
 
-        {/* ... (RESTEN AF INDHOLDET: BESKEDER, MEDLEMMER, SAMTALER, EVENTS, KALENDER, BILLEDER, FOOTER) ... */}
         {isApprovedMember && (
           <>
             <button onClick={() => router.push('/beskeder')} className="w-full bg-white p-4 rounded-[24px] shadow-sm flex items-center hover:bg-gray-50 transition-colors">
@@ -486,14 +515,56 @@ export default function ForeningDetaljePage() {
             {/* Footer-actions */}
             <div className="bg-white rounded-[24px] p-4 shadow-sm flex flex-col md:flex-row gap-3 mb-10">
               <button onClick={handleClickLeave} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-full font-bold hover:bg-gray-200 transition-colors">Afslut medlemskab</button>
-              {/* NOTE: 'Skift billede' knappen er fjernet herfra, da upload nu sker i 'Rediger' mode for at håndtere galleriet */}
               {isOwner && <button onClick={handleClickDelete} className="flex-1 py-3 bg-red-100 text-red-700 rounded-full font-bold hover:bg-red-200 transition-colors">Slet forening</button>}
             </div>
           </>
         )}
       </main>
 
-      {/* MODALER (Bekræft, Invite, Besked, Medlemmer) */}
+      {/* --- LIGHTBOX (Fuldskærm) --- */}
+      {lightboxOpen && heroImages.length > 0 && (
+        <div className="fixed inset-0 z-[400] bg-black flex items-center justify-center animate-in fade-in duration-200">
+          <button 
+            onClick={() => setLightboxOpen(false)}
+            className="absolute top-6 right-6 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-colors z-20"
+          >
+            ✕
+          </button>
+          
+          <img 
+            src={heroImages[activeHeroIndex]} 
+            alt="Fuldskærm" 
+            className="max-w-full max-h-full object-contain p-4 select-none"
+            draggable="false"
+            // Swipe Events
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          />
+
+           {/* Pile i Lightbox */}
+           {heroImages.length > 1 && (
+              <>
+                <button 
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4 z-20 hidden md:block"
+                  onClick={prevHeroImage}
+                >❮</button>
+                <button 
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white text-4xl p-4 z-20 hidden md:block"
+                  onClick={nextHeroImage}
+                >❯</button>
+                {/* Dots i bund */}
+                <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 z-20">
+                    {heroImages.map((_, idx) => (
+                    <div key={idx} className={`w-2 h-2 rounded-full transition-all ${idx === activeHeroIndex ? 'bg-white scale-125' : 'bg-white/40'}`} />
+                    ))}
+                </div>
+              </>
+            )}
+        </div>
+      )}
+
+      {/* --- MODALS --- */}
       {confirmModal.isOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl p-6 text-center">
@@ -507,7 +578,6 @@ export default function ForeningDetaljePage() {
         </div>
       )}
       
-      {/* ... De andre modaler (Invite, Besked, Medlemmer) ... */}
       {isApprovedMember && isMeAdmin && showInviteModal && (
         <div className="fixed inset-0 z-[260] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-6 relative">
