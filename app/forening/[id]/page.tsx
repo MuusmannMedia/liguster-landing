@@ -670,14 +670,14 @@ export default function ForeningDetaljePage() {
 
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {heroImages.map((img, idx) => (
-                      <div key={idx} className="relative w-20 h-24 shrink-0 flex flex-col items-center">
-                        <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group">
+                      <div key={idx} className="flex flex-col items-center gap-2 shrink-0">
+                        <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-gray-200 shadow-sm group">
                           <img src={img} className="w-full h-full object-cover" alt="" />
 
                           {/* Sæt primær (stjerne) */}
                           <button
                             type="button"
-                            className="absolute bottom-0 left-0 w-11 h-11 flex items-center justify-center z-30 transition-transform active:scale-95 touch-manipulation"
+                            className="absolute bottom-0 left-0 w-10 h-10 flex items-center justify-center z-30 transition-transform active:scale-95 touch-manipulation bg-gradient-to-tr from-black/50 to-transparent rounded-tr-xl"
                             title={idx === 0 ? 'Hovedbillede' : 'Sæt som hovedbillede'}
                             onTouchEnd={(e) => {
                               e.preventDefault();
@@ -692,13 +692,13 @@ export default function ForeningDetaljePage() {
                               handleSetPrimaryImage(idx);
                             }}
                           >
-                            <span className={`text-2xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
+                            <span className={`text-xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
                           </button>
 
                           {/* Slet billede (DESKTOP: X-knap i hjørnet) */}
                           <button
                             type="button"
-                            className="hidden md:flex absolute top-0 right-0 bg-red-600 text-white w-8 h-8 items-center justify-center rounded-bl-2xl text-base font-black z-30 hover:bg-red-700 shadow-sm active:scale-95 touch-manipulation"
+                            className="hidden md:flex absolute top-0 right-0 bg-red-600 text-white w-8 h-8 items-center justify-center rounded-bl-xl text-sm font-bold z-30 hover:bg-red-700 shadow-sm active:scale-95 transition-colors"
                             aria-label="Slet billede"
                             onClick={(e) => {
                               e.preventDefault();
@@ -710,13 +710,13 @@ export default function ForeningDetaljePage() {
                           </button>
 
                           {/* Indikator for main image */}
-                          {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg z-10" />}
+                          {idx === 0 && <div className="absolute inset-0 border-4 border-yellow-400 pointer-events-none rounded-xl z-20" />}
                         </div>
 
-                        {/* Slet billede (MOBIL: Tekst under billedet) */}
+                        {/* Slet billede (MOBIL: Rød knap under billedet) */}
                         <button
                           type="button"
-                          className="md:hidden mt-1 text-[10px] font-bold text-red-600 uppercase tracking-wide px-2 py-1"
+                          className="md:hidden px-3 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full border border-red-200 active:scale-95 active:bg-red-200 transition-transform"
                           onTouchEnd={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -730,7 +730,7 @@ export default function ForeningDetaljePage() {
                             handleDeleteHeroImage(idx);
                           }}
                         >
-                          Slet
+                          SLET
                         </button>
                       </div>
                     ))}
@@ -739,14 +739,14 @@ export default function ForeningDetaljePage() {
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-20 h-20 shrink-0 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:bg-gray-50 font-bold text-2xl"
+                        className="w-24 h-24 shrink-0 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:bg-gray-50 font-bold text-3xl transition-colors"
                       >
                         +
                       </button>
                     )}
                   </div>
 
-                  <p className="text-[10px] text-gray-400 mt-1 italic">Klik på stjernen for at vælge forsidebillede.</p>
+                  <p className="text-[10px] text-gray-400 mt-2 italic">Klik på stjernen for at vælge forsidebillede.</p>
                 </div>
 
                 <input
