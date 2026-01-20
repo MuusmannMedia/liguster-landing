@@ -149,9 +149,8 @@ export default function ForeningDetaljePage() {
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  // Mobil: action sheet til billede-handlinger (robust på iOS Safari)
+  // --- NYT: Mobil Action Sheet til billedstyring ---
   const [imageActionIndex, setImageActionIndex] = useState<number | null>(null);
-  const closeImageSheet = () => setImageActionIndex(null);
 
   // Swipe States (lightbox)
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -354,6 +353,7 @@ export default function ForeningDetaljePage() {
       setHeroImages(newImages);
       setActiveHeroIndex(newImages.length - 1);
 
+      // GEM I DATABASEN (standard: nyeste bliver main)
       const { error: dbError } = await supabase
         .from('foreninger')
         .update({
@@ -377,6 +377,9 @@ export default function ForeningDetaljePage() {
   // --- DELETE IMAGE ---
   const handleDeleteHeroImage = async (indexToDelete: number) => {
     if (!realForeningId) return;
+    // Hvis vi er i action sheet mode (mobil), luk sheetet først
+    setImageActionIndex(null); 
+    
     if (!confirm('Er du sikker på, at du vil slette dette billede?')) return;
 
     const newImages = heroImages.filter((_, idx) => idx !== indexToDelete);
@@ -407,11 +410,13 @@ export default function ForeningDetaljePage() {
     setForening((prev) => (prev ? { ...prev, images: newImages, billede_url: newMainImage } : prev));
   };
 
-  // --- SET PRIMARY IMAGE (robust) ---
+  // --- SET PRIMARY IMAGE ---
   const handleSetPrimaryImage = async (indexToPrimary: number) => {
     if (!realForeningId) return;
+    setImageActionIndex(null); // Luk sheet
+
     if (heroImages.length === 0) return;
-    if (indexToPrimary === 0) return;
+    if (indexToPrimary === 0) return; // allerede primær
 
     const selectedImage = heroImages[indexToPrimary];
     const otherImages = heroImages.filter((_, idx) => idx !== indexToPrimary);
@@ -608,9 +613,9 @@ export default function ForeningDetaljePage() {
   if (loading) return <div className="min-h-screen bg-[#869FB9] flex items-center justify-center font-black text-white">Indlæser...</div>;
   if (!forening) return <div className="min-h-screen bg-[#869FB9] p-10 text-center text-white">Forening ikke fundet</div>;
 
-  const sheetIndex = imageActionIndex;
-  const sheetImg = sheetIndex !== null ? heroImages[sheetIndex] : null;
-  const sheetIsPrimary = sheetIndex === 0;
+  // For action sheet logic
+  const sheetImage = imageActionIndex !== null ? heroImages[imageActionIndex] : null;
+  const isSheetImagePrimary = imageActionIndex === 0;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
@@ -667,71 +672,56 @@ export default function ForeningDetaljePage() {
                 {/* Edit Billeder */}
                 <div className="mb-2">
                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Billeder ({heroImages.length}/6)</p>
-
-                  {/* Hint til mobil */}
-                  <p className="md:hidden text-[11px] text-gray-500 font-bold mb-2">
-                    Tryk på et billede for at <span className="text-black">slette</span> eller <span className="text-black">sætte som forside</span>.
-                  </p>
+                  
+                  {/* Info til mobil */}
+                  <p className="md:hidden text-[11px] text-gray-500 font-bold mb-2">Tryk på et billede for at redigere.</p>
 
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {heroImages.map((img, idx) => (
-                      <div key={idx} className="shrink-0">
-                        {/* DESKTOP tile (med overlay knapper) */}
-                        <div className="hidden md:block relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
-                          <img src={img} className="w-full h-full object-cover" alt="" />
-
-                          {/* Star */}
-                          <button
-                            type="button"
-                            className="absolute bottom-0 left-0 w-11 h-11 flex items-center justify-center z-30 active:scale-95 touch-manipulation"
-                            title={idx === 0 ? 'Hovedbillede' : 'Sæt som hovedbillede'}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSetPrimaryImage(idx);
-                            }}
-                          >
-                            <span className={`text-2xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
-                          </button>
-
-                          {/* Delete (X) */}
-                          <button
-                            type="button"
-                            className="absolute top-0 right-0 bg-red-600 text-white w-8 h-8 flex items-center justify-center rounded-bl-2xl text-base font-black z-30 hover:bg-red-700 shadow-sm active:scale-95 touch-manipulation"
-                            aria-label="Slet billede"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDeleteHeroImage(idx);
-                            }}
-                          >
-                            ✕
-                          </button>
-
-                          {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg z-10" />}
-                        </div>
-
-                        {/* MOBIL tile (hele billedet er trykbart -> åbner action sheet) */}
+                      <div key={idx} className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden group border border-gray-200">
+                        {/* MOBIL: Knap der åbner Action Sheet */}
                         <button
                           type="button"
-                          className={[
-                            'md:hidden relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200',
-                            'active:scale-[0.98] transition-transform touch-manipulation',
-                          ].join(' ')}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setImageActionIndex(idx);
-                          }}
-                          aria-label="Administrér billede"
+                          className="md:hidden w-full h-full"
+                          onClick={() => setImageActionIndex(idx)}
                         >
-                          <img src={img} className="w-full h-full object-cover" alt="" />
-                          {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg z-10" />}
-                          {/* lille badge */}
-                          <div className="absolute bottom-1 right-1 bg-black/45 text-white text-[10px] font-black px-2 py-1 rounded-full">
-                            {idx === 0 ? 'Forside' : '…'}
-                          </div>
+                           <img src={img} className="w-full h-full object-cover" alt="" />
+                           {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg z-10" />}
                         </button>
+
+                        {/* DESKTOP: Billede + Overlay Knapper (Skjult på mobil) */}
+                        <div className="hidden md:block w-full h-full relative">
+                            <img src={img} className="w-full h-full object-cover" alt="" />
+                            
+                            {/* Star */}
+                            <button
+                                type="button"
+                                className="absolute bottom-0 left-0 w-11 h-11 flex items-center justify-center z-30 transition-transform active:scale-95 touch-manipulation"
+                                title={idx === 0 ? 'Hovedbillede' : 'Sæt som hovedbillede'}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleSetPrimaryImage(idx);
+                                }}
+                            >
+                                <span className={`text-2xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
+                            </button>
+
+                            {/* Slet */}
+                            <button
+                                type="button"
+                                className="absolute top-0 right-0 bg-red-600 text-white w-8 h-8 flex items-center justify-center rounded-bl-2xl text-base font-black z-30 hover:bg-red-700 shadow-sm active:scale-95 touch-manipulation"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleDeleteHeroImage(idx);
+                                }}
+                            >
+                                ✕
+                            </button>
+                            
+                            {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg z-10" />}
+                        </div>
                       </div>
                     ))}
 
@@ -745,7 +735,7 @@ export default function ForeningDetaljePage() {
                       </button>
                     )}
                   </div>
-
+                  
                   <p className="hidden md:block text-[10px] text-gray-400 mt-1 italic">Klik på stjernen for at vælge forsidebillede.</p>
                 </div>
 
@@ -825,6 +815,7 @@ export default function ForeningDetaljePage() {
             ))}
         </div>
 
+        {/* ... Rest of the page ... */}
         {isApprovedMember && (
           <>
             <button
@@ -958,6 +949,8 @@ export default function ForeningDetaljePage() {
                       const key = toKey(day);
                       const dayEvents = eventsByDate.get(key) || [];
                       const hasEvents = dayEvents.length > 0;
+                      // Tjek om det er i dag
+                      const isToday = day.toDateString() === new Date().toDateString();
 
                       return (
                         <button
@@ -971,6 +964,7 @@ export default function ForeningDetaljePage() {
                             hasEvents ? 'shadow-sm hover:shadow-md hover:scale-[1.02]' : '',
                             key === selectedDayKey && !hasEvents ? 'ring-2 ring-[#131921]' : '',
                             key === selectedDayKey ? 'ring-4 ring-white/70' : '',
+                            isToday && !hasEvents ? 'border-2 border-[#131921]' : '', // Outline for i dag
                           ].join(' ')}
                         >
                           <span>{day.getDate()}</span>
@@ -1076,77 +1070,72 @@ export default function ForeningDetaljePage() {
         )}
       </main>
 
-      {/* --- MOBIL ACTION SHEET (Slet / Forside) --- */}
-      {isEditing && imageActionIndex !== null && sheetImg && (
-        <div className="fixed inset-0 z-[650] flex items-end justify-center">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/70"
-            onClick={() => closeImageSheet()}
-            aria-label="Luk"
-          />
-          <div className="relative w-full max-w-md bg-white rounded-t-[28px] p-5 pb-7 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-widest text-gray-500">Billede</p>
-                <p className="text-sm font-black text-[#131921]">{sheetIsPrimary ? 'Forsidebillede' : 'Administrér billede'}</p>
-              </div>
-              <button
-                type="button"
-                className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 font-black"
-                onClick={() => closeImageSheet()}
-              >
-                ✕
-              </button>
+      {/* --- MOBILE IMAGE ACTION SHEET --- */}
+      {imageActionIndex !== null && sheetImage && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+            {/* Backdrop */}
+            <div 
+                className="absolute inset-0 bg-black/60 transition-opacity" 
+                onClick={closeImageSheet}
+            />
+            
+            {/* Sheet Content */}
+            <div className="relative w-full max-w-sm bg-white rounded-t-2xl sm:rounded-2xl p-6 shadow-xl transform transition-transform">
+                <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-black text-[#131921]">Administrér billede</h3>
+                    <button 
+                        onClick={closeImageSheet}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div className="w-full aspect-video bg-gray-100 rounded-lg overflow-hidden mb-6">
+                    <img src={sheetImage} alt="" className="w-full h-full object-cover" />
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <button
+                        onClick={() => {
+                            handleSetPrimaryImage(imageActionIndex);
+                        }}
+                        disabled={isSheetImagePrimary}
+                        className={`w-full py-3.5 rounded-full font-bold text-sm transition-colors ${
+                            isSheetImagePrimary 
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                : 'bg-[#131921] text-white hover:bg-black'
+                        }`}
+                    >
+                        {isSheetImagePrimary ? 'Valgt som forside' : 'Sæt som forside'}
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            handleDeleteHeroImage(imageActionIndex);
+                        }}
+                        className="w-full py-3.5 rounded-full font-bold text-sm bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                    >
+                        Slet billede
+                    </button>
+
+                    <button
+                        onClick={closeImageSheet}
+                        className="w-full py-3.5 rounded-full font-bold text-sm text-gray-500 hover:bg-gray-50 transition-colors mt-1"
+                    >
+                        Annuller
+                    </button>
+                </div>
             </div>
-
-            <div className="mt-4 w-full aspect-square rounded-2xl overflow-hidden bg-gray-100">
-              <img src={sheetImg} alt="" className="w-full h-full object-cover" />
-            </div>
-
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={sheetIsPrimary}
-                onClick={async () => {
-                  const idx = imageActionIndex;
-                  closeImageSheet();
-                  await handleSetPrimaryImage(idx);
-                }}
-                className={[
-                  'w-full py-3 rounded-full font-black',
-                  sheetIsPrimary ? 'bg-gray-100 text-gray-400' : 'bg-[#131921] text-white active:scale-[0.99]',
-                ].join(' ')}
-              >
-                {sheetIsPrimary ? 'Dette er allerede forside' : 'Sæt som forside'}
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  const idx = imageActionIndex;
-                  closeImageSheet();
-                  await handleDeleteHeroImage(idx);
-                }}
-                className="w-full py-3 rounded-full font-black bg-red-600 text-white active:scale-[0.99]"
-              >
-                Slet billede
-              </button>
-
-              <button
-                type="button"
-                onClick={() => closeImageSheet()}
-                className="w-full py-3 rounded-full font-black bg-gray-100 text-gray-700 active:scale-[0.99]"
-              >
-                Annuller
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
       {/* --- LIGHTBOX --- */}
-      {lightboxOpen && heroImages.length > 0 && (
+      {/* ... (existing lightbox code) ... */}
+      {/* ... (existing modals code) ... */}
+
+      {/* Re-inserting the existing Modals (omitted for brevity in prompt but necessary for functionality) */}
+       {lightboxOpen && heroImages.length > 0 && (
         <div className="fixed inset-0 z-[400] bg-black flex items-center justify-center animate-in fade-in duration-200">
           <button
             onClick={() => setLightboxOpen(false)}
@@ -1352,8 +1341,6 @@ export default function ForeningDetaljePage() {
           </div>
         </div>
       )}
-
-      <SiteFooter />
     </div>
   );
 }
