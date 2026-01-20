@@ -670,35 +670,53 @@ export default function ForeningDetaljePage() {
 
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {heroImages.map((img, idx) => (
-                      <div key={idx} className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden group border border-gray-200">
-                        <img src={img} className="w-full h-full object-cover" alt="" />
+                      <div key={idx} className="relative w-20 h-24 shrink-0 flex flex-col items-center">
+                        <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group">
+                          <img src={img} className="w-full h-full object-cover" alt="" />
 
-                        {/* Sæt primær (stjerne) */}
+                          {/* Sæt primær (stjerne) */}
+                          <button
+                            type="button"
+                            className="absolute bottom-0 left-0 w-11 h-11 flex items-center justify-center z-30 transition-transform active:scale-95 touch-manipulation"
+                            title={idx === 0 ? 'Hovedbillede' : 'Sæt som hovedbillede'}
+                            onTouchEnd={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              markTouch();
+                              handleSetPrimaryImage(idx);
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (isRecentTouch()) return;
+                              handleSetPrimaryImage(idx);
+                            }}
+                          >
+                            <span className={`text-2xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
+                          </button>
+
+                          {/* Slet billede (DESKTOP: X-knap i hjørnet) */}
+                          <button
+                            type="button"
+                            className="hidden md:flex absolute top-0 right-0 bg-red-600 text-white w-8 h-8 items-center justify-center rounded-bl-2xl text-base font-black z-30 hover:bg-red-700 shadow-sm active:scale-95 touch-manipulation"
+                            aria-label="Slet billede"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDeleteHeroImage(idx);
+                            }}
+                          >
+                            ✕
+                          </button>
+
+                          {/* Indikator for main image */}
+                          {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg z-10" />}
+                        </div>
+
+                        {/* Slet billede (MOBIL: Tekst under billedet) */}
                         <button
                           type="button"
-                          className="absolute bottom-0 left-0 w-11 h-11 flex items-center justify-center z-30 transition-transform active:scale-95 touch-manipulation"
-                          title={idx === 0 ? 'Hovedbillede' : 'Sæt som hovedbillede'}
-                          onTouchEnd={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            markTouch();
-                            handleSetPrimaryImage(idx);
-                          }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (isRecentTouch()) return;
-                            handleSetPrimaryImage(idx);
-                          }}
-                        >
-                          <span className={`text-2xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
-                        </button>
-
-                        {/* Slet billede (KUN PÅ DESKTOP - "hidden md:flex") */}
-                        <button
-                          type="button"
-                          className="hidden md:flex absolute top-0 right-0 bg-red-600 text-white w-11 h-11 items-center justify-center rounded-bl-2xl text-base font-black z-30 hover:bg-red-700 shadow-sm active:scale-95 touch-manipulation"
-                          aria-label="Slet billede"
+                          className="md:hidden mt-1 text-[10px] font-bold text-red-600 uppercase tracking-wide px-2 py-1"
                           onTouchEnd={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -712,11 +730,8 @@ export default function ForeningDetaljePage() {
                             handleDeleteHeroImage(idx);
                           }}
                         >
-                          ✕
+                          Slet
                         </button>
-
-                        {/* Indikator for main image */}
-                        {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg z-10" />}
                       </div>
                     ))}
 
