@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { MouseEvent as ReactMouseEvent, TouchEvent as ReactTouchEvent, ChangeEvent as ReactChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
@@ -189,13 +188,6 @@ export default function ForeningDetaljePage() {
     isLoading: false,
   });
 
-  const stop = (e: any) => {
-    e?.stopPropagation?.();
-    // IMPORTANT: undgå at kalde preventDefault() på scroll-gestures generelt.
-    // Men på knapper er det ok – vi gør det kun her hvor vi eksplicit klikker på UI.
-    e?.preventDefault?.();
-  };
-
   // --- LOAD DATA ---
   useEffect(() => {
     async function loadAllData() {
@@ -293,6 +285,7 @@ export default function ForeningDetaljePage() {
     return map;
   }, [calendarEvents]);
 
+  const todayKey = useMemo(() => toKey(new Date()), []);
   const selectedDayEvents = useMemo(() => (selectedDayKey ? eventsByDate.get(selectedDayKey) || [] : []), [eventsByDate, selectedDayKey]);
   const selectedDayLabel = useMemo(() => {
     if (!selectedDayKey) return '';
@@ -304,43 +297,39 @@ export default function ForeningDetaljePage() {
   const hasLongDesc = (forening?.beskrivelse || '').trim().length > 220;
 
   // --- HERO NAVIGATION ---
-  const nextHeroImage = (e?: ReactMouseEvent<HTMLButtonElement>) => {
+  const nextHeroImage = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (heroImages.length === 0) return;
     setActiveHeroIndex((prev) => (prev + 1) % heroImages.length);
   };
 
-  const prevHeroImage = (e?: ReactMouseEvent<HTMLButtonElement>) => {
+  const prevHeroImage = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (heroImages.length === 0) return;
     setActiveHeroIndex((prev) => (prev === 0 ? heroImages.length - 1 : prev - 1));
   };
 
   // --- SWIPE LOGIC (LIGHTBOX IMG) ---
-  const onTouchStart = (e: ReactTouchEvent<HTMLImageElement>) => {
+  const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
 
-  const onTouchMove = (e: ReactTouchEvent<HTMLImageElement>) => {
+  const onTouchMove = (e: React.TouchEvent) => {
     setTouchEnd(e.targetTouches[0].clientX);
   };
 
   const onTouchEnd = () => {
-    if (touchStart == null || touchEnd == null) return;
+    if (!touchStart || !touchEnd) return;
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
-    if (isLeftSwipe) {
-      setActiveHeroIndex((prev) => (heroImages.length ? (prev + 1) % heroImages.length : 0));
-    }
-    if (isRightSwipe) {
-      setActiveHeroIndex((prev) => (heroImages.length ? (prev === 0 ? heroImages.length - 1 : prev - 1) : 0));
-    }
+    if (isLeftSwipe) nextHeroImage();
+    if (isRightSwipe) prevHeroImage();
   };
 
   // --- UPLOAD IMAGE ---
-  const handleImageUpload = async (e: ReactChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !realForeningId) return;
     const file = e.target.files[0];
 
@@ -631,11 +620,7 @@ export default function ForeningDetaljePage() {
           >
             {heroImages.length > 0 ? (
               <>
-                <img
-                  src={heroImages[activeHeroIndex]}
-                  className="w-full h-full object-cover transition-opacity duration-300 cursor-zoom-in"
-                  alt="Cover"
-                />
+                <img src={heroImages[activeHeroIndex]} className="w-full h-full object-cover transition-opacity duration-300 cursor-zoom-in" alt="Cover" />
 
                 {/* Pile */}
                 {heroImages.length > 1 && (
@@ -676,42 +661,34 @@ export default function ForeningDetaljePage() {
                 <div className="mb-2">
                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Billeder ({heroImages.length}/6)</p>
 
-                  {/* MOBIL: grid (ingen horisontal scroll, bedre tap på iOS)
-                      DESKTOP: flex + overflow-x-auto som før */}
-                  <div className="grid grid-cols-3 gap-2 md:flex md:gap-2 md:overflow-x-auto md:pb-2 md:scrollbar-hide">
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {heroImages.map((img, idx) => (
-                      <div key={idx} className="relative w-full md:w-20 md:h-24 md:shrink-0 flex flex-col items-center">
-                        <div className="relative w-full aspect-square md:w-20 md:h-20 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                      <div key={idx} className="flex flex-col items-center gap-2 shrink-0">
+                        <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-gray-200 shadow-sm group">
                           <img src={img} className="w-full h-full object-cover" alt="" />
 
                           {/* Sæt primær (stjerne) */}
                           <button
                             type="button"
-                            className="absolute bottom-0 left-0 w-11 h-11 flex items-center justify-center z-30 active:scale-95 touch-manipulation"
+                            className="absolute bottom-0 left-0 w-10 h-10 flex items-center justify-center z-30 transition-transform active:scale-95 touch-manipulation bg-gradient-to-tr from-black/50 to-transparent rounded-tr-xl"
                             title={idx === 0 ? 'Hovedbillede' : 'Sæt som hovedbillede'}
-                            onPointerUp={(e: ReactPointerEvent<HTMLButtonElement>) => {
-                              stop(e);
-                              handleSetPrimaryImage(idx);
-                            }}
                             onClick={(e) => {
-                              stop(e);
+                              e.preventDefault();
+                              e.stopPropagation();
                               handleSetPrimaryImage(idx);
                             }}
                           >
-                            <span className={`text-2xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
+                            <span className={`text-xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
                           </button>
 
-                          {/* SLET (robust): altid synlig, stor tap-flade */}
+                          {/* Slet billede (DESKTOP: X-knap i hjørnet) */}
                           <button
                             type="button"
+                            className="hidden md:flex absolute top-0 right-0 bg-red-600 text-white w-8 h-8 items-center justify-center rounded-bl-xl text-sm font-bold z-30 hover:bg-red-700 shadow-sm active:scale-95 transition-colors"
                             aria-label="Slet billede"
-                            className="absolute top-0 right-0 bg-red-600 text-white w-10 h-10 flex items-center justify-center rounded-bl-2xl text-base font-black z-40 shadow-sm active:scale-95 touch-manipulation"
-                            onPointerUp={(e: ReactPointerEvent<HTMLButtonElement>) => {
-                              stop(e);
-                              handleDeleteHeroImage(idx);
-                            }}
                             onClick={(e) => {
-                              stop(e);
+                              e.preventDefault();
+                              e.stopPropagation();
                               handleDeleteHeroImage(idx);
                             }}
                           >
@@ -719,13 +696,21 @@ export default function ForeningDetaljePage() {
                           </button>
 
                           {/* Indikator for main image */}
-                          {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg z-10" />}
+                          {idx === 0 && <div className="absolute inset-0 border-4 border-yellow-400 pointer-events-none rounded-xl z-20" />}
                         </div>
 
-                        {/* Label under (kun mobil, valgfrit) */}
-                        <div className="md:hidden mt-1 text-[10px] font-bold text-gray-500 uppercase tracking-wide">
-                          {idx === 0 ? 'Forside' : 'Billede'}
-                        </div>
+                        {/* Slet billede (MOBIL: Rød knap under billedet) */}
+                        <button
+                          type="button"
+                          className="md:hidden px-3 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full border border-red-200 active:scale-95 active:bg-red-200 transition-transform"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDeleteHeroImage(idx);
+                          }}
+                        >
+                          SLET
+                        </button>
                       </div>
                     ))}
 
@@ -733,14 +718,14 @@ export default function ForeningDetaljePage() {
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-full aspect-square md:w-20 md:h-20 shrink-0 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:bg-gray-50 font-bold text-2xl"
+                        className="w-24 h-24 shrink-0 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:bg-gray-50 font-bold text-3xl transition-colors"
                       >
                         +
                       </button>
                     )}
                   </div>
 
-                  <p className="text-[10px] text-gray-400 mt-2 italic">Tryk på stjernen for at vælge forsidebillede. Tryk på X for at slette.</p>
+                  <p className="text-[10px] text-gray-400 mt-2 italic">Klik på stjernen for at vælge forsidebillede.</p>
                 </div>
 
                 <input
