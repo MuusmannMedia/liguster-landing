@@ -122,7 +122,6 @@ export default function ForeningDetaljePage() {
         if (!idOrSlug) return;
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
         
-        // VIGTIGT: Hent både eksisterende kolonner OG den nye 'images'
         let query = supabase.from('foreninger').select('*, images');
         
         if (isUuid) query = query.eq('id', idOrSlug);
@@ -139,15 +138,11 @@ export default function ForeningDetaljePage() {
 
         // --- HÅNDTER BILLEDER ---
         let loadedImages: string[] = [];
-        // Tjek om 'images' (JSONB) eksisterer og har indhold
         if (foreningData.images && Array.isArray(foreningData.images) && foreningData.images.length > 0) {
             loadedImages = foreningData.images;
-        } 
-        // Fallback til 'billede_url' hvis listen er tom
-        else if (foreningData.billede_url) {
+        } else if (foreningData.billede_url) {
             loadedImages = [foreningData.billede_url];
         }
-        
         setHeroImages(loadedImages);
         // -------------------------
 
@@ -243,7 +238,6 @@ export default function ForeningDetaljePage() {
     }
 
     setUploading(true);
-    // Unikt navn for at undgå browser cache problemer
     const fileName = `${realForeningId}_${Date.now()}`; 
     const { error: uploadError } = await supabase.storage.from('foreningsbilleder').upload(fileName, file);
 
@@ -258,14 +252,14 @@ export default function ForeningDetaljePage() {
       // GEM I DATABASEN
       const { error: dbError } = await supabase.from('foreninger')
         .update({ 
-            billede_url: newUrl, // Updater primært billede (backup)
-            images: newImages    // Updater listen (kræver SQL scriptet er kørt)
+            billede_url: newUrl, // Det nyeste billede bliver main (standard)
+            images: newImages    
         })
         .eq('id', realForeningId);
 
       if (dbError) {
           console.error("Fejl ved DB update:", dbError);
-          alert("Kunne ikke gemme billedet i databasen. Har du kørt SQL-scriptet?");
+          alert("Kunne ikke gemme billedet i databasen.");
       }
     }
     setUploading(false);
@@ -280,14 +274,40 @@ export default function ForeningDetaljePage() {
     const newImages = heroImages.filter((_, idx) => idx !== indexToDelete);
     setHeroImages(newImages);
     
+    // Juster aktivt index hvis nødvendigt
     if (activeHeroIndex >= newImages.length) {
         setActiveHeroIndex(Math.max(0, newImages.length - 1));
     }
 
+    // Hvis vi slettede det billede der var hovedbillede (index 0), så bliver det næste i rækken det nye hovedbillede
+    const newMainImage = newImages.length > 0 ? newImages[0] : null;
+
     await supabase.from('foreninger')
         .update({ 
             images: newImages, 
-            billede_url: newImages.length > 0 ? newImages[0] : null 
+            billede_url: newMainImage 
+        })
+        .eq('id', realForeningId);
+  };
+
+  // --- SET PRIMARY IMAGE (NEW FEATURE) ---
+  const handleSetPrimaryImage = async (indexToPrimary: number) => {
+    if (!realForeningId || indexToPrimary === 0) return; // Allerede primær
+
+    const selectedImage = heroImages[indexToPrimary];
+    const otherImages = heroImages.filter((_, idx) => idx !== indexToPrimary);
+    
+    // Nyt array med det valgte billede først
+    const newImages = [selectedImage, ...otherImages];
+    
+    setHeroImages(newImages);
+    setActiveHeroIndex(0); // Hop til det nye hovedbillede
+
+    // Opdater DB
+    await supabase.from('foreninger')
+        .update({
+            images: newImages,
+            billede_url: selectedImage // Opdater også fallback kolonnen
         })
         .eq('id', realForeningId);
   };
@@ -336,10 +356,6 @@ export default function ForeningDetaljePage() {
         {/* HERO */}
         <div className="bg-white rounded-[24px] p-5 shadow-md mt-6 flex flex-col gap-4">
           
-          {/* HERO BILLED CONTAINER 
-             - Mobile: aspect-square (Kvadratisk)
-             - Desktop: aspect-[16/13] (Ca 25-30% højere end 16/10)
-          */}
           <div 
             className="relative w-full aspect-square md:aspect-[16/13] rounded-[18px] overflow-hidden bg-gray-100 group"
             onClick={() => heroImages.length > 0 && setLightboxOpen(true)}
@@ -377,25 +393,40 @@ export default function ForeningDetaljePage() {
                 {/* Edit Billeder */}
                 <div className="mb-2">
                     <p className="text-xs font-bold text-gray-500 uppercase mb-2">Billeder ({heroImages.length}/6)</p>
-                    <div className="flex gap-2 overflow-x-auto pb-2">
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                         {heroImages.map((img, idx) => (
-                            <div key={idx} className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden group">
+                            <div key={idx} className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden group border border-gray-200">
                                 <img src={img} className="w-full h-full object-cover" />
+                                
+                                {/* Gør til primær (stjerne) */}
                                 <button 
-                                    onClick={() => handleDeleteHeroImage(idx)}
-                                    className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-lg text-xs font-bold"
+                                    onClick={(e) => { e.stopPropagation(); handleSetPrimaryImage(idx); }}
+                                    className="absolute bottom-0 left-0 w-6 h-6 flex items-center justify-center z-20 hover:scale-110 transition-transform"
+                                    title={idx === 0 ? "Hovedbillede" : "Sæt som hovedbillede"}
+                                >
+                                    <span className={`text-lg leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
+                                </button>
+
+                                {/* Slet billede */}
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteHeroImage(idx); }}
+                                    className="absolute top-0 right-0 bg-red-600 text-white w-6 h-6 flex items-center justify-center rounded-bl-lg text-xs font-bold z-20 hover:bg-red-700"
                                 >✕</button>
+                                
+                                {/* Indikator for main image */}
+                                {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg" />}
                             </div>
                         ))}
                         {heroImages.length < 6 && (
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
-                                className="w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:bg-gray-50 font-bold text-2xl"
+                                className="w-20 h-20 shrink-0 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:bg-gray-50 font-bold text-2xl"
                             >
                                 +
                             </button>
                         )}
                     </div>
+                    <p className="text-[10px] text-gray-400 mt-1 italic">Klik på stjernen for at vælge forsidebillede.</p>
                 </div>
 
                 <input value={editNavn} onChange={(e) => setEditNavn(e.target.value)} className="w-full p-3 border rounded-xl text-black font-black" placeholder="Foreningens navn" />
