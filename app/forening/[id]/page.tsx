@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '../../../lib/supabaseClient';
-import SiteHeader from '../../../components/SiteHeader';
-import SiteFooter from '../../../components/SiteFooter';
+import { supabase } from '../../../lib/supabaseClient'; // Tjek at stien passer hos dig
+import SiteHeader from '../../../components/SiteHeader'; // Tjek at stien passer hos dig
+import SiteFooter from '../../../components/SiteFooter'; // Tjek at stien passer hos dig
 
 // --- TYPER ---
 type Forening = {
@@ -709,7 +709,6 @@ export default function ForeningDetaljePage() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              // Desktop kan godt bruge confirm hvis du vil, men vi bruger samme “no-confirm” for konsistens:
                               handleDeleteHeroImage(idx);
                             }}
                           >
@@ -787,7 +786,7 @@ export default function ForeningDetaljePage() {
                     {isMeAdmin && (
                       <>
                         <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Rediger</button>
-                        <button onClick={handleOpenInvite} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase">Inviter</button>
+                        <button onClick={handleOpenInvite} className="px-4 py-2 bg-gray-100 text-black text-xs font-bold rounded-full uppercase hover:bg-gray-200">Inviter</button>
                       </>
                     )}
                   </div>
@@ -913,9 +912,7 @@ export default function ForeningDetaljePage() {
                           hasEvents ? dayColorClass(true) : 'bg-transparent',
                           hasEvents ? '' : (day.getMonth() !== monthCursor.getMonth() ? 'text-gray-300' : 'text-gray-800'),
                           hasEvents ? 'shadow-sm hover:shadow-md hover:scale-[1.02]' : '',
-                          // ✅ MØRK OUTLINE omkring i dag (uanset events)
                           isToday ? 'ring-2 ring-[#131921]' : '',
-                          // selected ring ovenpå
                           isSelected ? 'ring-4 ring-white/70' : '',
                         ].join(' ')}
                       >
@@ -928,7 +925,6 @@ export default function ForeningDetaljePage() {
                   })}
                 </div>
 
-                {/* ... resten af kalender-delen er uændret ... */}
                 {selectedDayKey && selectedDayEvents.length > 0 && (
                   <div className="mt-4 bg-[#F9FBFC] border border-gray-100 rounded-2xl p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -1047,17 +1043,14 @@ export default function ForeningDetaljePage() {
                 {sheetIsPrimary ? 'Dette er allerede forside' : 'Sæt som forside'}
               </button>
 
-              {/* ✅ Robust 2-step delete (ingen confirm()) */}
               <button
                 type="button"
                 onClick={async () => {
                   if (imageActionIndex === null) return;
-
                   if (!armDelete) {
                     setArmDelete(true);
                     return;
                   }
-
                   const idx = imageActionIndex;
                   setArmDelete(false);
                   closeImageSheet();
@@ -1117,7 +1110,7 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* --- MODALS --- */}
+      {/* --- CONFIRM MODAL --- */}
       {confirmModal.isOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl p-6 text-center">
@@ -1133,7 +1126,156 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* (resten af dine modals er uændrede) */}
+      {/* --- INVITE MODAL (Fix) --- */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-md rounded-[24px] shadow-2xl p-6">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-black text-[#131921]">Inviter bruger</h3>
+                <button 
+                onClick={() => setShowInviteModal(false)} 
+                className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-gray-200"
+                >
+                ✕
+                </button>
+            </div>
+
+            <div className="mb-4">
+                <input
+                type="text"
+                autoFocus
+                value={inviteQuery}
+                onChange={(e) => runInviteSearch(e.target.value)}
+                placeholder="Søg på navn, brugernavn eller email..."
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-black font-medium focus:outline-none focus:ring-2 focus:ring-[#131921]"
+                />
+            </div>
+
+            <div className="min-h-[150px] max-h-[300px] overflow-y-auto">
+                {inviteLoading && (
+                <div className="text-center text-gray-400 text-sm py-4">Søger...</div>
+                )}
+                
+                {!inviteLoading && inviteResults.length === 0 && inviteQuery.length > 1 && (
+                <div className="text-center text-gray-400 text-sm py-4">Ingen brugere fundet.</div>
+                )}
+
+                <div className="space-y-2">
+                {inviteResults.map((user) => (
+                    <div key={user.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+                        {getAvatarUrl(user.avatar_url) ? (
+                            <img src={getAvatarUrl(user.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-xs">?</div>
+                        )}
+                        </div>
+                        <div className="flex flex-col">
+                        <span className="text-sm font-bold text-[#131921]">{user.name || user.username}</span>
+                        <span className="text-xs text-gray-500">{user.email}</span>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => inviteUser(user.id)}
+                        className="px-3 py-1.5 bg-[#131921] text-white text-xs font-bold rounded-full hover:bg-black"
+                    >
+                        Inviter
+                    </button>
+                    </div>
+                ))}
+                </div>
+            </div>
+
+            {inviteInfo && (
+                <div className="mt-4 p-3 bg-gray-100 rounded-xl text-center text-sm font-bold text-[#131921]">
+                {inviteInfo}
+                </div>
+            )}
+            </div>
+        </div>
+      )}
+
+      {/* --- MEMBERS MODAL --- */}
+      {showMembers && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md max-h-[80vh] flex flex-col rounded-[24px] shadow-2xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-black text-[#131921]">Medlemmer</h3>
+              <button 
+                onClick={() => setShowMembers(false)} 
+                className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-gray-200"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {approved.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">Ingen medlemmer endnu.</p>
+              ) : (
+                approved.map((m) => (
+                  <div key={m.user_id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer" onClick={() => handleOpenMessageModal(m)}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+                        {getAvatarUrl(m.users?.avatar_url) ? (
+                          <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-xs">?</div>
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-[#131921]">{getDisplayName(m)}</span>
+                        <span className="text-xs text-gray-500 uppercase font-bold">{m.rolle || 'Medlem'}</span>
+                      </div>
+                    </div>
+                    {userId !== m.user_id && (
+                        <button className="text-xs font-bold text-[#131921] bg-gray-100 px-3 py-1.5 rounded-full hover:bg-gray-200">
+                            Besked
+                        </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- SEND MESSAGE MODAL --- */}
+      {showFirstMessageModal && selectedMember && (
+        <div className="fixed inset-0 z-[350] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-black text-[#131921]">Send besked</h3>
+              <button 
+                onClick={() => setShowFirstMessageModal(false)} 
+                className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-gray-200"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-3">Til: <span className="font-bold text-black">{getDisplayName(selectedMember)}</span></p>
+            
+            <textarea
+              value={firstMessageText}
+              onChange={(e) => setFirstMessageText(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 mb-4 min-h-[100px] text-sm focus:outline-none focus:ring-2 focus:ring-[#131921]"
+              placeholder="Skriv din besked her..."
+            />
+            
+            <button 
+              onClick={handleSendFirstMessage}
+              disabled={isSendingFirstMessage || !firstMessageText.trim()}
+              className="w-full py-3 bg-[#131921] text-white rounded-full font-bold text-sm hover:bg-black disabled:opacity-50"
+            >
+              {isSendingFirstMessage ? 'Sender...' : 'Send besked'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <SiteFooter />
     </div>
   );
