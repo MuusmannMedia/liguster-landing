@@ -1261,7 +1261,8 @@ export default function ForeningDetaljePage() {
             <textarea
               value={firstMessageText}
               onChange={(e) => setFirstMessageText(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 mb-4 min-h-[100px] text-sm focus:outline-none focus:ring-2 focus:ring-[#131921]"
+              // HER ER RETTELSEN: 'text-black' er tilføjet herunder
+              className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 mb-4 min-h-[100px] text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#131921]"
               placeholder="Skriv din besked her..."
             />
             
