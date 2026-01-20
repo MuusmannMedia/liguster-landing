@@ -401,20 +401,20 @@ export default function ForeningDetaljePage() {
                                 {/* Gør til primær (stjerne) */}
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleSetPrimaryImage(idx); }}
-                                    className="absolute bottom-0 left-0 w-6 h-6 flex items-center justify-center z-20 hover:scale-110 transition-transform"
+                                    className="absolute bottom-0 left-0 w-8 h-8 flex items-center justify-center z-30 hover:scale-110 transition-transform cursor-pointer"
                                     title={idx === 0 ? "Hovedbillede" : "Sæt som hovedbillede"}
                                 >
-                                    <span className={`text-lg leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
+                                    <span className={`text-xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
                                 </button>
 
-                                {/* Slet billede */}
+                                {/* Slet billede (RETTET: større areal) */}
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleDeleteHeroImage(idx); }}
-                                    className="absolute top-0 right-0 bg-red-600 text-white w-6 h-6 flex items-center justify-center rounded-bl-lg text-xs font-bold z-20 hover:bg-red-700"
+                                    className="absolute top-0 right-0 bg-red-600 text-white w-8 h-8 flex items-center justify-center rounded-bl-xl text-sm font-bold z-30 hover:bg-red-700 cursor-pointer shadow-sm"
                                 >✕</button>
                                 
                                 {/* Indikator for main image */}
-                                {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg" />}
+                                {idx === 0 && <div className="absolute inset-0 border-2 border-yellow-400 pointer-events-none rounded-lg z-10" />}
                             </div>
                         ))}
                         {heroImages.length < 6 && (
