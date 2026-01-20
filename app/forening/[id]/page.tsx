@@ -156,7 +156,7 @@ export default function ForeningDetaljePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ FIX (mobile web): undgå dobbelt-fyring (touchend + click)
+  // Fix (mobile web): undgå dobbelt-fyring
   const lastTouchRef = useRef<number>(0);
   const markTouch = () => {
     lastTouchRef.current = Date.now();
@@ -378,7 +378,7 @@ export default function ForeningDetaljePage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // --- DELETE IMAGE (FIX: mobile web) ---
+  // --- DELETE IMAGE ---
   const handleDeleteHeroImage = async (indexToDelete: number) => {
     if (!realForeningId) return;
     if (!confirm('Er du sikker på, at du vil slette dette billede?')) return;
@@ -694,10 +694,10 @@ export default function ForeningDetaljePage() {
                           <span className={`text-2xl leading-none drop-shadow-md ${idx === 0 ? 'text-yellow-400' : 'text-white hover:text-yellow-200'}`}>★</span>
                         </button>
 
-                        {/* Slet billede (FIX: mobil web) */}
+                        {/* Slet billede (KUN PÅ DESKTOP - "hidden md:flex") */}
                         <button
                           type="button"
-                          className="absolute top-0 right-0 bg-red-600 text-white w-11 h-11 flex items-center justify-center rounded-bl-2xl text-base font-black z-30 hover:bg-red-700 shadow-sm active:scale-95 touch-manipulation"
+                          className="hidden md:flex absolute top-0 right-0 bg-red-600 text-white w-11 h-11 items-center justify-center rounded-bl-2xl text-base font-black z-30 hover:bg-red-700 shadow-sm active:scale-95 touch-manipulation"
                           aria-label="Slet billede"
                           onTouchEnd={(e) => {
                             e.preventDefault();
