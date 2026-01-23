@@ -12,6 +12,38 @@ export default function LigusterLandingPage() {
   const totalSlides = 10;
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
+  // --- NYT: COPY FEEDBACK STATE ---
+  const [shareFeedback, setShareFeedback] = useState('');
+
+  // --- NYT: SHARE FUNCTION ---
+  const handleShare = async () => {
+    const shareData = {
+      title: 'Liguster',
+      text: 'Hej! Jeg har fundet den her nye app til nabolaget. Skal vi ikke prøve den?',
+      url: window.location.href, // Deler den nuværende side
+    };
+
+    // Tjekker om browseren understøtter "Native Share" (Mobil + moderne browsere)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        setShareFeedback('Tak fordi du deler! 💙');
+        setTimeout(() => setShareFeedback(''), 3000);
+      } catch (err) {
+        // Brugeren annullerede delingen - gør intet
+      }
+    } else {
+      // Fallback til PC/Desktop: Kopier link til udklipsholder
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        setShareFeedback('Link kopieret! Indsæt det i en besked 📋');
+        setTimeout(() => setShareFeedback(''), 3000);
+      } catch (err) {
+        setShareFeedback('Kunne ikke kopiere linket');
+      }
+    }
+  };
+
   // --- CAROUSEL LOGIC ---
   const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % totalSlides);
   const prevSlide = () =>
@@ -117,7 +149,7 @@ export default function LigusterLandingPage() {
 
           <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse items-center">
             
-            {/* ✅ NY KNAP: OPSLAG */}
+            {/* KNAP: OPSLAG */}
             <Link
               href="/offentlige-opslag"
               className="text-white hover:text-white/80 font-bold text-sm px-3 py-2.5 transition-all flex items-center"
@@ -166,7 +198,7 @@ export default function LigusterLandingPage() {
               </span>
             </p>
 
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
               <a
                 href="#features"
                 className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-gray-900 border border-gray-300 rounded-lg bg-white hover:bg-gray-100 transition-colors"
@@ -174,15 +206,33 @@ export default function LigusterLandingPage() {
                 Se hvordan det virker
               </a>
 
-              <div className="flex items-center gap-4 text-white/80 text-sm mt-2 md:mt-0">
+              {/* --- NY DELE KNAP --- */}
+              <button
+                onClick={handleShare}
+                className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white border border-white/30 rounded-lg hover:bg-white/10 transition-colors backdrop-blur-sm group"
+              >
+                <i className="fa-solid fa-share-nodes mr-2 group-hover:scale-110 transition-transform"></i>
+                Tip en nabo
+              </button>
+            </div>
+
+            {/* FEEDBACK BESKED VED DELING */}
+            {shareFeedback && (
+               <div className="mt-3 text-green-300 font-bold text-sm animate-pulse">
+                 <i className="fa-solid fa-check mr-2"></i>{shareFeedback}
+               </div>
+            )}
+            {/* --------------------- */}
+
+            <div className="flex items-center gap-4 text-white/80 text-sm mt-8 md:mt-8">
                 <div className="flex items-center">
                   <i className="fa-brands fa-apple text-xl mr-2"></i> iOS
                 </div>
                 <div className="flex items-center">
                   <i className="fa-brands fa-android text-xl mr-2"></i> Android
                 </div>
-              </div>
             </div>
+
           </div>
 
           <div className="hidden lg:mt-0 lg:col-span-5 lg:flex justify-center items-center relative">
