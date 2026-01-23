@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '../../../lib/supabaseClient'; // Tjek at stien passer hos dig
-import SiteHeader from '../../../components/SiteHeader'; // Tjek at stien passer hos dig
-import SiteFooter from '../../../components/SiteFooter'; // Tjek at stien passer hos dig
+import { supabase } from '../../../lib/supabaseClient'; 
+import SiteHeader from '../../../components/SiteHeader'; 
+import SiteFooter from '../../../components/SiteFooter'; 
 
 // --- TYPER ---
 type Forening = {
@@ -273,6 +273,20 @@ export default function ForeningDetaljePage() {
 
   // --- MEMOS ---
   const approved = useMemo(() => medlemmer.filter((m) => m.status === 'approved'), [medlemmer]);
+  
+  // OPDELING I ADMIN OG REGULÆRE MEDLEMMER
+  const admins = useMemo(() => approved.filter(m => {
+    const r = (m.rolle || '').toLowerCase();
+    const isCreator = forening?.oprettet_af === m.user_id;
+    return r === 'admin' || r === 'administrator' || isCreator;
+  }), [approved, forening]);
+
+  const regulars = useMemo(() => approved.filter(m => {
+    const r = (m.rolle || '').toLowerCase();
+    const isCreator = forening?.oprettet_af === m.user_id;
+    return !(r === 'admin' || r === 'administrator' || isCreator);
+  }), [approved, forening]);
+
   const myMembership = useMemo(() => medlemmer.find((m) => m.user_id === userId), [medlemmer, userId]);
   const isApprovedMember = myMembership?.status === 'approved';
   const isPending = myMembership?.status === 'pending';
@@ -809,25 +823,55 @@ export default function ForeningDetaljePage() {
               <div className="bg-[#131921] text-white px-4 py-2 rounded-full font-black text-sm tracking-wider uppercase">Beskeder</div>
             </button>
 
-            {/* MEDLEMMER */}
+            {/* MEDLEMMER (KUN REGULÆRE) */}
             <div className="bg-white rounded-[24px] p-4 shadow-sm relative">
               <div className="flex justify-between items-center mb-3 px-2">
                 <h3 className="font-black text-[#131921]">MEDLEMMER</h3>
                 <button onClick={() => setShowMembers(true)} className="text-xs font-bold text-gray-500">Se alle</button>
               </div>
               <div className="flex gap-4 overflow-x-auto pb-2 px-2 scrollbar-hide">
-                {approved.map((m) => (
-                  <div key={m.user_id} className="flex flex-col items-center min-w-[64px] cursor-pointer" onClick={() => { setSelectedMember(m); setShowMembers(true); }}>
-                    <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
-                      {getAvatarUrl(m.users?.avatar_url) ? (
-                        <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>
-                      )}
+                {regulars.length > 0 ? (
+                  regulars.map((m) => (
+                    <div key={m.user_id} className="flex flex-col items-center min-w-[64px] cursor-pointer" onClick={() => { setSelectedMember(m); setShowMembers(true); }}>
+                      <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
+                        {getAvatarUrl(m.users?.avatar_url) ? (
+                          <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
                     </div>
-                    <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400">Ingen medlemmer</p>
+                )}
+              </div>
+            </div>
+
+            {/* ADMINISTRATOR (NY BOKS) */}
+            <div className="bg-white rounded-[24px] p-4 shadow-sm relative">
+              <div className="flex justify-between items-center mb-3 px-2">
+                <h3 className="font-black text-[#131921]">ADMINISTRATOR</h3>
+                <button onClick={() => setShowMembers(true)} className="text-xs font-bold text-gray-500">Se alle</button>
+              </div>
+              <div className="flex gap-4 overflow-x-auto pb-2 px-2 scrollbar-hide">
+                {admins.length > 0 ? (
+                  admins.map((m) => (
+                    <div key={m.user_id} className="flex flex-col items-center min-w-[64px] cursor-pointer" onClick={() => { setSelectedMember(m); setShowMembers(true); }}>
+                      <div className="w-14 h-14 rounded-[14px] bg-gray-100 overflow-hidden mb-1">
+                        {getAvatarUrl(m.users?.avatar_url) ? (
+                          <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center font-bold text-gray-400">?</div>
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-black truncate w-16 text-center">{getDisplayName(m)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400">Ingen administratorer</p>
+                )}
               </div>
             </div>
 
@@ -997,85 +1041,124 @@ export default function ForeningDetaljePage() {
         )}
       </main>
 
-      {/* --- MOBIL ACTION SHEET (Slet / Forside) --- */}
-      {isEditing && imageActionIndex !== null && sheetImg && (
-        <div className="fixed inset-0 z-[650] flex items-end justify-center">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/70"
-            onClick={() => { setArmDelete(false); closeImageSheet(); }}
-            aria-label="Luk"
-          />
-          <div className="relative w-full max-w-md bg-white rounded-t-[28px] p-5 pb-7 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-widest text-gray-500">Billede</p>
-                <p className="text-sm font-black text-[#131921]">{sheetIsPrimary ? 'Forsidebillede' : 'Administrér billede'}</p>
-              </div>
-              <button
-                type="button"
-                className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 font-black"
-                onClick={() => { setArmDelete(false); closeImageSheet(); }}
+      {/* --- MEMBERS MODAL --- */}
+      {showMembers && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md max-h-[80vh] flex flex-col rounded-[24px] shadow-2xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-black text-[#131921]">Medlemmer</h3>
+              <button 
+                onClick={() => setShowMembers(false)} 
+                className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-gray-200"
               >
                 ✕
               </button>
             </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {/* ADMINS */}
+              <div>
+                <h4 className="text-sm font-black text-gray-500 uppercase mb-2">Administratorer</h4>
+                {admins.length === 0 ? (
+                  <p className="text-sm text-gray-400">Ingen administratorer.</p>
+                ) : (
+                  admins.map((m) => (
+                    <div key={m.user_id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer" onClick={() => handleOpenMessageModal(m)}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+                          {getAvatarUrl(m.users?.avatar_url) ? (
+                            <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-xs">?</div>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-[#131921]">{getDisplayName(m)}</span>
+                          <span className="text-xs text-gray-500 uppercase font-bold">ADMIN</span>
+                        </div>
+                      </div>
+                      {userId !== m.user_id && (
+                          <button className="text-xs font-bold text-[#131921] bg-gray-100 px-3 py-1.5 rounded-full hover:bg-gray-200">
+                              Besked
+                          </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
 
-            <div className="mt-4 w-full aspect-square rounded-2xl overflow-hidden bg-gray-100">
-              <img src={sheetImg} alt="" className="w-full h-full object-cover" />
-            </div>
-
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={sheetIsPrimary}
-                onClick={async () => {
-                  const idx = imageActionIndex;
-                  setArmDelete(false);
-                  closeImageSheet();
-                  await handleSetPrimaryImage(idx);
-                }}
-                className={[
-                  'w-full py-3 rounded-full font-black',
-                  sheetIsPrimary ? 'bg-gray-100 text-gray-400' : 'bg-[#131921] text-white active:scale-[0.99]',
-                ].join(' ')}
-              >
-                {sheetIsPrimary ? 'Dette er allerede forside' : 'Sæt som forside'}
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  if (imageActionIndex === null) return;
-                  if (!armDelete) {
-                    setArmDelete(true);
-                    return;
-                  }
-                  const idx = imageActionIndex;
-                  setArmDelete(false);
-                  closeImageSheet();
-                  await handleDeleteHeroImage(idx);
-                }}
-                className={[
-                  'w-full py-3 rounded-full font-black text-white active:scale-[0.99]',
-                  armDelete ? 'bg-red-700' : 'bg-red-600',
-                ].join(' ')}
-              >
-                {armDelete ? 'Tryk igen for at slette' : 'Slet billede'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setArmDelete(false); closeImageSheet(); }}
-                className="w-full py-3 rounded-full font-black bg-gray-100 text-gray-700 active:scale-[0.99]"
-              >
-                Annuller
-              </button>
+              {/* MEDLEMMER */}
+              <div>
+                <h4 className="text-sm font-black text-gray-500 uppercase mb-2">Medlemmer</h4>
+                {regulars.length === 0 ? (
+                  <p className="text-sm text-gray-400">Ingen medlemmer.</p>
+                ) : (
+                  regulars.map((m) => (
+                    <div key={m.user_id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer" onClick={() => handleOpenMessageModal(m)}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+                          {getAvatarUrl(m.users?.avatar_url) ? (
+                            <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-xs">?</div>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-[#131921]">{getDisplayName(m)}</span>
+                          <span className="text-xs text-gray-500 uppercase font-bold">MEDLEM</span>
+                        </div>
+                      </div>
+                      {userId !== m.user_id && (
+                          <button className="text-xs font-bold text-[#131921] bg-gray-100 px-3 py-1.5 rounded-full hover:bg-gray-200">
+                              Besked
+                          </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* --- SEND MESSAGE MODAL --- */}
+      {showFirstMessageModal && selectedMember && (
+        <div className="fixed inset-0 z-[350] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-black text-[#131921]">Send besked</h3>
+              <button 
+                onClick={() => setShowFirstMessageModal(false)} 
+                className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-gray-200"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-3">Til: <span className="font-bold text-black">{getDisplayName(selectedMember)}</span></p>
+            
+            <textarea
+              value={firstMessageText}
+              onChange={(e) => setFirstMessageText(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 mb-4 min-h-[100px] text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#131921]"
+              placeholder="Skriv din besked her..."
+            />
+            
+            <button 
+              onClick={handleSendFirstMessage}
+              disabled={isSendingFirstMessage || !firstMessageText.trim()}
+              className="w-full py-3 bg-[#131921] text-white rounded-full font-bold text-sm hover:bg-black disabled:opacity-50"
+            >
+              {isSendingFirstMessage ? 'Sender...' : 'Send besked'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- RESTEN AF MODALS (LIGHTBOX, INVITE, ETC) ER UÆNDRET --- */}
+      {/* ... (Copy from original file if needed, men de er med i main render ovenfor) ... */}
+      
       {/* --- LIGHTBOX --- */}
       {lightboxOpen && heroImages.length > 0 && (
         <div className="fixed inset-0 z-[400] bg-black flex items-center justify-center animate-in fade-in duration-200">
@@ -1196,83 +1279,81 @@ export default function ForeningDetaljePage() {
         </div>
       )}
 
-      {/* --- MEMBERS MODAL --- */}
-      {showMembers && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md max-h-[80vh] flex flex-col rounded-[24px] shadow-2xl p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-black text-[#131921]">Medlemmer</h3>
-              <button 
-                onClick={() => setShowMembers(false)} 
-                className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-gray-200"
+      {/* --- MOBIL ACTION SHEET (Slet / Forside) --- */}
+      {isEditing && imageActionIndex !== null && sheetImg && (
+        <div className="fixed inset-0 z-[650] flex items-end justify-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/70"
+            onClick={() => { setArmDelete(false); closeImageSheet(); }}
+            aria-label="Luk"
+          />
+          <div className="relative w-full max-w-md bg-white rounded-t-[28px] p-5 pb-7 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-widest text-gray-500">Billede</p>
+                <p className="text-sm font-black text-[#131921]">{sheetIsPrimary ? 'Forsidebillede' : 'Administrér billede'}</p>
+              </div>
+              <button
+                type="button"
+                className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 font-black"
+                onClick={() => { setArmDelete(false); closeImageSheet(); }}
               >
                 ✕
               </button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto space-y-2">
-              {approved.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">Ingen medlemmer endnu.</p>
-              ) : (
-                approved.map((m) => (
-                  <div key={m.user_id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer" onClick={() => handleOpenMessageModal(m)}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
-                        {getAvatarUrl(m.users?.avatar_url) ? (
-                          <img src={getAvatarUrl(m.users?.avatar_url)!} className="w-full h-full object-cover" alt="" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-xs">?</div>
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-[#131921]">{getDisplayName(m)}</span>
-                        <span className="text-xs text-gray-500 uppercase font-bold">{m.rolle || 'Medlem'}</span>
-                      </div>
-                    </div>
-                    {userId !== m.user_id && (
-                        <button className="text-xs font-bold text-[#131921] bg-gray-100 px-3 py-1.5 rounded-full hover:bg-gray-200">
-                            Besked
-                        </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* --- SEND MESSAGE MODAL --- */}
-      {showFirstMessageModal && selectedMember && (
-        <div className="fixed inset-0 z-[350] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-black text-[#131921]">Send besked</h3>
-              <button 
-                onClick={() => setShowFirstMessageModal(false)} 
-                className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full font-bold text-gray-600 hover:bg-gray-200"
+            <div className="mt-4 w-full aspect-square rounded-2xl overflow-hidden bg-gray-100">
+              <img src={sheetImg} alt="" className="w-full h-full object-cover" />
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={sheetIsPrimary}
+                onClick={async () => {
+                  const idx = imageActionIndex;
+                  setArmDelete(false);
+                  closeImageSheet();
+                  await handleSetPrimaryImage(idx);
+                }}
+                className={[
+                  'w-full py-3 rounded-full font-black',
+                  sheetIsPrimary ? 'bg-gray-100 text-gray-400' : 'bg-[#131921] text-white active:scale-[0.99]',
+                ].join(' ')}
               >
-                ✕
+                {sheetIsPrimary ? 'Dette er allerede forside' : 'Sæt som forside'}
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (imageActionIndex === null) return;
+                  if (!armDelete) {
+                    setArmDelete(true);
+                    return;
+                  }
+                  const idx = imageActionIndex;
+                  setArmDelete(false);
+                  closeImageSheet();
+                  await handleDeleteHeroImage(idx);
+                }}
+                className={[
+                  'w-full py-3 rounded-full font-black text-white active:scale-[0.99]',
+                  armDelete ? 'bg-red-700' : 'bg-red-600',
+                ].join(' ')}
+              >
+                {armDelete ? 'Tryk igen for at slette' : 'Slet billede'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setArmDelete(false); closeImageSheet(); }}
+                className="w-full py-3 rounded-full font-black bg-gray-100 text-gray-700 active:scale-[0.99]"
+              >
+                Annuller
               </button>
             </div>
-            
-            <p className="text-sm text-gray-600 mb-3">Til: <span className="font-bold text-black">{getDisplayName(selectedMember)}</span></p>
-            
-            <textarea
-              value={firstMessageText}
-              onChange={(e) => setFirstMessageText(e.target.value)}
-              // HER ER RETTELSEN: 'text-black' er tilføjet herunder
-              className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 mb-4 min-h-[100px] text-sm text-black focus:outline-none focus:ring-2 focus:ring-[#131921]"
-              placeholder="Skriv din besked her..."
-            />
-            
-            <button 
-              onClick={handleSendFirstMessage}
-              disabled={isSendingFirstMessage || !firstMessageText.trim()}
-              className="w-full py-3 bg-[#131921] text-white rounded-full font-bold text-sm hover:bg-black disabled:opacity-50"
-            >
-              {isSendingFirstMessage ? 'Sender...' : 'Send besked'}
-            </button>
           </div>
         </div>
       )}
