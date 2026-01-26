@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../lib/supabaseClient'; // Ensure this path is correct for your project structure
+import { supabase } from '../lib/supabaseClient';
 
 type Post = {
   id: string;
@@ -21,9 +21,11 @@ type Props = {
   post: Post | null;
   onClose: () => void;
   currentUserId: string | null;
+  // ✅ Nye props til likes
+  isLiked: boolean;
+  onToggleLike: (postId: string) => void;
 };
 
-// Helper for unique IDs
 const makeUuid = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -32,13 +34,13 @@ const makeUuid = () => {
   });
 };
 
-export default function PostDetailModal({ isOpen, post, onClose, currentUserId }: Props) {
+export default function PostDetailModal({ isOpen, post, onClose, currentUserId, isLiked, onToggleLike }: Props) {
   const router = useRouter();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isStartingChat, setIsStartingChat] = useState(false);
+  const [animatingLike, setAnimatingLike] = useState(false);
 
-  // Reset when modal opens with a new post
   useEffect(() => {
     if (isOpen) {
       setActiveImageIndex(0);
@@ -49,7 +51,6 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
 
   if (!isOpen || !post) return null;
 
-  // 1. Normalize images
   const images: string[] = [];
   if (post.images && post.images.length > 0) {
     post.images.forEach(img => images.push(img));
@@ -60,7 +61,6 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
   const isOwnPost = currentUserId === post.user_id;
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/opslag?id=${post.id}` : '';
 
-  // --- Handlinger ---
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -71,7 +71,7 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
   };
 
   const handleShare = async () => {
-    // @ts-ignore - navigator.share might not be in all TS definitions
+    // @ts-ignore
     if (navigator.share) {
       try {
         // @ts-ignore
@@ -80,12 +80,16 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
           text: `Se dette opslag på Liguster: ${post.overskrift}`,
           url: shareUrl,
         });
-      } catch (err) {
-        // User cancelled share
-      }
+      } catch (err) {}
     } else {
-      handleCopyLink(); // Fallback
+      handleCopyLink();
     }
+  };
+
+  const handleLikeClick = () => {
+    setAnimatingLike(true);
+    setTimeout(() => setAnimatingLike(false), 300); // Reset animation class
+    onToggleLike(post.id);
   };
 
   const handleContact = async () => {
@@ -93,13 +97,10 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
       alert("Du skal være logget ind for at skrive en besked.");
       return;
     }
-
     if (isOwnPost) return;
 
     setIsStartingChat(true);
-
     try {
-      // 1. Check if a thread already exists between these two users
       const { data: existingThreads } = await supabase
         .from('messages')
         .select('thread_id')
@@ -110,10 +111,8 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
         ? existingThreads[0].thread_id 
         : makeUuid();
 
-      // 2. If no thread exists, create it by sending the first message
       if (!existingThreads || existingThreads.length === 0) {
         const initialMessage = `Hej! Jeg skriver angående dit opslag: "${post.overskrift}"`;
-        
         const { error } = await supabase
           .from('messages')
           .insert({
@@ -123,15 +122,10 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
             text: initialMessage,
             is_read: false
           });
-
         if (error) throw error;
       }
-
-      // 3. Navigate to messages page with the correct thread
-      // Close modal first to avoid UI clutter
       onClose(); 
       router.push(`/beskeder?id=${threadId}&dmUser=${post.user_id}`);
-      
     } catch (error: any) {
       console.error("Fejl ved start af chat:", error);
       alert("Kunne ikke starte samtalen. Prøv igen senere.");
@@ -140,7 +134,6 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
     }
   };
 
-  // Navigation functions
   const nextImage = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     setActiveImageIndex(prev => (prev + 1) % images.length);
@@ -153,16 +146,13 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 z-50">
-      {/* 1. Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       ></div>
 
-      {/* 2. Selve Kortet */}
       <div className="relative bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Luk Knap */}
         <button 
           onClick={onClose}
           className="absolute top-4 right-4 z-10 bg-black/20 hover:bg-black/40 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-colors"
@@ -170,10 +160,8 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
           <i className="fa-solid fa-xmark text-lg"></i>
         </button>
 
-        {/* Scrollbart indhold */}
         <div className="overflow-y-auto flex-1 bg-white">
-          
-          {/* A. Billed-sektion */}
+          {/* Billed-sektion */}
           <div className="relative bg-gray-100 w-full aspect-[4/3] group select-none">
             {images.length > 0 ? (
               <>
@@ -185,7 +173,6 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
                   draggable="false"
                 />
                 
-                {/* Dots til galleri */}
                 {images.length > 1 && (
                   <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
                     {images.map((_, idx) => (
@@ -198,21 +185,16 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
                   </div>
                 )}
                 
-                {/* PILE TIL GALLERI */}
                 {images.length > 1 && (
                   <>
                     <button 
                       className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/60 transition-colors z-10"
                       onClick={prevImage}
-                    >
-                      ‹
-                    </button>
+                    >‹</button>
                     <button 
                       className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/60 transition-colors z-10"
                       onClick={nextImage}
-                    >
-                      ›
-                    </button>
+                    >›</button>
                   </>
                 )}
               </>
@@ -224,7 +206,7 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
             )}
           </div>
 
-          {/* B. Indhold */}
+          {/* Indhold */}
           <div className="p-6">
             <div className="flex flex-wrap gap-2 mb-4">
               {post.kategori && (
@@ -240,31 +222,42 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
             </div>
 
             <h2 className="text-2xl font-bold text-[#0f172a] mb-4">{post.overskrift}</h2>
-            
             <p className="text-[#0f172a] leading-relaxed whitespace-pre-wrap">
               {post.text}
             </p>
-
             <div className="mt-8 pt-6 border-t border-gray-100 text-sm text-gray-500">
                Oprettet {new Date(post.created_at).toLocaleDateString()}
             </div>
           </div>
         </div>
 
-        {/* C. Footer */}
+        {/* Footer */}
         <div className="p-4 border-t border-gray-100 bg-white flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shrink-0">
           <div className="flex gap-2">
+            
+            {/* ✅ LIKE KNAP */}
+            <button 
+              onClick={handleLikeClick}
+              className={`flex-1 md:flex-none px-4 py-2.5 text-xs font-bold rounded-xl transition-all uppercase tracking-wide flex items-center justify-center gap-2 group
+                ${isLiked ? 'bg-red-50 text-red-600' : 'bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a]'}
+                ${animatingLike ? 'scale-90' : 'scale-100'}
+              `}
+            >
+              <i className={`${isLiked ? 'fa-solid' : 'fa-regular'} fa-heart text-sm transition-transform group-hover:scale-110`}></i> 
+              <span className="hidden md:inline">{isLiked ? '' : ''}</span>
+            </button>
+
             <button 
               onClick={handleCopyLink}
               className="flex-1 md:flex-none px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
             >
-              <i className="fa-solid fa-link"></i> Kopiér
+              <i className="fa-solid fa-link"></i>
             </button>
             <button 
               onClick={handleShare}
               className="flex-1 md:flex-none px-4 py-2.5 bg-[#e9eef5] hover:bg-gray-200 text-[#0f172a] text-xs font-bold rounded-xl transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
             >
-              <i className="fa-solid fa-share-nodes"></i> Del
+              <i className="fa-solid fa-share-nodes"></i>
             </button>
           </div>
 
@@ -292,7 +285,6 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
         </div>
       </div>
 
-      {/* --- LIGHTBOX (Fuldskærm) --- */}
       {lightboxOpen && images.length > 0 && (
         <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center animate-in fade-in duration-200">
           <button 
@@ -309,7 +301,6 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
             draggable="false"
           />
 
-           {/* Pile i Lightbox */}
            {images.length > 1 && (
               <>
                 <button 
@@ -324,7 +315,6 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId }
             )}
         </div>
       )}
-
     </div>
   );
 }

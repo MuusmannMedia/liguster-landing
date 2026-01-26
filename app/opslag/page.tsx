@@ -20,23 +20,22 @@ type Post = {
   kategori?: string;
   omraade?: string;
   user_id: string;
-  // VIGTIGT: Disse to felter skal findes i din Supabase database tabel 'posts'
   latitude?: number; 
   longitude?: number;
 };
 
 // Data konstanter
 const KATEGORIER = [
-  'Værktøj', 'Arbejde tilbydes', 'Affald', 'Mindre ting', 
+  'Gratis', 'Værktøj', 'Arbejde tilbydes', 'Affald', 'Mindre ting', 
   'Større ting', 'Hjælp søges', 'Hjælp tilbydes', 
   'Byttes', 'Udlejning', 'Sælges', 'Andet'
 ];
 
 const RADIUS_OPTIONS = [1, 2, 3, 5, 10, 20, 50];
 
-// Hjælpefunktion: Beregner afstand mellem to koordinater (Haversine formel)
+// Hjælpefunktion: Beregner afstand
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // Jordens radius i km
+  const R = 6371; 
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
   const a =
@@ -44,7 +43,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Returnerer afstand i km
+  return R * c; 
 }
 
 export default function OpslagPage() {
@@ -54,7 +53,7 @@ export default function OpslagPage() {
   
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [radius, setRadius] = useState(50); // Standard 50 km
+  const [radius, setRadius] = useState(50); 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
   const [isRadiusMenuOpen, setIsRadiusMenuOpen] = useState(false); 
@@ -62,6 +61,9 @@ export default function OpslagPage() {
   // Lokations States
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Favorit State (Set for hurtigt opslag)
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
 
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -79,16 +81,23 @@ export default function OpslagPage() {
         return; 
       }
       
-      setCurrentUserId(session.user.id);
+      const uid = session.user.id;
+      setCurrentUserId(uid);
       
-      // Vi starter begge processer
+      // Start processer
       getUserLocation();
-      await fetchPosts();
+      
+      // Hent både opslag og likes parallelt
+      await Promise.all([
+        fetchPosts(),
+        fetchLikes(uid)
+      ]);
+      
+      setLoading(false);
     };
     checkUserAndFetch();
   }, [router]);
 
-  // Hent brugerens GPS position
   const getUserLocation = () => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -101,30 +110,78 @@ export default function OpslagPage() {
         },
         (error) => {
           console.warn("Kunne ikke hente lokation:", error);
-          setLocationError("Kunne ikke hente din placering. Tjek browserindstillinger.");
+          setLocationError("Kunne ikke hente din placering.");
         }
       );
-    } else {
-      setLocationError("Browser understøtter ikke geolocation.");
     }
   };
 
   const fetchPosts = async () => {
     try {
       const now = new Date().toISOString(); 
-
       const { data, error } = await supabase
         .from('posts')
         .select('*')
-        .gt('expires_at', now) // Kun aktive opslag
+        .gt('expires_at', now) 
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setPosts(data || []);
     } catch (error) {
       console.error('Fejl ved hentning af opslag:', error);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  // Hent brugerens likes
+  const fetchLikes = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('post_likes')
+        .select('post_id')
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+      
+      // Konverter til et Set for hurtig adgang
+      const ids = new Set((data || []).map(row => row.post_id));
+      setLikedPostIds(ids);
+    } catch (error) {
+      console.error('Fejl ved hentning af likes:', error);
+    }
+  };
+
+  // Håndter Like/Unlike (sendes til modalen)
+  const handleToggleLike = async (postId: string) => {
+    if (!currentUserId) return;
+
+    const isLiked = likedPostIds.has(postId);
+    
+    // 1. Optimistisk opdatering af UI
+    const newSet = new Set(likedPostIds);
+    if (isLiked) {
+      newSet.delete(postId);
+    } else {
+      newSet.add(postId);
+    }
+    setLikedPostIds(newSet);
+
+    // 2. Opdater database
+    try {
+      if (isLiked) {
+        await supabase
+          .from('post_likes')
+          .delete()
+          .eq('user_id', currentUserId)
+          .eq('post_id', postId);
+      } else {
+        await supabase
+          .from('post_likes')
+          .insert({ user_id: currentUserId, post_id: postId });
+      }
+    } catch (err) {
+      console.error("Fejl ved like:", err);
+      // Rul tilbage ved fejl (valgfrit, men god praksis)
+      fetchLikes(currentUserId); 
     }
   };
 
@@ -136,17 +193,16 @@ export default function OpslagPage() {
       post.overskrift.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.text.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // 2. Kategori filter
-    const matchesCategory = 
-      selectedCategory === null || 
-      post.kategori === selectedCategory;
+    // 2. Kategori filter (inkl. FAVORITTER)
+    let matchesCategory = true;
+    if (selectedCategory === 'FAVORITTER') {
+      matchesCategory = likedPostIds.has(post.id);
+    } else if (selectedCategory !== null) {
+      matchesCategory = post.kategori === selectedCategory;
+    }
 
     // 3. Radius filter
     let matchesRadius = true;
-
-    // Vi kan kun filtrere på radius hvis:
-    // a) Vi har brugerens lokation
-    // b) Opslaget har koordinater (lat/long) i databasen
     if (userLocation && post.latitude && post.longitude) {
       const distance = calculateDistance(
         userLocation.lat,
@@ -156,7 +212,6 @@ export default function OpslagPage() {
       );
       matchesRadius = distance <= radius;
     }
-    // Hvis vi IKKE har lokation, viser vi alt (matchesRadius forbliver true)
 
     return matchesSearch && matchesCategory && matchesRadius;
   });
@@ -173,7 +228,7 @@ export default function OpslagPage() {
     <div className="min-h-screen flex flex-col bg-[#f0f2f5]">
       <SiteHeader />
 
-      {/* Filter Bar og Knapper */}
+      {/* Filter Bar */}
       <div className="bg-[#869FB9] py-6 px-4 shadow-sm relative z-10">
         <div className="max-w-4xl mx-auto space-y-4">
           
@@ -184,10 +239,7 @@ export default function OpslagPage() {
             <i className="fa-solid fa-plus-circle text-2xl"></i> Opret nyt opslag
           </button>
 
-          {/* Filter Bar Container */}
           <div className="flex items-center gap-2 bg-white/20 p-2 rounded-2xl backdrop-blur-sm relative">
-            
-            {/* Søgefelt */}
             <div className="flex-1 relative">
               <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
               <input
@@ -199,7 +251,7 @@ export default function OpslagPage() {
               />
             </div>
 
-            {/* Kategori Knap */}
+            {/* Kategori Dropdown */}
             <div className="relative">
               <button 
                 onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
@@ -209,20 +261,31 @@ export default function OpslagPage() {
                     : 'bg-white text-[#131921] hover:bg-gray-50' 
                 }`}
               >
-                <i className="fa-solid fa-filter"></i>
+                <i className={`fa-solid ${selectedCategory === 'FAVORITTER' ? 'fa-heart text-red-500' : 'fa-filter'}`}></i>
               </button>
 
               {isCategoryMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setIsCategoryMenuOpen(false)}/>
-                  <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl z-20 overflow-hidden border border-gray-100 py-2">
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl z-20 overflow-hidden border border-gray-100 py-2 max-h-[400px] overflow-y-auto">
+                    
+                    {/* Favoritter Øverst */}
+                    <button
+                      onClick={() => { setSelectedCategory('FAVORITTER'); setIsCategoryMenuOpen(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm font-bold hover:bg-gray-50 ${selectedCategory === 'FAVORITTER' ? 'bg-blue-50 text-[#131921]' : 'text-[#131921]'}`}
+                    >
+                      ❤️ Mine favoritter
+                    </button>
+
                     <button
                       onClick={() => { setSelectedCategory(null); setIsCategoryMenuOpen(false); }}
                       className={`w-full text-left px-4 py-3 text-sm font-bold hover:bg-gray-50 ${!selectedCategory ? 'text-[#131921] bg-gray-50' : 'text-gray-600'}`}
                     >
                       Alle kategorier
                     </button>
+                    
                     <div className="h-px bg-gray-100 my-1" />
+                    
                     {KATEGORIER.map(cat => (
                       <button
                         key={cat}
@@ -237,7 +300,6 @@ export default function OpslagPage() {
               )}
             </div>
 
-            {/* Radius Knap */}
             <button 
               onClick={() => setIsRadiusMenuOpen(true)}
               className={`h-12 px-4 bg-white rounded-xl flex items-center justify-center shadow-sm text-[#131921] font-bold text-sm hover:bg-gray-50 min-w-[70px] ${!userLocation ? 'opacity-50' : ''}`}
@@ -246,22 +308,18 @@ export default function OpslagPage() {
             </button>
           </div>
           
-          {/* Advarsel hvis vi mangler lokation */}
           {locationError && (
              <div className="text-white text-xs text-center bg-red-500/20 p-2 rounded-lg">
                ⚠️ {locationError} - Viser alle opslag uanset afstand.
              </div>
           )}
-
         </div>
       </div>
 
-      {/* Liste med opslag */}
       <main className="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">
         {filteredPosts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredPosts.map((post) => {
-              // Beregn afstand til visning på kortet
               let distanceText = '';
               if (userLocation && post.latitude && post.longitude) {
                 const dist = calculateDistance(userLocation.lat, userLocation.lng, post.latitude, post.longitude);
@@ -281,10 +339,21 @@ export default function OpslagPage() {
                         alt={post.overskrift}
                         className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                       />
+                      {/* Lille hjerte-indikator på kortet hvis liket */}
+                      {likedPostIds.has(post.id) && (
+                        <div className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm">
+                          <i className="fa-solid fa-heart text-red-500 text-sm"></i>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div className="w-full h-32 bg-gray-50 rounded-xl mb-4 flex items-center justify-center text-gray-300">
+                    <div className="w-full h-32 bg-gray-50 rounded-xl mb-4 flex items-center justify-center text-gray-300 relative">
                       <i className="fa-solid fa-image text-3xl"></i>
+                      {likedPostIds.has(post.id) && (
+                        <div className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm">
+                          <i className="fa-solid fa-heart text-red-500 text-sm"></i>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -322,8 +391,10 @@ export default function OpslagPage() {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center pt-20 text-gray-400">
-            <i className="fa-solid fa-magnifying-glass text-4xl mb-4 opacity-50"></i>
-            <p className="text-lg font-medium">Ingen opslag fundet</p>
+            <i className={`fa-solid ${selectedCategory === 'FAVORITTER' ? 'fa-heart-broken' : 'fa-magnifying-glass'} text-4xl mb-4 opacity-50`}></i>
+            <p className="text-lg font-medium">
+              {selectedCategory === 'FAVORITTER' ? 'Du har ingen favoritter endnu' : 'Ingen opslag fundet'}
+            </p>
             {(searchQuery || selectedCategory || radius < 50) && (
               <button 
                 onClick={() => { setSearchQuery(''); setSelectedCategory(null); setRadius(50); }}
@@ -338,33 +409,31 @@ export default function OpslagPage() {
 
       <SiteFooter />
 
-      {/* --- OPRET MODAL --- */}
       <CreatePostModal 
         isOpen={isCreateModalOpen} 
         onClose={() => setIsCreateModalOpen(false)}
         onPostCreated={() => fetchPosts()}
       />
 
-      {/* --- DETALJE MODAL --- */}
+      {/* Opdateret detaljemodal med Like funktionalitet */}
       <PostDetailModal 
         isOpen={!!selectedPost}
         post={selectedPost}
         onClose={() => setSelectedPost(null)}
         currentUserId={currentUserId}
+        isLiked={selectedPost ? likedPostIds.has(selectedPost.id) : false}
+        onToggleLike={handleToggleLike}
       />
 
-      {/* --- RADIUS MODAL --- */}
       {isRadiusMenuOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-200">
-            
             <h3 className="text-lg font-bold text-[#131921] mb-2">Vis opslag indenfor</h3>
             {!userLocation && (
               <p className="text-xs text-red-500 mb-4 text-center">
-                Vi mangler din lokation. Tillad i browseren for at bruge dette filter.
+                Vi mangler din lokation.
               </p>
             )}
-            
             <div className="w-full space-y-3">
               {RADIUS_OPTIONS.map((r) => (
                 <button
@@ -380,7 +449,6 @@ export default function OpslagPage() {
                 </button>
               ))}
             </div>
-
             <button 
               onClick={() => setIsRadiusMenuOpen(false)}
               className="mt-8 text-[#131921] font-bold text-sm px-8 py-2.5 rounded-full hover:bg-gray-50 transition-colors"
