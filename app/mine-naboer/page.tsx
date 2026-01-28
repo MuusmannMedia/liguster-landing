@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../lib/supabaseClient'; // Ret stien hvis nødvendigt
+import { supabase } from '../../lib/supabaseClient';
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
+import CreatePostModal from '../../components/CreatePostModal'; // Denne skal nok ikke bruges her, men jeg har beholdt importen for nu. Slet hvis irrelevant.
+// import PostDetailModal from '../../components/PostDetailModal'; // Denne skal nok ikke bruges her, men jeg har beholdt importen for nu. Slet hvis irrelevant.
 
-// --- TYPER ---
+// Type definition (Samme som før, men kun relevant for naboer)
 type NeighborItem = {
   id: string;             
   status: string;         
@@ -19,7 +21,7 @@ type NeighborItem = {
   };
 };
 
-// Hjælper til ID-generering (samme som i appen)
+// Hjælpefunktion: UUID (Samme som før)
 const makeUuid = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -27,6 +29,7 @@ const makeUuid = () => {
     return v.toString(16);
   });
 };
+
 
 export default function MineNaboerPage() {
   const router = useRouter();
@@ -44,6 +47,7 @@ export default function MineNaboerPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [inviteMessage, setInviteMessage] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+
 
   // --- 1. INITIAL LOAD & AUTH ---
   useEffect(() => {
@@ -273,20 +277,17 @@ export default function MineNaboerPage() {
     <div className="min-h-screen flex flex-col bg-[#f0f2f5]">
       <SiteHeader />
 
-      {/* TOP BAR / ACTION AREA */}
-      <div className="bg-[#869FB9] py-8 px-4 shadow-sm">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <h1 className="text-3xl font-black text-[#131921] uppercase tracking-wide">
-              Mine Naboer
-            </h1>
-            <button 
-              onClick={() => setIsInviteModalOpen(true)}
-              className="bg-[#131921] text-white font-bold py-3 px-8 rounded-full shadow-lg hover:bg-gray-900 transition-all uppercase tracking-wider flex items-center gap-2 transform hover:scale-105"
-            >
-              <i className="fa-solid fa-user-plus"></i> Inviter nabo
-            </button>
-          </div>
+      {/* Filter Bar (Genbrugt stil fra OpslagPage, men tilpasset) */}
+      <div className="bg-[#869FB9] py-6 px-4 shadow-sm relative z-10">
+        <div className="max-w-4xl mx-auto space-y-4">
+          
+          <button 
+            className="w-full bg-[#131921] text-white font-bold text-lg py-4 rounded-2xl shadow-lg hover:bg-gray-900 transition-all uppercase tracking-wider flex items-center justify-center gap-2 transform hover:scale-[1.01]"
+            onClick={() => setIsInviteModalOpen(true)}
+          >
+            <i className="fa-solid fa-plus-circle text-2xl"></i> Inviter nabo
+          </button>
+
         </div>
       </div>
 
