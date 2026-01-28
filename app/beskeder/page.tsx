@@ -609,7 +609,8 @@ function BeskederContent() {
   return (
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
-      <main className="flex-1 w-full max-w-6xl mx-auto p-4 pb-20">
+      {/* ÆNDRING: max-w-6xl -> max-w-4xl */}
+      <main className="flex-1 w-full max-w-4xl mx-auto p-4 pb-20">
         <div className="bg-white rounded-[40px] shadow-2xl overflow-hidden min-h-[75vh] flex flex-col md:flex-row border border-gray-100">
           <div className={`w-full md:w-80 bg-gray-50 border-r border-gray-100 flex-shrink-0 flex flex-col ${activeThreadId ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-8 border-b border-gray-200">
