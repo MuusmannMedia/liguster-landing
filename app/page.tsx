@@ -10,17 +10,17 @@ export default function LigusterLandingPage() {
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
   const totalSlides = 10;
-  const autoPlayRef = useRef(null);
+  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- NYT: FEEDBACK STATE FOR DELING ---
+  // --- NYT: COPY FEEDBACK STATE ---
   const [shareFeedback, setShareFeedback] = useState('');
 
   // --- NYT: SHARE FUNCTION ---
   const handleShare = async () => {
     const shareData = {
       title: 'Liguster',
-      text: 'Hej! Jeg har fundet den her nye app til nabolaget. Skal vi ikke prøve den? 🏡',
-      url: typeof window !== 'undefined' ? window.location.href : '', // Sikrer at vi har URL'en
+      text: 'Hej! Jeg har fundet den her nye app til nabolaget. Skal vi ikke prøve den?',
+      url: window.location.href, // Deler den nuværende side
     };
 
     // Tjekker om browseren understøtter "Native Share" (Mobil + moderne browsere)
@@ -65,12 +65,12 @@ export default function LigusterLandingPage() {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
 
-  const handleTouchStart = (e) => {
+  const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
     if (autoPlayRef.current) clearInterval(autoPlayRef.current);
   };
 
-  const handleTouchEnd = (e) => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     setTouchEnd(e.changedTouches[0].clientX);
     if (touchStart - touchEnd > 50) nextSlide();
     if (touchStart - touchEnd < -50) prevSlide();
@@ -182,7 +182,7 @@ export default function LigusterLandingPage() {
         <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-24 md:pt-0">
           <div className="mr-auto place-self-center lg:col-span-7 fade-in-up">
             <span className="bg-white/10 text-white text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-white/20">
-              Nyhed: Nu kan du teste appen!
+              Nyhed: Demo / Betaversion
             </span>
 
             <h1 className="max-w-2xl mb-4 text-4xl font-extrabold tracking-tight leading-none md:text-5xl xl:text-6xl text-white">
@@ -192,14 +192,18 @@ export default function LigusterLandingPage() {
             <p className="max-w-2xl mb-6 font-light text-gray-200 lg:mb-8 md:text-lg lg:text-xl">
               Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med fokus på tryghed,
               enkelhed og en grønnere hverdag.
+              <br className="hidden md:block" />
+              <span className="block mt-2 font-normal text-white">
+                🚀 Apps til iPhone og Android er på vej og lander snart!
+              </span>
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
               <a
                 href="#features"
                 className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-gray-900 border border-gray-300 rounded-lg bg-white hover:bg-gray-100 transition-colors"
               >
-                Se funktioner
+                Se hvordan det virker
               </a>
 
               {/* --- NY DELE KNAP --- */}
@@ -214,18 +218,18 @@ export default function LigusterLandingPage() {
 
             {/* FEEDBACK BESKED VED DELING */}
             {shareFeedback && (
-               <div className="mt-3 text-green-300 font-bold text-sm animate-pulse flex items-center">
+               <div className="mt-3 text-green-300 font-bold text-sm animate-pulse">
                  <i className="fa-solid fa-check mr-2"></i>{shareFeedback}
                </div>
             )}
             {/* --------------------- */}
 
-            <div className="flex items-center gap-4 text-white/80 text-sm mt-8">
+            <div className="flex items-center gap-4 text-white/80 text-sm mt-8 md:mt-8">
                 <div className="flex items-center">
-                  <i className="fa-brands fa-apple text-xl mr-2"></i> iOS klar
+                  <i className="fa-brands fa-apple text-xl mr-2"></i> iOS
                 </div>
                 <div className="flex items-center">
-                  <i className="fa-brands fa-android text-xl mr-2"></i> Android på vej
+                  <i className="fa-brands fa-android text-xl mr-2"></i> Android
                 </div>
             </div>
 
@@ -285,7 +289,7 @@ export default function LigusterLandingPage() {
           <div className="bg-liguster-gradient rounded-[2.5rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
             
             <div className="relative z-10 flex flex-col items-center">
-              {/* Logo */}
+              {/* Logo i toppen - NU ENDNU STØRRE */}
               <div className="relative w-[500px] h-[165px] mb-10">
                  <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="Liguster" />
               </div>
@@ -299,6 +303,7 @@ export default function LigusterLandingPage() {
                 Det er gratis, enkelt og tager kun et øjeblik.
               </p>
 
+              {/* RETTET LINK TIL /opret HER */}
               <Link 
                 href="/opret" 
                 className="bg-white text-[#0b2b52] font-black text-lg px-10 py-4 rounded-full shadow-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 inline-flex items-center gap-2"
@@ -312,7 +317,7 @@ export default function LigusterLandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features Section - MED MØRKERE BAGGRUND (bg-gray-100) */}
       <section id="features" className="py-16 md:py-24 bg-gray-100">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="text-center mb-16">
