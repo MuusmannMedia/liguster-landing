@@ -2,13 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../lib/supabaseClient'; // Ret stien hvis nødvendigt
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
-import CreatePostModal from '../../components/CreatePostModal'; // Denne skal nok ikke bruges her, men jeg har beholdt importen for nu. Slet hvis irrelevant.
-// import PostDetailModal from '../../components/PostDetailModal'; // Denne skal nok ikke bruges her, men jeg har beholdt importen for nu. Slet hvis irrelevant.
 
-// Type definition (Samme som før, men kun relevant for naboer)
+// --- TYPER ---
 type NeighborItem = {
   id: string;             
   status: string;         
@@ -21,7 +19,7 @@ type NeighborItem = {
   };
 };
 
-// Hjælpefunktion: UUID (Samme som før)
+// Hjælper til ID-generering
 const makeUuid = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -29,7 +27,6 @@ const makeUuid = () => {
     return v.toString(16);
   });
 };
-
 
 export default function MineNaboerPage() {
   const router = useRouter();
@@ -47,7 +44,6 @@ export default function MineNaboerPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [inviteMessage, setInviteMessage] = useState('');
   const [isInviting, setIsInviting] = useState(false);
-
 
   // --- 1. INITIAL LOAD & AUTH ---
   useEffect(() => {
@@ -277,17 +273,19 @@ export default function MineNaboerPage() {
     <div className="min-h-screen flex flex-col bg-[#f0f2f5]">
       <SiteHeader />
 
-      {/* Filter Bar (Genbrugt stil fra OpslagPage, men tilpasset) */}
-      <div className="bg-[#869FB9] py-6 px-4 shadow-sm relative z-10">
-        <div className="max-w-4xl mx-auto space-y-4">
-          
-          <button 
-            className="w-full bg-[#131921] text-white font-bold text-lg py-4 rounded-2xl shadow-lg hover:bg-gray-900 transition-all uppercase tracking-wider flex items-center justify-center gap-2 transform hover:scale-[1.01]"
-            onClick={() => setIsInviteModalOpen(true)}
-          >
-            <i className="fa-solid fa-plus-circle text-2xl"></i> Inviter nabo
-          </button>
-
+      {/* TOP BAR / ACTION AREA */}
+      <div className="bg-[#869FB9] py-8 px-4 shadow-sm">
+        <div className="max-w-4xl mx-auto">
+          {/* Tekst fjernet - kun knap tilbage, justeret til højre */}
+          <div className="flex flex-col md:flex-row justify-end items-center gap-4">
+            
+            <button 
+              onClick={() => setIsInviteModalOpen(true)}
+              className="bg-[#131921] text-white font-bold py-3 px-8 rounded-full shadow-lg hover:bg-gray-900 transition-all uppercase tracking-wider flex items-center gap-2 transform hover:scale-105"
+            >
+              <i className="fa-solid fa-user-plus"></i> Inviter nabo
+            </button>
+          </div>
         </div>
       </div>
 
@@ -405,7 +403,7 @@ export default function MineNaboerPage() {
                 <input 
                   type="text" 
                   placeholder="Søg på navn..." 
-                  className="w-full bg-gray-50 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] transition-all"
+                  className="w-full bg-gray-50 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-[#131921] transition-all text-gray-900 placeholder-gray-400"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -413,7 +411,7 @@ export default function MineNaboerPage() {
 
               <textarea 
                 placeholder="Skriv en besked (valgfri)" 
-                className="w-full bg-gray-50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-[#131921] min-h-[80px] resize-none transition-all"
+                className="w-full bg-gray-50 rounded-xl p-4 outline-none focus:ring-2 focus:ring-[#131921] min-h-[80px] resize-none transition-all text-gray-900 placeholder-gray-400"
                 value={inviteMessage}
                 onChange={(e) => setInviteMessage(e.target.value)}
               />
