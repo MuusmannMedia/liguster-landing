@@ -87,11 +87,13 @@ export default function SiteHeader() {
     }
   };
 
+  // Opdateret menu-liste med "Mine naboer"
   const menuItems = [
     { name: 'Opslag', href: '/opslag', icon: 'fa-layer-group', badge: 0 },
     { name: 'Forening', href: '/forening', icon: 'fa-people-roof', badge: foreningBadgeCount },
     { name: 'Beskeder', href: '/beskeder', icon: 'fa-comments', badge: unreadMsgCount },
     { name: 'Mine opslag', href: '/mine-opslag', icon: 'fa-box-open', badge: 0 },
+    { name: 'Mine naboer', href: '/mine-naboer', icon: 'fa-users', badge: 0 }, // <-- NYT PUNKT
     { name: 'Mig', href: '/mig', icon: 'fa-user', badge: 0 },
   ];
 
