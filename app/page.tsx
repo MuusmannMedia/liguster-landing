@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 export default function LigusterLandingPage() {
   // --- STATE ---
-  
+
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
   const totalSlides = 10;
@@ -59,6 +59,7 @@ export default function LigusterLandingPage() {
     return () => {
       if (autoPlayRef.current) clearInterval(autoPlayRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Swipe handlers
@@ -148,7 +149,6 @@ export default function LigusterLandingPage() {
           </div>
 
           <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse items-center">
-            
             {/* KNAP: OPSLAG */}
             <Link
               href="/offentlige-opslag"
@@ -178,7 +178,6 @@ export default function LigusterLandingPage() {
 
       {/* Hero Section */}
       <section className="bg-liguster-gradient relative min-h-[95vh] flex items-center overflow-hidden">
-        
         <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-24 md:pt-0">
           <div className="mr-auto place-self-center lg:col-span-7 fade-in-up">
             <span className="bg-white/10 text-white text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-white/20">
@@ -190,13 +189,52 @@ export default function LigusterLandingPage() {
             </h1>
 
             <p className="max-w-2xl mb-6 font-light text-gray-200 lg:mb-8 md:text-lg lg:text-xl">
-              Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med fokus på tryghed,
-              enkelhed og en grønnere hverdag.
+              Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med
+              fokus på tryghed, enkelhed og en grønnere hverdag.
               <br className="hidden md:block" />
               <span className="block mt-2 font-normal text-white">
-                🚀 Apps til iPhone og Android er på vej og lander snart!
+                🚀 iPhone-beta er klar nu via TestFlight. Android følger senere.
               </span>
             </p>
+
+            {/* --- BETA CTA (TestFlight) --- */}
+            <div className="max-w-2xl mb-6 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm p-5">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 text-white/90">
+                  <i className="fa-brands fa-apple text-xl"></i>
+                </div>
+
+                <div className="flex-1">
+                  <h3 className="text-white font-extrabold text-lg leading-tight">
+                    Prøv Liguster på iPhone (beta)
+                  </h3>
+
+                  <p className="text-gray-200 text-sm md:text-base mt-1 leading-relaxed">
+                    Vil du hjælpe med at teste? Hent betaversionen via TestFlight og kom i gang på 2 minutter.
+                    <span className="block mt-2 text-white/90">
+                      Android er på vej, men vi kan endnu ikke åbne for massetest.
+                    </span>
+                  </p>
+
+                  <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                    <a
+                      href="https://testflight.apple.com/join/YVUVvbZp"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center px-5 py-3 text-base font-black text-[#0b2b52] rounded-lg bg-white hover:bg-gray-100 transition-colors"
+                    >
+                      <i className="fa-brands fa-apple mr-2"></i>
+                      Åbn TestFlight
+                    </a>
+
+                    <span className="text-white/70 text-xs sm:text-sm flex items-center">
+                      <i className="fa-solid fa-circle-info mr-2"></i>
+                      Kræver TestFlight installeret
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
               <a
@@ -218,21 +256,22 @@ export default function LigusterLandingPage() {
 
             {/* FEEDBACK BESKED VED DELING */}
             {shareFeedback && (
-               <div className="mt-3 text-green-300 font-bold text-sm animate-pulse">
-                 <i className="fa-solid fa-check mr-2"></i>{shareFeedback}
-               </div>
+              <div className="mt-3 text-green-300 font-bold text-sm animate-pulse">
+                <i className="fa-solid fa-check mr-2"></i>
+                {shareFeedback}
+              </div>
             )}
             {/* --------------------- */}
 
             <div className="flex items-center gap-4 text-white/80 text-sm mt-8 md:mt-8">
-                <div className="flex items-center">
-                  <i className="fa-brands fa-apple text-xl mr-2"></i> iOS
-                </div>
-                <div className="flex items-center">
-                  <i className="fa-brands fa-android text-xl mr-2"></i> Android
-                </div>
-            </div>
+              <div className="flex items-center">
+                <i className="fa-brands fa-apple text-xl mr-2"></i> iOS (beta)
+              </div>
 
+              <div className="flex items-center">
+                <i className="fa-brands fa-android text-xl mr-2"></i> Android (kommer senere)
+              </div>
+            </div>
           </div>
 
           <div className="hidden lg:mt-0 lg:col-span-5 lg:flex justify-center items-center relative">
@@ -287,32 +326,30 @@ export default function LigusterLandingPage() {
       <section className="py-16 md:py-24 bg-white border-b border-gray-100">
         <div className="max-w-5xl mx-auto px-4">
           <div className="bg-liguster-gradient rounded-[2.5rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
-            
             <div className="relative z-10 flex flex-col items-center">
               {/* Logo i toppen - NU ENDNU STØRRE */}
               <div className="relative w-[500px] h-[165px] mb-10">
-                 <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="Liguster" />
+                <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="Liguster" />
               </div>
-              
+
               <h2 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-tight">
                 Klar til at gøre en forskel lokalt?
               </h2>
-              
+
               <p className="text-blue-100 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-                Opret en bruger i dag og vær med til at skabe mere liv, tryghed og fællesskab på din vej. 
-                Det er gratis, enkelt og tager kun et øjeblik.
+                Opret en bruger i dag og vær med til at skabe mere liv, tryghed og fællesskab på din vej. Det
+                er gratis, enkelt og tager kun et øjeblik.
               </p>
 
               {/* RETTET LINK TIL /opret HER */}
-              <Link 
-                href="/opret" 
+              <Link
+                href="/opret"
                 className="bg-white text-[#0b2b52] font-black text-lg px-10 py-4 rounded-full shadow-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 inline-flex items-center gap-2"
               >
                 <i className="fa-solid fa-user-plus"></i>
                 Opret bruger nu
               </Link>
             </div>
-
           </div>
         </div>
       </section>
@@ -321,11 +358,10 @@ export default function LigusterLandingPage() {
       <section id="features" className="py-16 md:py-24 bg-gray-100">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Hvad kan du bruge Liguster til?
-            </h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Hvad kan du bruge Liguster til?</h2>
             <p className="text-gray-600 max-w-3xl mx-auto">
-              Liguster er et lokalt samlingspunkt, hvor du kan dele, låne, hjælpe og organisere fællesskaber – uden støj og med fokus på tryghed.
+              Liguster er et lokalt samlingspunkt, hvor du kan dele, låne, hjælpe og organisere fællesskaber –
+              uden støj og med fokus på tryghed.
             </p>
           </div>
 
@@ -337,8 +373,9 @@ export default function LigusterLandingPage() {
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">1. Opret opslag</h3>
               <p className="text-gray-600">
-                Slå noget op til dit lokalområde eller din gruppe: “Gives væk”, “Søges”, “Lån”, “Hjælp” eller “Event”.
-                Det kan være alt fra en stol du vil give videre, til en efterlysning af en stige eller en hjælpende hånd.
+                Slå noget op til dit lokalområde eller din gruppe: “Gives væk”, “Søges”, “Lån”, “Hjælp” eller
+                “Event”. Det kan være alt fra en stol du vil give videre, til en efterlysning af en stige eller
+                en hjælpende hånd.
               </p>
             </div>
 
@@ -361,8 +398,9 @@ export default function LigusterLandingPage() {
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">3. Lån og udlån</h3>
               <p className="text-gray-600">
-                Lån værktøj og hverdagsting i nærheden: boremaskine, trailer, stige, festborde eller en højtryksrenser.
-                Når du låner noget ud, kan du tilbyde et “tilgode” – så det bliver nemt at hjælpe hinanden igen senere.
+                Lån værktøj og hverdagsting i nærheden: boremaskine, trailer, stige, festborde eller en
+                højtryksrenser. Når du låner noget ud, kan du tilbyde et “tilgode” – så det bliver nemt at hjælpe
+                hinanden igen senere.
               </p>
             </div>
 
@@ -373,8 +411,8 @@ export default function LigusterLandingPage() {
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">4. Tilbyd og få hjælp</h3>
               <p className="text-gray-600">
-                Spørg om hjælp eller tilbyd en hånd: bære en sofa op, vande planter i ferien, passe en kat,
-                samle et IKEA-møbel eller hente en pakke. Små ting, der gør hverdagen lettere – lokalt.
+                Spørg om hjælp eller tilbyd en hånd: bære en sofa op, vande planter i ferien, passe en kat, samle
+                et IKEA-møbel eller hente en pakke. Små ting, der gør hverdagen lettere – lokalt.
               </p>
             </div>
 
@@ -385,8 +423,8 @@ export default function LigusterLandingPage() {
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">5. Saml folk om aktiviteter</h3>
               <p className="text-gray-600">
-                Lav opslag til aktiviteter og aftaler: arbejdsdag, fællesspisning, bytte-dag, spilaften,
-                julehygge eller en tur i skoven. Nemt at samle folk – uden at det drukner i kommentarer og støj.
+                Lav opslag til aktiviteter og aftaler: arbejdsdag, fællesspisning, bytte-dag, spilaften, julehygge
+                eller en tur i skoven. Nemt at samle folk – uden at det drukner i kommentarer og støj.
               </p>
             </div>
 
@@ -397,8 +435,8 @@ export default function LigusterLandingPage() {
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">6. Hold det trygt og overskueligt</h3>
               <p className="text-gray-600">
-                Liguster er bygget til at undgå konflikter: ingen offentlige kommentarspor i opslag.
-                Dialog foregår i privatbeskeder. Sikkerhed og god tone er tænkt ind fra start.
+                Liguster er bygget til at undgå konflikter: ingen offentlige kommentarspor i opslag. Dialog foregår
+                i privatbeskeder. Sikkerhed og god tone er tænkt ind fra start.
               </p>
             </div>
           </div>
@@ -408,7 +446,6 @@ export default function LigusterLandingPage() {
       {/* Footer */}
       <footer className="bg-gray-950 text-gray-400 py-12 border-t border-gray-800 text-center mt-auto">
         <div className="max-w-screen-xl mx-auto px-4">
-          
           <div className="flex justify-center mb-6">
             <div className="relative h-10 w-40 opacity-80">
               <Image src="/Liguster-logo-NEG.png" alt="Logo" fill className="object-contain" />
@@ -417,7 +454,7 @@ export default function LigusterLandingPage() {
 
           <div className="flex flex-col items-center gap-3">
             <p className="text-sm">&copy; 2026 Liguster Systemer. Alle rettigheder forbeholdes.</p>
-            
+
             <div className="flex gap-4 text-xs font-medium">
               <Link href="/privatliv" className="text-gray-500 hover:text-white transition-colors">
                 Privatlivspolitik
@@ -428,7 +465,6 @@ export default function LigusterLandingPage() {
               </Link>
             </div>
           </div>
-
         </div>
       </footer>
     </div>
