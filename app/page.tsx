@@ -6,34 +6,32 @@ import Link from 'next/link';
 
 export default function LigusterLandingPage() {
   // --- STATE ---
-
+  
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
   const totalSlides = 10;
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- NYT: COPY FEEDBACK STATE ---
+  // --- COPY FEEDBACK STATE ---
   const [shareFeedback, setShareFeedback] = useState('');
 
-  // --- NYT: SHARE FUNCTION ---
+  // --- SHARE FUNCTION ---
   const handleShare = async () => {
     const shareData = {
       title: 'Liguster',
       text: 'Hej! Jeg har fundet den her nye app til nabolaget. Skal vi ikke prøve den?',
-      url: window.location.href, // Deler den nuværende side
+      url: window.location.href, 
     };
 
-    // Tjekker om browseren understøtter "Native Share" (Mobil + moderne browsere)
     if (navigator.share) {
       try {
         await navigator.share(shareData);
         setShareFeedback('Tak fordi du deler! 💙');
         setTimeout(() => setShareFeedback(''), 3000);
       } catch (err) {
-        // Brugeren annullerede delingen - gør intet
+        // Brugeren annullerede
       }
     } else {
-      // Fallback til PC/Desktop: Kopier link til udklipsholder
       try {
         await navigator.clipboard.writeText(window.location.href);
         setShareFeedback('Link kopieret! Indsæt det i en besked 📋');
@@ -59,7 +57,6 @@ export default function LigusterLandingPage() {
     return () => {
       if (autoPlayRef.current) clearInterval(autoPlayRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Swipe handlers
@@ -101,7 +98,6 @@ export default function LigusterLandingPage() {
       />
 
       <style jsx global>{`
-        /* Mørkere blå gradient */
         .bg-liguster-gradient {
           background: linear-gradient(135deg, #071a2f 0%, #0b2b52 100%);
         }
@@ -136,7 +132,6 @@ export default function LigusterLandingPage() {
       <nav className="absolute w-full z-20 top-0 start-0 border-b border-white/10">
         <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
           <div className="flex items-center space-x-3">
-            {/* Logo */}
             <div className="relative h-14 w-44 md:h-16 md:w-56">
               <Image
                 src="/Liguster-logo-NEG.png"
@@ -149,7 +144,6 @@ export default function LigusterLandingPage() {
           </div>
 
           <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse items-center">
-            {/* KNAP: OPSLAG */}
             <Link
               href="/offentlige-opslag"
               className="text-white hover:text-white/80 font-bold text-sm px-3 py-2.5 transition-all flex items-center"
@@ -157,7 +151,6 @@ export default function LigusterLandingPage() {
               Opslag
             </Link>
 
-            {/* KNAP: FORENINGER */}
             <Link
               href="/offentlige-foreninger"
               className="text-white hover:text-white/80 font-bold text-sm px-3 py-2.5 transition-all flex items-center mr-2"
@@ -165,7 +158,6 @@ export default function LigusterLandingPage() {
               Foreninger
             </Link>
 
-            {/* LOG IND KNAP */}
             <Link
               href="/login"
               className="text-white bg-white/20 hover:bg-white/30 font-medium rounded-lg text-sm px-5 py-2.5 transition-all backdrop-blur-sm border border-white/40 flex items-center"
@@ -181,7 +173,7 @@ export default function LigusterLandingPage() {
         <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-24 md:pt-0">
           <div className="mr-auto place-self-center lg:col-span-7 fade-in-up">
             <span className="bg-white/10 text-white text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-white/20">
-              Nyhed: Demo / Betaversion
+              Aktiv Beta: Prøv appen nu
             </span>
 
             <h1 className="max-w-2xl mb-4 text-4xl font-extrabold tracking-tight leading-none md:text-5xl xl:text-6xl text-white">
@@ -189,49 +181,32 @@ export default function LigusterLandingPage() {
             </h1>
 
             <p className="max-w-2xl mb-6 font-light text-gray-200 lg:mb-8 md:text-lg lg:text-xl">
-              Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med
-              fokus på tryghed, enkelhed og en grønnere hverdag.
-              <br className="hidden md:block" />
-              <span className="block mt-2 font-normal text-white">
-                🚀 iPhone-beta er klar nu via TestFlight. Android følger senere.
-              </span>
+              Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med fokus på tryghed,
+              enkelhed og en grønnere hverdag.
             </p>
 
-            {/* --- BETA CTA (TestFlight) --- */}
-            <div className="max-w-2xl mb-6 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm p-5">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 text-white/90">
-                  <i className="fa-brands fa-apple text-xl"></i>
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-white font-extrabold text-lg leading-tight">
-                    Prøv Liguster på iPhone (beta)
-                  </h3>
-
-                  <p className="text-gray-200 text-sm md:text-base mt-1 leading-relaxed">
-                    Vil du hjælpe med at teste? Hent betaversionen via TestFlight og kom i gang på 2 minutter.
-                    <span className="block mt-2 text-white/90">
-                      Android er på vej, men vi kan endnu ikke åbne for massetest.
-                    </span>
-                  </p>
-
-                  <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                    <a
-                      href="https://testflight.apple.com/join/YVUVvbZp"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center px-5 py-3 text-base font-black text-[#0b2b52] rounded-lg bg-white hover:bg-gray-100 transition-colors"
-                    >
-                      <i className="fa-brands fa-apple mr-2"></i>
-                      Åbn TestFlight
-                    </a>
-
-                    <span className="text-white/70 text-xs sm:text-sm flex items-center">
-                      <i className="fa-solid fa-circle-info mr-2"></i>
-                      Kræver TestFlight installeret
-                    </span>
-                  </div>
+            {/* --- TESTFLIGHT / APP DOWNLOAD RUBRIK --- */}
+            <div className="max-w-xl mb-8 p-6 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm">
+              <h3 className="text-white font-bold mb-2 flex items-center gap-2">
+                <i className="fa-brands fa-apple text-xl"></i> 
+                Prøv beta-versionen på iPhone
+              </h3>
+              <p className="text-gray-300 text-sm mb-4">
+                Vi tester i øjeblikket appen via Apples <strong>TestFlight</strong>. Som beta-tester får du direkte adgang til de nyeste funktioner før alle andre.
+              </p>
+              <div className="flex flex-wrap gap-4 items-center">
+                <a
+                  href="https://testflight.apple.com/join/YVUVvbZp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center px-5 py-3 text-sm font-bold text-center text-[#0b2b52] bg-white rounded-lg hover:bg-blue-50 transition-all shadow-lg hover:scale-[1.02]"
+                >
+                  <i className="fa-solid fa-download mr-2"></i>
+                  Hent via TestFlight
+                </a>
+                <div className="flex items-center text-gray-400 text-xs italic">
+                  <i className="fa-brands fa-android mr-2 text-base"></i>
+                  Android version lander snart!
                 </div>
               </div>
             </div>
@@ -239,12 +214,11 @@ export default function LigusterLandingPage() {
             <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
               <a
                 href="#features"
-                className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-gray-900 border border-gray-300 rounded-lg bg-white hover:bg-gray-100 transition-colors"
+                className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white border border-white/30 rounded-lg hover:bg-white/10 transition-colors backdrop-blur-sm"
               >
                 Se hvordan det virker
               </a>
 
-              {/* --- NY DELE KNAP --- */}
               <button
                 onClick={handleShare}
                 className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white border border-white/30 rounded-lg hover:bg-white/10 transition-colors backdrop-blur-sm group"
@@ -254,29 +228,15 @@ export default function LigusterLandingPage() {
               </button>
             </div>
 
-            {/* FEEDBACK BESKED VED DELING */}
             {shareFeedback && (
-              <div className="mt-3 text-green-300 font-bold text-sm animate-pulse">
-                <i className="fa-solid fa-check mr-2"></i>
-                {shareFeedback}
-              </div>
+               <div className="mt-3 text-green-300 font-bold text-sm animate-pulse">
+                 <i className="fa-solid fa-check mr-2"></i>{shareFeedback}
+               </div>
             )}
-            {/* --------------------- */}
-
-            <div className="flex items-center gap-4 text-white/80 text-sm mt-8 md:mt-8">
-              <div className="flex items-center">
-                <i className="fa-brands fa-apple text-xl mr-2"></i> iOS (beta)
-              </div>
-
-              <div className="flex items-center">
-                <i className="fa-brands fa-android text-xl mr-2"></i> Android (kommer senere)
-              </div>
-            </div>
           </div>
 
           <div className="hidden lg:mt-0 lg:col-span-5 lg:flex justify-center items-center relative">
             <div className="relative">
-              {/* STØRRE TELEFON */}
               <div
                 className="mockup-frame w-[340px] h-[700px] bg-black relative z-10 mx-auto border-[14px] border-gray-800 rounded-[3rem] overflow-hidden"
                 onTouchStart={handleTouchStart}
@@ -327,23 +287,21 @@ export default function LigusterLandingPage() {
         <div className="max-w-5xl mx-auto px-4">
           <div className="bg-liguster-gradient rounded-[2.5rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
             <div className="relative z-10 flex flex-col items-center">
-              {/* Logo i toppen - NU ENDNU STØRRE */}
               <div className="relative w-[500px] h-[165px] mb-10">
-                <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="Liguster" />
+                 <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="Liguster" />
               </div>
-
+              
               <h2 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-tight">
                 Klar til at gøre en forskel lokalt?
               </h2>
-
+              
               <p className="text-blue-100 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-                Opret en bruger i dag og vær med til at skabe mere liv, tryghed og fællesskab på din vej. Det
-                er gratis, enkelt og tager kun et øjeblik.
+                Opret en bruger i dag og vær med til at skabe mere liv, tryghed og fællesskab på din vej. 
+                Det er gratis, enkelt og tager kun et øjeblik.
               </p>
 
-              {/* RETTET LINK TIL /opret HER */}
-              <Link
-                href="/opret"
+              <Link 
+                href="/opret" 
                 className="bg-white text-[#0b2b52] font-black text-lg px-10 py-4 rounded-full shadow-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 inline-flex items-center gap-2"
               >
                 <i className="fa-solid fa-user-plus"></i>
@@ -354,89 +312,76 @@ export default function LigusterLandingPage() {
         </div>
       </section>
 
-      {/* Features Section - MED MØRKERE BAGGRUND (bg-gray-100) */}
+      {/* Features Section */}
       <section id="features" className="py-16 md:py-24 bg-gray-100">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Hvad kan du bruge Liguster til?</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Hvad kan du bruge Liguster til?
+            </h2>
             <p className="text-gray-600 max-w-3xl mx-auto">
-              Liguster er et lokalt samlingspunkt, hvor du kan dele, låne, hjælpe og organisere fællesskaber –
-              uden støj og med fokus på tryghed.
+              Liguster er et lokalt samlingspunkt, hvor du kan dele, låne, hjælpe og organisere fællesskaber – uden støj og med fokus på tryghed.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* 1 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-6 text-2xl">
                 <i className="fa-solid fa-pen-to-square"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">1. Opret opslag</h3>
               <p className="text-gray-600">
-                Slå noget op til dit lokalområde eller din gruppe: “Gives væk”, “Søges”, “Lån”, “Hjælp” eller
-                “Event”. Det kan være alt fra en stol du vil give videre, til en efterlysning af en stige eller
-                en hjælpende hånd.
+                Slå noget op til dit lokalområde eller din gruppe: “Gives væk”, “Søges”, “Lån”, “Hjælp” eller “Event”.
               </p>
             </div>
 
-            {/* 2 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-6 text-2xl">
                 <i className="fa-solid fa-people-group"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">2. Opret din egen forening</h3>
               <p className="text-gray-600">
-                Lav et fællesskab på få minutter. Det kan være alt fra en grundejerforening og kolonihaveforening
-                til en Trivial Pursuit-klub, en løbeklub, en forældregruppe eller en vennegruppe i opgangen.
+                Lav et fællesskab på få minutter. Fra grundejerforeninger til små hobbyklubber og løbehold.
               </p>
             </div>
 
-            {/* 3 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-sky-100 rounded-xl flex items-center justify-center text-sky-600 mb-6 text-2xl">
                 <i className="fa-solid fa-screwdriver-wrench"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">3. Lån og udlån</h3>
               <p className="text-gray-600">
-                Lån værktøj og hverdagsting i nærheden: boremaskine, trailer, stige, festborde eller en
-                højtryksrenser. Når du låner noget ud, kan du tilbyde et “tilgode” – så det bliver nemt at hjælpe
-                hinanden igen senere.
+                Lån værktøj og hverdagsting i nærheden. Spar penge og plads ved at dele med naboerne.
               </p>
             </div>
 
-            {/* 4 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-6 text-2xl">
                 <i className="fa-solid fa-handshake-angle"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">4. Tilbyd og få hjælp</h3>
               <p className="text-gray-600">
-                Spørg om hjælp eller tilbyd en hånd: bære en sofa op, vande planter i ferien, passe en kat, samle
-                et IKEA-møbel eller hente en pakke. Små ting, der gør hverdagen lettere – lokalt.
+                Vand planter i ferien eller få hjælp til at bære en sofa. Små ting, der styrker fællesskabet.
               </p>
             </div>
 
-            {/* 5 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 mb-6 text-2xl">
                 <i className="fa-solid fa-calendar-check"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">5. Saml folk om aktiviteter</h3>
               <p className="text-gray-600">
-                Lav opslag til aktiviteter og aftaler: arbejdsdag, fællesspisning, bytte-dag, spilaften, julehygge
-                eller en tur i skoven. Nemt at samle folk – uden at det drukner i kommentarer og støj.
+                Arranger arbejdsdage, fællesspisning eller byttedage. Nemt og overskueligt for alle deltagere.
               </p>
             </div>
 
-            {/* 6 */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-rose-100 rounded-xl flex items-center justify-center text-rose-600 mb-6 text-2xl">
                 <i className="fa-solid fa-shield-halved"></i>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-900">6. Hold det trygt og overskueligt</h3>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">6. Hold det trygt</h3>
               <p className="text-gray-600">
-                Liguster er bygget til at undgå konflikter: ingen offentlige kommentarspor i opslag. Dialog foregår
-                i privatbeskeder. Sikkerhed og god tone er tænkt ind fra start.
+                Ingen offentlige kommentarspor. Dialog foregår privat, så vi undgår støj og misforståelser.
               </p>
             </div>
           </div>
@@ -454,7 +399,6 @@ export default function LigusterLandingPage() {
 
           <div className="flex flex-col items-center gap-3">
             <p className="text-sm">&copy; 2026 Liguster Systemer. Alle rettigheder forbeholdes.</p>
-
             <div className="flex gap-4 text-xs font-medium">
               <Link href="/privatliv" className="text-gray-500 hover:text-white transition-colors">
                 Privatlivspolitik
