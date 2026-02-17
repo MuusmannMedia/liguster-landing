@@ -149,14 +149,14 @@ export default function LigusterLandingPage() {
       <nav className="absolute inset-x-0 top-0 z-20 border-b border-white/10 bg-[#071a2f]/35 backdrop-blur-sm">
         <div className="max-w-screen-xl mx-auto px-3 py-3 md:p-4">
           <div className="flex items-center justify-between gap-3">
-            <Link href="/" className="relative h-12 w-28 md:h-16 md:w-56 shrink-0">
+            <Link href="/" className="relative h-12 w-28 md:h-[4.5rem] md:w-60 shrink-0">
               <Image
                 src="/Liguster-logo-NEG.png"
                 alt="Liguster Logo"
                 fill
                 className="object-contain object-left"
                 priority
-                sizes="(min-width: 768px) 224px, 112px"
+                sizes="(min-width: 768px) 240px, 112px"
                 quality={85}
               />
             </Link>
@@ -440,13 +440,13 @@ export default function LigusterLandingPage() {
       <footer className="bg-gray-950 text-gray-400 py-12 border-t border-gray-800 text-center mt-auto">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="flex justify-center mb-6">
-            <div className="relative h-10 w-40 opacity-80">
+            <div className="relative h-12 w-48 opacity-85">
               <Image
                 src="/Liguster-logo-NEG.png"
                 alt="Logo"
                 fill
                 className="object-contain"
-                sizes="160px"
+                sizes="192px"
                 quality={85}
               />
             </div>

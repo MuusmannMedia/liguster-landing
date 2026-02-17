@@ -128,21 +128,21 @@ export default function SiteHeader() {
   return (
     <nav className="bg-[#131921] text-white sticky top-0 z-[100] shadow-md border-b border-gray-800 overflow-x-clip">
       <div className="max-w-6xl mx-auto px-2 md:px-4">
-        <div className="flex items-center gap-1 md:gap-3 h-14 md:h-16">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-1 h-14 md:h-[5rem] md:max-w-5xl md:mx-auto md:flex md:justify-center md:gap-8">
           <div className="flex-shrink-0 flex items-center">
-            <Link href="/opslag" className="relative h-9 w-9 md:h-8 md:w-32 opacity-90 hover:opacity-100 transition-opacity">
+            <Link href="/opslag" className="relative h-10 w-10 md:h-16 md:w-52 lg:w-56 opacity-90 hover:opacity-100 transition-opacity">
               <Image
                 src="/Liguster-logo-NEG.png"
                 alt="Liguster"
                 fill
                 className="object-contain md:object-left"
-                sizes="(min-width: 768px) 128px, 36px"
+                sizes="(min-width: 1024px) 224px, (min-width: 768px) 208px, 40px"
                 quality={85}
               />
             </Link>
           </div>
 
-          <div className="flex-1 min-w-0 flex justify-end">
+          <div className="min-w-0 flex justify-end md:justify-start">
             <div className="flex items-stretch gap-0.5 md:gap-1">
               {menuItems.map((item) => {
                 const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
@@ -152,7 +152,7 @@ export default function SiteHeader() {
                     key={item.name}
                     href={item.href}
                     aria-label={item.name}
-                    className={`relative inline-flex flex-col items-center justify-center px-1.5 sm:px-2 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium transition-colors duration-200 border-b-2 min-w-0
+                    className={`relative inline-flex flex-col items-center justify-center px-1.5 sm:px-2 md:px-2.5 lg:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium transition-colors duration-200 border-b-2 min-w-0
                       ${
                         isActive
                           ? 'border-white text-white'
@@ -178,7 +178,7 @@ export default function SiteHeader() {
               <button
                 onClick={handleLogout}
                 aria-label="Log ud"
-                className="inline-flex flex-col items-center justify-center px-1.5 sm:px-2 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium transition-colors duration-200 border-b-2 border-transparent text-gray-400 hover:text-red-400 hover:border-red-400 min-w-0"
+                className="inline-flex flex-col items-center justify-center px-1.5 sm:px-2 md:px-2.5 lg:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium transition-colors duration-200 border-b-2 border-transparent text-gray-400 hover:text-red-400 hover:border-red-400 min-w-0"
                 title="Log ud"
               >
                 <i className="fa-solid fa-right-from-bracket mb-0.5 md:mb-1 text-sm md:text-lg" aria-hidden="true"></i>
