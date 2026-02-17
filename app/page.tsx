@@ -147,8 +147,8 @@ export default function LigusterLandingPage() {
       `}</style>
 
       <nav className="absolute inset-x-0 top-0 z-20 border-b border-white/10 bg-[#071a2f]/35 backdrop-blur-sm">
-        <div className="max-w-screen-xl mx-auto px-3 py-3 md:p-4">
-          <div className="flex items-center justify-between gap-3">
+        <div className="max-w-screen-xl mx-auto px-3 py-3 md:px-4 md:py-3">
+          <div className="grid grid-cols-[auto_1fr] items-center gap-3 md:max-w-5xl md:mx-auto md:flex md:justify-center md:gap-8">
             <Link href="/" className="relative h-12 w-28 md:h-[4.5rem] md:w-60 shrink-0">
               <Image
                 src="/Liguster-logo-NEG.png"
@@ -161,7 +161,8 @@ export default function LigusterLandingPage() {
               />
             </Link>
 
-            <div className="flex items-center gap-2">
+            <div className="min-w-0 flex justify-end md:justify-start">
+              <div className="flex items-center gap-2 md:gap-3">
               <Link
                 href="/offentlige-opslag"
                 className="hidden sm:inline-flex text-white hover:text-white/80 font-bold text-sm px-3 py-2 transition-all items-center"
@@ -182,6 +183,7 @@ export default function LigusterLandingPage() {
               >
                 <i className="fa-solid fa-right-to-bracket mr-2" aria-hidden="true"></i> Log ind
               </Link>
+            </div>
             </div>
           </div>
 
@@ -440,13 +442,13 @@ export default function LigusterLandingPage() {
       <footer className="bg-gray-950 text-gray-400 py-12 border-t border-gray-800 text-center mt-auto">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="flex justify-center mb-6">
-            <div className="relative h-12 w-48 opacity-85">
+            <div className="relative h-16 w-64 sm:h-20 sm:w-80 opacity-90">
               <Image
                 src="/Liguster-logo-NEG.png"
                 alt="Logo"
                 fill
                 className="object-contain"
-                sizes="192px"
+                sizes="(min-width: 640px) 320px, 256px"
                 quality={85}
               />
             </div>

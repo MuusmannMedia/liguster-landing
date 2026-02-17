@@ -10,7 +10,7 @@ export default function SiteFooter() {
         
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <div className="relative h-10 w-40 opacity-85">
+          <div className="relative h-14 w-56 sm:h-16 sm:w-64 opacity-90">
             <Image src="/Liguster-logo-NEG.png" alt="Logo" fill className="object-contain" />
           </div>
         </div>
