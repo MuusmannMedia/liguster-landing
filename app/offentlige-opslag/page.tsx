@@ -20,6 +20,8 @@ type Post = {
 };
 
 const PAGE_SIZE = 18;
+const POST_SELECT_WITH_PRICE = 'id, overskrift, text, image_url, kategori, pris, omraade, created_at';
+const POST_SELECT_BASE = 'id, overskrift, text, image_url, kategori, omraade, created_at';
 
 function canOptimizeImage(src: string) {
   try {
@@ -77,27 +79,36 @@ export default function OffentligeOpslagPage() {
       const to = from + PAGE_SIZE - 1;
       const safeSearch = toSearchTerm(currentSearch);
 
-      let query = supabase
-        .from('posts')
-        .select('id, overskrift, text, image_url, kategori, pris, omraade, created_at', { count: 'exact' })
-        .eq('is_public', true)
-        .order('created_at', { ascending: false })
-        .range(from, to);
+      const runQuery = async (selectColumns: string) => {
+        let query = supabase
+          .from('posts')
+          .select(selectColumns, { count: 'exact' })
+          .eq('is_public', true)
+          .order('created_at', { ascending: false })
+          .range(from, to);
 
-      if (safeSearch) {
-        query = query.or(
-          `overskrift.ilike.%${safeSearch}%,text.ilike.%${safeSearch}%,omraade.ilike.%${safeSearch}%,kategori.ilike.%${safeSearch}%`
-        );
+        if (safeSearch) {
+          query = query.or(
+            `overskrift.ilike.%${safeSearch}%,text.ilike.%${safeSearch}%,omraade.ilike.%${safeSearch}%,kategori.ilike.%${safeSearch}%`
+          );
+        }
+
+        return query;
+      };
+
+      let { data, error, count } = await runQuery(POST_SELECT_WITH_PRICE);
+
+      // Nogle databaser har ikke 'pris'-kolonnen endnu. Fallback holder siden oppe.
+      if (error && error.message.toLowerCase().includes('pris')) {
+        ({ data, error, count } = await runQuery(POST_SELECT_BASE));
       }
-
-      const { data, error, count } = await query;
 
       if (error) {
         console.error('Kunne ikke hente offentlige opslag:', error.message);
         return;
       }
 
-      const nextPosts = data ?? [];
+      const nextPosts = (data ?? []) as unknown as Post[];
       setTotalCount(count || 0);
       setHasMore(to + 1 < (count || 0));
 

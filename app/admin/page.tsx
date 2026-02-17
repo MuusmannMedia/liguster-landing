@@ -40,6 +40,23 @@ export default function AdminPage() {
   const [inspectLoading, setInspectLoading] = useState(false);
   const [userContent, setUserContent] = useState<{posts: any[], foreninger: any[]}>({ posts: [], foreninger: [] });
 
+  // 1. HENT KUN BRUGERE
+  async function fetchUsers() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Fejl:", error);
+      alert("Kunne ikke hente brugere: " + error.message);
+    } else {
+      setUsers(data || []);
+    }
+    setLoading(false);
+  }
+
   useEffect(() => {
     const checkAccess = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -62,23 +79,6 @@ export default function AdminPage() {
 
     checkAccess();
   }, [router]);
-
-  // 1. HENT KUN BRUGERE
-  const fetchUsers = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error("Fejl:", error);
-      alert("Kunne ikke hente brugere: " + error.message);
-    } else {
-      setUsers(data || []);
-    }
-    setLoading(false);
-  };
 
   // 2. HENT INDHOLD VED INSPEKTION
   const handleInspectClick = async (user: any) => {

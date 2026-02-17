@@ -59,6 +59,7 @@ function EditPostModal({ isOpen, onClose, post, onSaved }: { isOpen: boolean, on
 
   useEffect(() => {
     if (post) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setText(post.text || "");
       setIsPublic(post.is_public || false);
     }

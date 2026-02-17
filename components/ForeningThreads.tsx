@@ -55,11 +55,33 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
   // Cache til brugernavne (så vi slipper for joins der kan fejle)
   const [userCache, setUserCache] = useState<Record<string, any>>({});
 
-  useEffect(() => {
-    fetchThreads();
-  }, [foreningId]);
+  // Hjælper til at hente brugere og gemme i cache
+  const resolveUserNames = async (ids: string[]) => {
+    // Filtrer ID'er vi allerede kender fra
+    const missing = ids.filter(id => !userCache[id]);
+    if (missing.length === 0) return;
 
-  const fetchThreads = async () => {
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, name, username, email, avatar_url")
+      .in("id", missing);
+
+    if (users) {
+      setUserCache(prev => {
+        const next = { ...prev };
+        users.forEach(u => { next[u.id] = u; });
+        return next;
+      });
+      
+      // Hvis chatten er åben, opdater beskederne med de nye navne
+      setMessages(prev => prev.map(msg => ({
+        ...msg,
+        user: users.find(u => u.id === msg.user_id) || msg.user
+      })));
+    }
+  };
+
+  async function fetchThreads() {
     setLoading(true);
     const { data } = await supabase
       .from("forening_threads")
@@ -73,7 +95,13 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
       resolveUserNames(data.map(t => t.created_by));
     }
     setLoading(false);
-  };
+  }
+
+  useEffect(() => {
+    // This effect intentionally loads remote thread data when foreningId changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchThreads();
+  }, [foreningId]);
 
   // Robust funktion til at hente beskeder og derefter brugere (Ligesom i appen)
   const fetchMessages = async (threadId: string) => {
@@ -105,32 +133,6 @@ export default function ForeningThreads({ foreningId, userId, isUserAdmin, isMem
     });
 
     setMessages(uiMsgs);
-  };
-
-  // Hjælper til at hente brugere og gemme i cache
-  const resolveUserNames = async (ids: string[]) => {
-    // Filtrer ID'er vi allerede kender fra
-    const missing = ids.filter(id => !userCache[id]);
-    if (missing.length === 0) return;
-
-    const { data: users } = await supabase
-      .from("users")
-      .select("id, name, username, email, avatar_url")
-      .in("id", missing);
-
-    if (users) {
-      setUserCache(prev => {
-        const next = { ...prev };
-        users.forEach(u => { next[u.id] = u; });
-        return next;
-      });
-      
-      // Hvis chatten er åben, opdater beskederne med de nye navne
-      setMessages(prev => prev.map(msg => ({
-        ...msg,
-        user: users.find(u => u.id === msg.user_id) || msg.user
-      })));
-    }
   };
 
   const createThread = async () => {

@@ -71,16 +71,14 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId, 
   };
 
   const handleShare = async () => {
-    // @ts-ignore
-    if (navigator.share) {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
-        // @ts-ignore
         await navigator.share({
           title: post.overskrift,
           text: `Se dette opslag på Liguster: ${post.overskrift}`,
           url: shareUrl,
         });
-      } catch (err) {}
+      } catch {}
     } else {
       handleCopyLink();
     }
@@ -107,7 +105,7 @@ export default function PostDetailModal({ isOpen, post, onClose, currentUserId, 
         .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${post.user_id}),and(sender_id.eq.${post.user_id},receiver_id.eq.${currentUserId})`)
         .limit(1);
 
-      let threadId = existingThreads && existingThreads.length > 0 
+      const threadId = existingThreads && existingThreads.length > 0 
         ? existingThreads[0].thread_id 
         : makeUuid();
 

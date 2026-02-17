@@ -101,7 +101,7 @@ export default function MineNaboerPage() {
       });
 
       // C) Hent brugerdata
-      let usersMap: Record<string, any> = {};
+      const usersMap: Record<string, any> = {};
       if (otherUserIds.size > 0) {
         const { data: users } = await supabase
           .from('users')
