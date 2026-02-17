@@ -147,8 +147,8 @@ export default function LigusterLandingPage() {
       `}</style>
 
       <nav className="absolute inset-x-0 top-0 z-20 border-b border-white/10 bg-[#071a2f]/35 backdrop-blur-sm">
-        <div className="max-w-screen-xl mx-auto px-3 py-3 md:px-4 md:py-3">
-          <div className="grid grid-cols-[auto_1fr] items-center gap-3 md:max-w-5xl md:mx-auto md:flex md:justify-center md:gap-8">
+        <div className="max-w-screen-xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
             <Link href="/" className="relative h-12 w-28 md:h-[4.5rem] md:w-60 shrink-0">
               <Image
                 src="/Liguster-logo-NEG.png"
@@ -161,8 +161,7 @@ export default function LigusterLandingPage() {
               />
             </Link>
 
-            <div className="min-w-0 flex justify-end md:justify-start">
-              <div className="flex items-center gap-2 md:gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <Link
                 href="/offentlige-opslag"
                 className="hidden sm:inline-flex text-white hover:text-white/80 font-bold text-sm px-3 py-2 transition-all items-center"
@@ -183,7 +182,6 @@ export default function LigusterLandingPage() {
               >
                 <i className="fa-solid fa-right-to-bracket mr-2" aria-hidden="true"></i> Log ind
               </Link>
-            </div>
             </div>
           </div>
 
