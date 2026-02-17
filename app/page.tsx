@@ -146,49 +146,64 @@ export default function LigusterLandingPage() {
         }
       `}</style>
 
-      <nav className="absolute w-full z-20 top-0 start-0 border-b border-white/10">
-        <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
-          <div className="flex items-center space-x-3">
-            <div className="relative h-14 w-44 md:h-16 md:w-56">
+      <nav className="absolute inset-x-0 top-0 z-20 border-b border-white/10 bg-[#071a2f]/35 backdrop-blur-sm">
+        <div className="max-w-screen-xl mx-auto px-3 py-3 md:p-4">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/" className="relative h-12 w-28 md:h-16 md:w-56 shrink-0">
               <Image
                 src="/Liguster-logo-NEG.png"
                 alt="Liguster Logo"
                 fill
                 className="object-contain object-left"
                 priority
-                sizes="(min-width: 768px) 224px, 176px"
+                sizes="(min-width: 768px) 224px, 112px"
                 quality={85}
               />
+            </Link>
+
+            <div className="flex items-center gap-2">
+              <Link
+                href="/offentlige-opslag"
+                className="hidden sm:inline-flex text-white hover:text-white/80 font-bold text-sm px-3 py-2 transition-all items-center"
+              >
+                Opslag
+              </Link>
+
+              <Link
+                href="/offentlige-foreninger"
+                className="hidden sm:inline-flex text-white hover:text-white/80 font-bold text-sm px-3 py-2 transition-all items-center"
+              >
+                Foreninger
+              </Link>
+
+              <Link
+                href="/login"
+                className="text-white bg-white/20 hover:bg-white/30 font-medium rounded-lg text-sm px-4 py-2 md:px-5 md:py-2.5 transition-all border border-white/40 inline-flex items-center"
+              >
+                <i className="fa-solid fa-right-to-bracket mr-2" aria-hidden="true"></i> Log ind
+              </Link>
             </div>
           </div>
 
-          <div className="flex md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse items-center">
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:hidden">
             <Link
               href="/offentlige-opslag"
-              className="text-white hover:text-white/80 font-bold text-sm px-3 py-2.5 transition-all flex items-center"
+              className="text-white/95 font-bold text-sm px-3 py-2 rounded-lg border border-white/25 text-center hover:bg-white/10 transition-colors"
             >
               Opslag
             </Link>
-
             <Link
               href="/offentlige-foreninger"
-              className="text-white hover:text-white/80 font-bold text-sm px-3 py-2.5 transition-all flex items-center mr-2"
+              className="text-white/95 font-bold text-sm px-3 py-2 rounded-lg border border-white/25 text-center hover:bg-white/10 transition-colors"
             >
               Foreninger
-            </Link>
-
-            <Link
-              href="/login"
-              className="text-white bg-white/20 hover:bg-white/30 font-medium rounded-lg text-sm px-5 py-2.5 transition-all backdrop-blur-sm border border-white/40 flex items-center"
-            >
-              <i className="fa-solid fa-right-to-bracket mr-2" aria-hidden="true"></i> Log ind
             </Link>
           </div>
         </div>
       </nav>
 
       <section className="bg-liguster-gradient relative min-h-[95vh] flex items-center overflow-hidden">
-        <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-24 md:pt-0">
+        <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-44 sm:pt-36 md:pt-0">
           <div className="mr-auto place-self-center lg:col-span-7 fade-in-up">
             <span className="bg-white/10 text-white text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-white/20">
               Aktiv Beta: Prøv appen nu

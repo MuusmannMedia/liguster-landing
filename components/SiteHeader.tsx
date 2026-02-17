@@ -126,61 +126,65 @@ export default function SiteHeader() {
   };
 
   return (
-    <nav className="bg-[#131921] text-white sticky top-0 z-[100] shadow-md border-b border-gray-800">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="flex justify-between h-16">
+    <nav className="bg-[#131921] text-white sticky top-0 z-[100] shadow-md border-b border-gray-800 overflow-x-clip">
+      <div className="max-w-6xl mx-auto px-2 md:px-4">
+        <div className="flex items-center gap-1 md:gap-3 h-14 md:h-16">
           <div className="flex-shrink-0 flex items-center">
-            <Link href="/opslag" className="relative h-8 w-32 opacity-90 hover:opacity-100 transition-opacity">
+            <Link href="/opslag" className="relative h-9 w-9 md:h-8 md:w-32 opacity-90 hover:opacity-100 transition-opacity">
               <Image
                 src="/Liguster-logo-NEG.png"
                 alt="Liguster"
                 fill
-                className="object-contain object-left"
-                sizes="128px"
+                className="object-contain md:object-left"
+                sizes="(min-width: 768px) 128px, 36px"
                 quality={85}
               />
             </Link>
           </div>
 
-          <div className="flex space-x-1 md:space-x-4">
-            {menuItems.map((item) => {
-              const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+          <div className="flex-1 min-w-0 flex justify-end">
+            <div className="flex items-stretch gap-0.5 md:gap-1">
+              {menuItems.map((item) => {
+                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
 
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`relative inline-flex flex-col items-center justify-center px-3 md:px-4 py-2 text-xs md:text-sm font-medium transition-colors duration-200 border-b-2
-                    ${
-                      isActive
-                        ? 'border-white text-white'
-                        : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-600'
-                    }`}
-                >
-                  <div className="relative">
-                    <i className={`fa-solid ${item.icon} mb-1 text-sm md:text-lg`} aria-hidden="true"></i>
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    aria-label={item.name}
+                    className={`relative inline-flex flex-col items-center justify-center px-1.5 sm:px-2 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium transition-colors duration-200 border-b-2 min-w-0
+                      ${
+                        isActive
+                          ? 'border-white text-white'
+                          : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-600'
+                      }`}
+                  >
+                    <div className="relative">
+                      <i className={`fa-solid ${item.icon} mb-0.5 md:mb-1 text-sm md:text-lg`} aria-hidden="true"></i>
 
-                    {item.badge > 0 && (
-                      <span className="absolute -top-1.5 -right-2 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-[#131921]"></span>
-                      </span>
-                    )}
-                  </div>
+                      {item.badge > 0 && (
+                        <span className="absolute -top-1.5 -right-2 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-[#131921]"></span>
+                        </span>
+                      )}
+                    </div>
 
-                  <span className="hidden md:inline">{item.name}</span>
-                </Link>
-              );
-            })}
+                    <span className="hidden md:inline">{item.name}</span>
+                  </Link>
+                );
+              })}
 
-            <button
-              onClick={handleLogout}
-              className="inline-flex flex-col items-center justify-center px-3 md:px-4 py-2 text-xs md:text-sm font-medium transition-colors duration-200 border-b-2 border-transparent text-gray-400 hover:text-red-400 hover:border-red-400"
-              title="Log ud"
-            >
-              <i className="fa-solid fa-right-from-bracket mb-1 text-sm md:text-lg" aria-hidden="true"></i>
-              <span className="hidden md:inline">Log ud</span>
-            </button>
+              <button
+                onClick={handleLogout}
+                aria-label="Log ud"
+                className="inline-flex flex-col items-center justify-center px-1.5 sm:px-2 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium transition-colors duration-200 border-b-2 border-transparent text-gray-400 hover:text-red-400 hover:border-red-400 min-w-0"
+                title="Log ud"
+              >
+                <i className="fa-solid fa-right-from-bracket mb-0.5 md:mb-1 text-sm md:text-lg" aria-hidden="true"></i>
+                <span className="hidden md:inline">Log ud</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
