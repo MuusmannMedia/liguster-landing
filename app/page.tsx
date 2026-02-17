@@ -147,7 +147,7 @@ export default function LigusterLandingPage() {
       `}</style>
 
       <nav className="absolute inset-x-0 top-0 z-20 border-b border-white/10 bg-[#071a2f]/35 backdrop-blur-sm">
-        <div className="max-w-screen-xl mx-auto px-4 py-3">
+        <div className="max-w-[1080px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <Link href="/" className="relative h-12 w-28 md:h-[4.5rem] md:w-60 shrink-0">
               <Image
@@ -203,7 +203,7 @@ export default function LigusterLandingPage() {
       </nav>
 
       <section className="bg-liguster-gradient relative min-h-[95vh] flex items-center overflow-hidden">
-        <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-44 sm:pt-36 md:pt-0">
+        <div className="grid max-w-[1080px] px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-44 sm:pt-36 md:pt-0">
           <div className="mr-auto place-self-center lg:col-span-7 fade-in-up">
             <span className="bg-white/10 text-white text-xs font-medium px-2.5 py-0.5 rounded-full mb-4 inline-block border border-white/20">
               Aktiv Beta: Prøv appen nu
@@ -327,7 +327,7 @@ export default function LigusterLandingPage() {
       </section>
 
       <section className="py-16 md:py-24 bg-white border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-4">
+        <div className="max-w-[1080px] mx-auto px-4">
           <div className="bg-liguster-gradient rounded-[2.5rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
             <div className="relative z-10 flex flex-col items-center">
               <div className="relative w-[500px] h-[165px] mb-10 max-w-full">
@@ -363,7 +363,7 @@ export default function LigusterLandingPage() {
       </section>
 
       <section id="features" className="py-16 md:py-24 bg-gray-100">
-        <div className="max-w-screen-xl mx-auto px-4">
+        <div className="max-w-[1080px] mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
               Hvad kan du bruge Liguster til?
@@ -438,7 +438,7 @@ export default function LigusterLandingPage() {
       </section>
 
       <footer className="bg-gray-950 text-gray-400 py-12 border-t border-gray-800 text-center mt-auto">
-        <div className="max-w-screen-xl mx-auto px-4">
+        <div className="max-w-[1080px] mx-auto px-4">
           <div className="flex justify-center mb-6">
             <div className="relative h-16 w-64 sm:h-20 sm:w-80 opacity-90">
               <Image
