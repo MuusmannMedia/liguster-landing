@@ -37,11 +37,12 @@ export default function LoginScreen() {
       // Hvis succes, send brugeren til opslag-siden
       router.push('/opslag');
       
-    } catch (error: any) {
-      if (error.message.includes("Invalid login credentials")) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes("Invalid login credentials")) {
         setErrorMsg("Forkert email eller adgangskode.");
       } else {
-        setErrorMsg(error.message || "Login fejlede. Prøv igen.");
+        setErrorMsg(message || "Login fejlede. Prøv igen.");
       }
     } finally {
       setLoading(false);
@@ -144,11 +145,11 @@ export default function LoginScreen() {
 
             {/* ✅ Opdaterede links i bunden af login-boksen */}
             <div className="mt-8 flex gap-4 text-xs text-gray-400">
-              <Link href="https://www.liguster-app.dk/privatliv" className="hover:text-gray-600 transition-colors">
+              <Link href="/privatliv" className="hover:text-gray-600 transition-colors">
                 Privatliv
               </Link>
               <span>•</span>
-              <Link href="https://www.liguster-app.dk/vilkaar" className="hover:text-gray-600 transition-colors">
+              <Link href="/vilkaar" className="hover:text-gray-600 transition-colors">
                 Vilkår
               </Link>
             </div>

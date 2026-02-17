@@ -1,114 +1,132 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-export default function LigusterLandingPage() {
-  // --- STATE ---
-  
-  // Carousel State
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const totalSlides = 10;
-  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
+const slides = [
+  '/landing/app-01.jpg',
+  '/landing/app-02.jpg',
+  '/landing/app-03.jpg',
+  '/landing/app-04.jpg',
+  '/landing/app-05.jpg',
+  '/landing/app-06.jpg',
+  '/landing/app-07.jpg',
+  '/landing/app-08.jpg',
+  '/landing/app-09.jpg',
+  '/landing/app-10.jpg',
+] as const;
 
-  // --- COPY FEEDBACK STATE ---
+const totalSlides = slides.length;
+
+export default function LigusterLandingPage() {
+  const [currentSlide, setCurrentSlide] = useState(0);
   const [shareFeedback, setShareFeedback] = useState('');
 
-  // --- SHARE FUNCTION ---
-  const handleShare = async () => {
+  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
+  const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
+
+  const clearAutoPlay = useCallback(() => {
+    if (autoPlayRef.current) {
+      clearInterval(autoPlayRef.current);
+      autoPlayRef.current = null;
+    }
+  }, []);
+
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev + 1) % totalSlides);
+  }, []);
+
+  const prevSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev === 0 ? totalSlides - 1 : prev - 1));
+  }, []);
+
+  const resetAutoPlay = useCallback(() => {
+    clearAutoPlay();
+    autoPlayRef.current = setInterval(nextSlide, 3500);
+  }, [clearAutoPlay, nextSlide]);
+
+  const setTemporaryFeedback = useCallback((message: string) => {
+    setShareFeedback(message);
+
+    if (feedbackTimeoutRef.current) {
+      clearTimeout(feedbackTimeoutRef.current);
+    }
+
+    feedbackTimeoutRef.current = setTimeout(() => {
+      setShareFeedback('');
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    resetAutoPlay();
+
+    return () => {
+      clearAutoPlay();
+      if (feedbackTimeoutRef.current) {
+        clearTimeout(feedbackTimeoutRef.current);
+      }
+    };
+  }, [clearAutoPlay, resetAutoPlay]);
+
+  const handleShare = useCallback(async () => {
     const shareData = {
       title: 'Liguster',
       text: 'Hej! Jeg har fundet den her nye app til nabolaget. Skal vi ikke prøve den?',
-      url: window.location.href, 
+      url: window.location.href,
     };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-        setShareFeedback('Tak fordi du deler! 💙');
-        setTimeout(() => setShareFeedback(''), 3000);
-      } catch (err) {
-        // Brugeren annullerede
+        setTemporaryFeedback('Tak fordi du deler!');
+      } catch {
+        // Brugeren annullerede deling
       }
-    } else {
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-        setShareFeedback('Link kopieret! Indsæt det i en besked 📋');
-        setTimeout(() => setShareFeedback(''), 3000);
-      } catch (err) {
-        setShareFeedback('Kunne ikke kopiere linket');
-      }
+      return;
     }
-  };
 
-  // --- CAROUSEL LOGIC ---
-  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % totalSlides);
-  const prevSlide = () =>
-    setCurrentSlide((prev) => (prev === 0 ? totalSlides - 1 : prev - 1));
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setTemporaryFeedback('Link kopieret! Indsæt det i en besked.');
+    } catch {
+      setTemporaryFeedback('Kunne ikke kopiere linket');
+    }
+  }, [setTemporaryFeedback]);
 
-  const resetAutoPlay = () => {
-    if (autoPlayRef.current) clearInterval(autoPlayRef.current);
-    autoPlayRef.current = setInterval(nextSlide, 3500);
-  };
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartXRef.current = e.targetTouches[0].clientX;
+    clearAutoPlay();
+  }, [clearAutoPlay]);
 
-  useEffect(() => {
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartXRef.current === null) {
+      resetAutoPlay();
+      return;
+    }
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const delta = touchStartXRef.current - touchEndX;
+
+    if (delta > 50) {
+      nextSlide();
+    } else if (delta < -50) {
+      prevSlide();
+    }
+
+    touchStartXRef.current = null;
     resetAutoPlay();
-    return () => {
-      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
-    };
-  }, []);
+  }, [nextSlide, prevSlide, resetAutoPlay]);
 
-  // Swipe handlers
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX);
-    if (autoPlayRef.current) clearInterval(autoPlayRef.current);
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    setTouchEnd(e.changedTouches[0].clientX);
-    if (touchStart - touchEnd > 50) nextSlide();
-    if (touchStart - touchEnd < -50) prevSlide();
-    resetAutoPlay();
-  };
-
-  // --- BILLEDER ---
-  const slides = [
-    '/app-01.png',
-    '/app-02.png',
-    '/app-03.png',
-    '/app-04.png',
-    '/app-05.png',
-    '/app-06.png',
-    '/app-07.png',
-    '/app-08.png',
-    '/app-09.png',
-    '/app-10.png',
-  ];
+  const previousSlideIndex = (currentSlide - 1 + totalSlides) % totalSlides;
+  const nextSlideIndex = (currentSlide + 1) % totalSlides;
 
   return (
     <div className="font-sans text-gray-800 bg-gray-50 min-h-screen pb-0">
-      {/* FontAwesome */}
-      <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-      />
-
       <style jsx global>{`
         .bg-liguster-gradient {
           background: linear-gradient(135deg, #071a2f 0%, #0b2b52 100%);
-        }
-        .text-liguster {
-          color: #0b2b52;
-        }
-        .bg-liguster {
-          background-color: #0b2b52;
-        }
-        .hover-bg-liguster:hover {
-          background-color: #071a2f;
         }
         .mockup-frame {
           box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
@@ -128,7 +146,6 @@ export default function LigusterLandingPage() {
         }
       `}</style>
 
-      {/* Navigation */}
       <nav className="absolute w-full z-20 top-0 start-0 border-b border-white/10">
         <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
           <div className="flex items-center space-x-3">
@@ -139,6 +156,8 @@ export default function LigusterLandingPage() {
                 fill
                 className="object-contain object-left"
                 priority
+                sizes="(min-width: 768px) 224px, 176px"
+                quality={85}
               />
             </div>
           </div>
@@ -162,13 +181,12 @@ export default function LigusterLandingPage() {
               href="/login"
               className="text-white bg-white/20 hover:bg-white/30 font-medium rounded-lg text-sm px-5 py-2.5 transition-all backdrop-blur-sm border border-white/40 flex items-center"
             >
-              <i className="fa-solid fa-right-to-bracket mr-2"></i> Log ind
+              <i className="fa-solid fa-right-to-bracket mr-2" aria-hidden="true"></i> Log ind
             </Link>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
       <section className="bg-liguster-gradient relative min-h-[95vh] flex items-center overflow-hidden">
         <div className="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12 relative z-10 pt-24 md:pt-0">
           <div className="mr-auto place-self-center lg:col-span-7 fade-in-up">
@@ -181,14 +199,13 @@ export default function LigusterLandingPage() {
             </h1>
 
             <p className="max-w-2xl mb-6 font-light text-gray-200 lg:mb-8 md:text-lg lg:text-xl">
-              Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget – med fokus på tryghed,
+              Liguster gør det nemt at give ting videre, låne værktøj og tilbyde hjælp i nabolaget - med fokus på tryghed,
               enkelhed og en grønnere hverdag.
             </p>
 
-            {/* --- TESTFLIGHT / APP DOWNLOAD RUBRIK --- */}
             <div className="max-w-xl mb-8 p-6 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm">
               <h3 className="text-white font-bold mb-2 flex items-center gap-2">
-                <i className="fa-brands fa-apple text-xl"></i> 
+                <i className="fa-brands fa-apple text-xl" aria-hidden="true"></i>
                 Prøv beta-versionen på iPhone
               </h3>
               <p className="text-gray-300 text-sm mb-4">
@@ -201,11 +218,11 @@ export default function LigusterLandingPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center px-5 py-3 text-sm font-bold text-center text-[#0b2b52] bg-white rounded-lg hover:bg-blue-50 transition-all shadow-lg hover:scale-[1.02]"
                 >
-                  <i className="fa-solid fa-download mr-2"></i>
+                  <i className="fa-solid fa-download mr-2" aria-hidden="true"></i>
                   Hent via TestFlight
                 </a>
                 <div className="flex items-center text-gray-400 text-xs italic">
-                  <i className="fa-brands fa-android mr-2 text-base"></i>
+                  <i className="fa-brands fa-android mr-2 text-base" aria-hidden="true"></i>
                   Android version lander snart!
                 </div>
               </div>
@@ -223,15 +240,16 @@ export default function LigusterLandingPage() {
                 onClick={handleShare}
                 className="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white border border-white/30 rounded-lg hover:bg-white/10 transition-colors backdrop-blur-sm group"
               >
-                <i className="fa-solid fa-share-nodes mr-2 group-hover:scale-110 transition-transform"></i>
+                <i className="fa-solid fa-share-nodes mr-2 group-hover:scale-110 transition-transform" aria-hidden="true"></i>
                 Tip en nabo
               </button>
             </div>
 
             {shareFeedback && (
-               <div className="mt-3 text-green-300 font-bold text-sm animate-pulse">
-                 <i className="fa-solid fa-check mr-2"></i>{shareFeedback}
-               </div>
+              <div className="mt-3 text-green-300 font-bold text-sm animate-pulse">
+                <i className="fa-solid fa-check mr-2" aria-hidden="true"></i>
+                {shareFeedback}
+              </div>
             )}
           </div>
 
@@ -246,26 +264,37 @@ export default function LigusterLandingPage() {
                   className="flex transition-transform duration-500 ease-in-out h-full w-full"
                   style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                 >
-                  {slides.map((src, index) => (
-                    <div
-                      key={index}
-                      className="min-w-full h-full bg-gray-900 flex items-center justify-center relative"
-                    >
-                      <Image
-                        src={src}
-                        alt={`App slide ${index + 1}`}
-                        fill
-                        className="object-cover"
-                        priority={index === 0}
-                      />
-                    </div>
-                  ))}
+                  {slides.map((src, index) => {
+                    const shouldRender =
+                      index === currentSlide || index === previousSlideIndex || index === nextSlideIndex;
+
+                    return (
+                      <div
+                        key={src}
+                        className="min-w-full h-full bg-gray-900 flex items-center justify-center relative"
+                      >
+                        {shouldRender ? (
+                          <Image
+                            src={src}
+                            alt={`App slide ${index + 1}`}
+                            fill
+                            className="object-cover"
+                            priority={index === 0}
+                            quality={70}
+                            sizes="340px"
+                          />
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
-                  {[...Array(totalSlides)].map((_, index) => (
-                    <div
+                  {Array.from({ length: totalSlides }).map((_, index) => (
+                    <button
                       key={index}
+                      type="button"
+                      aria-label={`Gå til slide ${index + 1}`}
                       onClick={() => {
                         setCurrentSlide(index);
                         resetAutoPlay();
@@ -282,29 +311,35 @@ export default function LigusterLandingPage() {
         </div>
       </section>
 
-      {/* --- OPRET BRUGER CTA --- */}
       <section className="py-16 md:py-24 bg-white border-b border-gray-100">
         <div className="max-w-5xl mx-auto px-4">
           <div className="bg-liguster-gradient rounded-[2.5rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
             <div className="relative z-10 flex flex-col items-center">
-              <div className="relative w-[500px] h-[165px] mb-10">
-                 <Image src="/Liguster-logo-NEG.png" fill className="object-contain" alt="Liguster" />
+              <div className="relative w-[500px] h-[165px] mb-10 max-w-full">
+                <Image
+                  src="/Liguster-logo-NEG.png"
+                  fill
+                  className="object-contain"
+                  alt="Liguster"
+                  sizes="(min-width: 768px) 500px, 80vw"
+                  quality={85}
+                />
               </div>
-              
+
               <h2 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-tight">
                 Klar til at gøre en forskel lokalt?
               </h2>
-              
+
               <p className="text-blue-100 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-                Opret en bruger i dag og vær med til at skabe mere liv, tryghed og fællesskab på din vej. 
+                Opret en bruger i dag og vær med til at skabe mere liv, tryghed og fællesskab på din vej.
                 Det er gratis, enkelt og tager kun et øjeblik.
               </p>
 
-              <Link 
-                href="/opret" 
+              <Link
+                href="/opret"
                 className="bg-white text-[#0b2b52] font-black text-lg px-10 py-4 rounded-full shadow-lg hover:bg-blue-50 hover:scale-105 transition-all duration-300 inline-flex items-center gap-2"
               >
-                <i className="fa-solid fa-user-plus"></i>
+                <i className="fa-solid fa-user-plus" aria-hidden="true"></i>
                 Opret bruger nu
               </Link>
             </div>
@@ -312,7 +347,6 @@ export default function LigusterLandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
       <section id="features" className="py-16 md:py-24 bg-gray-100">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="text-center mb-16">
@@ -320,24 +354,24 @@ export default function LigusterLandingPage() {
               Hvad kan du bruge Liguster til?
             </h2>
             <p className="text-gray-600 max-w-3xl mx-auto">
-              Liguster er et lokalt samlingspunkt, hvor du kan dele, låne, hjælpe og organisere fællesskaber – uden støj og med fokus på tryghed.
+              Liguster er et lokalt samlingspunkt, hvor du kan dele, låne, hjælpe og organisere fællesskaber - uden støj og med fokus på tryghed.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-6 text-2xl">
-                <i className="fa-solid fa-pen-to-square"></i>
+                <i className="fa-solid fa-pen-to-square" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">1. Opret opslag</h3>
               <p className="text-gray-600">
-                Slå noget op til dit lokalområde eller din gruppe: “Gives væk”, “Søges”, “Lån”, “Hjælp” eller “Event”.
+                Slå noget op til dit lokalområde eller din gruppe: &quot;Gives væk&quot;, &quot;Søges&quot;, &quot;Lån&quot;, &quot;Hjælp&quot; eller &quot;Event&quot;.
               </p>
             </div>
 
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-6 text-2xl">
-                <i className="fa-solid fa-people-group"></i>
+                <i className="fa-solid fa-people-group" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">2. Opret din egen forening</h3>
               <p className="text-gray-600">
@@ -347,7 +381,7 @@ export default function LigusterLandingPage() {
 
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-sky-100 rounded-xl flex items-center justify-center text-sky-600 mb-6 text-2xl">
-                <i className="fa-solid fa-screwdriver-wrench"></i>
+                <i className="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">3. Lån og udlån</h3>
               <p className="text-gray-600">
@@ -357,7 +391,7 @@ export default function LigusterLandingPage() {
 
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-6 text-2xl">
-                <i className="fa-solid fa-handshake-angle"></i>
+                <i className="fa-solid fa-handshake-angle" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">4. Tilbyd og få hjælp</h3>
               <p className="text-gray-600">
@@ -367,7 +401,7 @@ export default function LigusterLandingPage() {
 
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 mb-6 text-2xl">
-                <i className="fa-solid fa-calendar-check"></i>
+                <i className="fa-solid fa-calendar-check" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">5. Saml folk om aktiviteter</h3>
               <p className="text-gray-600">
@@ -377,7 +411,7 @@ export default function LigusterLandingPage() {
 
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="w-14 h-14 bg-rose-100 rounded-xl flex items-center justify-center text-rose-600 mb-6 text-2xl">
-                <i className="fa-solid fa-shield-halved"></i>
+                <i className="fa-solid fa-shield-halved" aria-hidden="true"></i>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">6. Hold det trygt</h3>
               <p className="text-gray-600">
@@ -388,12 +422,18 @@ export default function LigusterLandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-gray-950 text-gray-400 py-12 border-t border-gray-800 text-center mt-auto">
         <div className="max-w-screen-xl mx-auto px-4">
           <div className="flex justify-center mb-6">
             <div className="relative h-10 w-40 opacity-80">
-              <Image src="/Liguster-logo-NEG.png" alt="Logo" fill className="object-contain" />
+              <Image
+                src="/Liguster-logo-NEG.png"
+                alt="Logo"
+                fill
+                className="object-contain"
+                sizes="160px"
+                quality={85}
+              />
             </div>
           </div>
 

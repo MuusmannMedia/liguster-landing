@@ -1,7 +1,15 @@
-'use client';
+import type { Metadata } from 'next';
 
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
+
+export const metadata: Metadata = {
+  title: 'Brugervilkår',
+  description: 'Læs vilkår og betingelser for brug af Liguster.',
+  alternates: {
+    canonical: '/vilkaar',
+  },
+};
 
 export default function VilkaarPage() {
   return (
@@ -18,7 +26,7 @@ export default function VilkaarPage() {
         <div className="space-y-8 text-[#E3E8EF] leading-relaxed text-base md:text-lg">
           
           <p>
-            Ved at bruge Liguster-appen ("Tjenesten") accepterer du nedenstående vilkår og betingelser. Hvis du ikke kan acceptere disse vilkår, bør du ikke bruge Tjenesten.
+            Ved at bruge Liguster-appen (&quot;Tjenesten&quot;) accepterer du nedenstående vilkår og betingelser. Hvis du ikke kan acceptere disse vilkår, bør du ikke bruge Tjenesten.
           </p>
 
           {/* Generelt */}
@@ -64,7 +72,7 @@ export default function VilkaarPage() {
           <section>
             <h2 className="text-2xl font-bold text-white mb-3">Konto og ophør</h2>
             <p>
-              Du er ansvarlig for at holde dine login-oplysninger hemmelige. Du kan til enhver tid slette din konto og dine data via funktionen "Slet konto" under "Mig" i appen.
+              Du er ansvarlig for at holde dine login-oplysninger hemmelige. Du kan til enhver tid slette din konto og dine data via funktionen &quot;Slet konto&quot; under &quot;Mig&quot; i appen.
             </p>
           </section>
 
@@ -75,7 +83,7 @@ export default function VilkaarPage() {
               Vi bestræber os på, at Tjenesten er tilgængelig og fungerer stabilt, men vi kan ikke garantere uafbrudt adgang, fejlfrie funktioner eller at systemet til enhver tid er opdateret.
             </p>
             <p>
-              Tjenesten stilles til rådighed "som den er" uden nogen form for garanti, hverken udtrykkelig eller underforstået, herunder – men ikke begrænset til – garantier for egnethed til et bestemt formål.
+              Tjenesten stilles til rådighed &quot;som den er&quot; uden nogen form for garanti, hverken udtrykkelig eller underforstået, herunder – men ikke begrænset til – garantier for egnethed til et bestemt formål.
             </p>
           </section>
 

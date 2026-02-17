@@ -1,7 +1,15 @@
-'use client';
+import type { Metadata } from 'next';
 
 import SiteHeader from '../../components/SiteHeader';
 import SiteFooter from '../../components/SiteFooter';
+
+export const metadata: Metadata = {
+  title: 'Privatlivspolitik',
+  description: 'Læs Ligusters privatlivspolitik og hvordan vi behandler dine personoplysninger.',
+  alternates: {
+    canonical: '/privatliv',
+  },
+};
 
 export default function PrivacyPage() {
   return (
@@ -17,7 +25,7 @@ export default function PrivacyPage() {
         {/* Indhold */}
         <div className="space-y-6 text-[#E3E8EF] leading-relaxed text-base md:text-lg">
           <p>
-            Denne privatlivspolitik beskriver, hvordan Liguster ("vi", "os" eller "vores") behandler personoplysninger i forbindelse med din brug af Liguster-appen og tilhørende tjenester (samlet kaldet "Tjenesten").
+            Denne privatlivspolitik beskriver, hvordan Liguster (&quot;vi&quot;, &quot;os&quot; eller &quot;vores&quot;) behandler personoplysninger i forbindelse med din brug af Liguster-appen og tilhørende tjenester (samlet kaldet &quot;Tjenesten&quot;).
           </p>
 
           <p>
@@ -119,7 +127,7 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-5 mt-2 space-y-1">
               <li>Ret til indsigt i de oplysninger, vi behandler om dig</li>
               <li>Ret til berigtigelse (rettelse) af urigtige oplysninger</li>
-              <li>Ret til sletning ("retten til at blive glemt")</li>
+              <li>Ret til sletning (&quot;retten til at blive glemt&quot;)</li>
               <li>Ret til begrænsning af behandling</li>
               <li>Ret til indsigelse mod behandling</li>
               <li>Ret til dataportabilitet (udlevering af data i et struktureret format)</li>
