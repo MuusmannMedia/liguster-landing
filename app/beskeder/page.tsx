@@ -25,11 +25,21 @@ type ChatMessage = {
   text: string;
   created_at: string;
   user_id: string;
+  message_reactions?: MessageReaction[];
   users?: {
     name?: string;
     avatar_url?: string | null;
   };
 };
+
+type MessageReaction = {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+};
+
+const QUICK_REACTIONS = ['❤️', '😂', '👍', '😮', '😢', '😡'];
 
 // --- HJÆLPERE ---
 const getAvatarUrl = (path: string | null | undefined) => {
@@ -92,6 +102,9 @@ function BeskederContent() {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
+  const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
+  const [forwardingToThreadId, setForwardingToThreadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [dmDeletedMap, setDmDeletedMap] = useState<Record<string, string | null>>({});
@@ -287,6 +300,226 @@ function BeskederContent() {
       // jeg har skrevet -> så er tråden "læst" for mig
       await markThreadAsRead(activeThreadId, false);
     }
+  };
+
+  const handleToggleReaction = async (message: ChatMessage, emoji: string) => {
+    if (!userId || !isDirectMessage) return;
+
+    const previousReactions = message.message_reactions || [];
+    const ownReaction = previousReactions.find((r) => r.user_id === userId);
+    const removeOwnReaction = ownReaction?.emoji === emoji;
+
+    const nextReactions = removeOwnReaction
+      ? previousReactions.filter((r) => r.user_id !== userId)
+      : [
+          ...previousReactions.filter((r) => r.user_id !== userId),
+          {
+            id: `temp-${Date.now()}`,
+            message_id: message.id,
+            user_id: userId,
+            emoji,
+          },
+        ];
+
+    setMessages((prev) =>
+      prev.map((m) => (m.id === message.id ? { ...m, message_reactions: nextReactions } : m))
+    );
+    setSelectedMessage(null);
+
+    const delRes = await supabase
+      .from('message_reactions')
+      .delete()
+      .eq('message_id', message.id)
+      .eq('user_id', userId);
+
+    if (delRes.error) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === message.id ? { ...m, message_reactions: previousReactions } : m))
+      );
+      alert('Kunne ikke opdatere reaktion.');
+      return;
+    }
+
+    if (removeOwnReaction) return;
+
+    const insRes = await supabase
+      .from('message_reactions')
+      .insert({ message_id: message.id, user_id: userId, emoji });
+
+    if (insRes.error) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === message.id ? { ...m, message_reactions: previousReactions } : m))
+      );
+      alert('Kunne ikke gemme reaktion.');
+    }
+  };
+
+  const handleDeleteMessage = async (message: ChatMessage) => {
+    if (!userId || message.user_id !== userId) return;
+    if (!confirm('Vil du slette denne besked?')) return;
+
+    const table = isDirectMessage ? 'messages' : 'forening_messages';
+    const { error } = await supabase.from(table).delete().eq('id', message.id);
+
+    if (error) {
+      alert('Fejl: ' + error.message);
+      return;
+    }
+
+    setMessages((prev) => prev.filter((m) => m.id !== message.id));
+    setSelectedMessage(null);
+  };
+
+  const handleReportMessage = async (message: ChatMessage) => {
+    if (!userId || !activeThreadId) return;
+    const reason = window.prompt('Hvorfor vil du anmelde denne besked?');
+    if (!reason) return;
+
+    const richInsert = await supabase.from('reports').insert({
+      reporter_id: userId,
+      thread_id: activeThreadId,
+      target_id: message.id,
+      target_type: isDirectMessage ? 'message' : 'forening_message',
+      reason,
+      status: 'pending',
+      metadata: {
+        text: message.text,
+        sender: message.user_id,
+      },
+    });
+
+    if (richInsert.error) {
+      const fallbackInsert = await supabase.from('reports').insert({
+        reporter_id: userId,
+        thread_id: activeThreadId,
+        reason,
+        status: 'pending',
+      });
+
+      if (fallbackInsert.error) {
+        alert('Fejl: ' + fallbackInsert.error.message);
+        return;
+      }
+    }
+
+    setSelectedMessage(null);
+    alert('Tak, anmeldelse modtaget.');
+  };
+
+  const handleOpenForward = (message: ChatMessage) => {
+    setSelectedMessage(null);
+    setForwardMessage(message);
+  };
+
+  const handleForwardMessageToThread = async (targetThread: ThreadItem) => {
+    if (!forwardMessage || !userId) return;
+    const text = forwardMessage.text.trim();
+    if (!text) return;
+
+    setForwardingToThreadId(targetThread.id);
+
+    if (targetThread.isDm) {
+      if (!targetThread.dmUserId) {
+        setForwardingToThreadId(null);
+        alert('Kan ikke videresende til denne tråd.');
+        return;
+      }
+
+      const insRes = await supabase
+        .from('messages')
+        .insert([
+          {
+            thread_id: targetThread.id,
+            sender_id: userId,
+            receiver_id: targetThread.dmUserId,
+            text,
+            is_read: false,
+          },
+        ])
+        .select('id, text, created_at, sender_id')
+        .single();
+
+      if (insRes.error) {
+        setForwardingToThreadId(null);
+        alert('Fejl: ' + insRes.error.message);
+        return;
+      }
+
+      if (targetThread.id === activeThreadId) {
+        const inserted = insRes.data;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: inserted.id,
+            text: inserted.text,
+            created_at: inserted.created_at,
+            user_id: inserted.sender_id,
+            message_reactions: [],
+            users: { name: myProfile?.name || 'Mig', avatar_url: myProfile?.avatar_url || null },
+          },
+        ]);
+        scrollToBottom();
+      }
+
+      await upsertThreadToTop({
+        threadId: targetThread.id,
+        otherUserId: targetThread.dmUserId,
+        created_at: insRes.data.created_at,
+        isIncoming: false,
+      });
+    } else {
+      const insRes = await supabase
+        .from('forening_messages')
+        .insert([
+          {
+            thread_id: targetThread.id,
+            user_id: userId,
+            text,
+          },
+        ])
+        .select('id, text, created_at, user_id')
+        .single();
+
+      if (insRes.error) {
+        setForwardingToThreadId(null);
+        alert('Fejl: ' + insRes.error.message);
+        return;
+      }
+
+      if (targetThread.id === activeThreadId) {
+        const inserted = insRes.data;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: inserted.id,
+            text: inserted.text,
+            created_at: inserted.created_at,
+            user_id: inserted.user_id,
+            users: { name: myProfile?.name || 'Mig', avatar_url: myProfile?.avatar_url || null },
+          },
+        ]);
+        scrollToBottom();
+      }
+
+      setThreads((prev) => {
+        const idx = prev.findIndex((t) => t.id === targetThread.id && !t.isDm);
+        if (idx === -1) return prev;
+
+        const existing = prev[idx];
+        const updated: ThreadItem = {
+          ...existing,
+          created_at: insRes.data.created_at,
+          unreadCount: targetThread.id === activeThreadId ? 0 : existing.unreadCount ?? 0,
+        };
+        const rest = prev.filter((_, i) => i !== idx);
+        return [updated, ...rest].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      });
+    }
+
+    setForwardingToThreadId(null);
+    setForwardMessage(null);
   };
 
   const handleReport = async () => {
@@ -540,7 +773,7 @@ function BeskederContent() {
 
         let q = supabase
           .from('messages')
-          .select('id, text, created_at, sender_id')
+          .select('id, text, created_at, sender_id, message_reactions(id, message_id, user_id, emoji)')
           .eq('thread_id', activeThreadId)
           .order('created_at', { ascending: true });
 
@@ -579,6 +812,12 @@ function BeskederContent() {
 
     fetchM();
   }, [activeThreadId, isDirectMessage, userId, dmDeletedMap]);
+
+  useEffect(() => {
+    setSelectedMessage(null);
+    setForwardMessage(null);
+    setForwardingToThreadId(null);
+  }, [activeThreadId]);
 
   // --- REALTIME: DM INBOX (opdater tråd + unread dot) ---
   useEffect(() => {
@@ -659,6 +898,28 @@ function BeskederContent() {
       avatar: buildAvatarFallback(activeThread?.forening?.navn || title),
     };
   }, [activeThreadId, isDirectMessage, dmTargetUser, threads]);
+
+  const renderReactionBadges = (msg: ChatMessage, isMe: boolean) => {
+    if (!msg.message_reactions || msg.message_reactions.length === 0) return null;
+    const counts = new Map<string, number>();
+    msg.message_reactions.forEach((reaction) => {
+      counts.set(reaction.emoji, (counts.get(reaction.emoji) ?? 0) + 1);
+    });
+
+    return (
+      <div className={`mt-2 flex flex-wrap gap-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+        {Array.from(counts.entries()).map(([emoji, count]) => (
+          <span
+            key={`${msg.id}-${emoji}`}
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-[#131921] text-white border border-gray-300"
+          >
+            {emoji}
+            {count > 1 ? ` ${count}` : ''}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -803,10 +1064,23 @@ function BeskederContent() {
                             className="w-full h-full object-cover"
                           />
                         </div>
-                        <div className={`max-w-[70%] rounded-2xl p-4 shadow-sm ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'}`}>
-                          <p className="text-[15px] leading-relaxed font-semibold whitespace-pre-wrap">
-                            {formatTextWithLinks(msg.text)}
-                          </p>
+                        <div className={`max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                          <div className={`flex items-end gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                            <div className={`rounded-2xl p-4 shadow-sm ${isMe ? 'bg-[#131921] text-white rounded-br-none' : 'bg-white text-gray-900 rounded-bl-none border border-gray-100'}`}>
+                              <p className="text-[15px] leading-relaxed font-semibold whitespace-pre-wrap">
+                                {formatTextWithLinks(msg.text)}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => setSelectedMessage(msg)}
+                              className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-500 hover:text-[#131921] hover:bg-gray-100 transition-colors"
+                              title="Beskedmenu"
+                              aria-label="Beskedmenu"
+                            >
+                              <i className="fa-solid fa-ellipsis"></i>
+                            </button>
+                          </div>
+                          {renderReactionBadges(msg, isMe)}
                         </div>
                       </div>
                     );
@@ -840,6 +1114,129 @@ function BeskederContent() {
           </div>
         </div>
       </main>
+
+      {selectedMessage && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/45 flex items-end md:items-center justify-center p-4"
+          onClick={() => setSelectedMessage(null)}
+        >
+          <div
+            className="w-full max-w-md bg-[#131921] rounded-2xl border border-white/10 overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isDirectMessage && selectedMessage.user_id !== userId && (
+              <div className="flex items-center justify-between gap-2 px-4 py-4 border-b border-white/10">
+                {QUICK_REACTIONS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => void handleToggleReaction(selectedMessage, emoji)}
+                    className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-2xl"
+                    aria-label={`Reager med ${emoji}`}
+                    title={`Reager med ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => handleOpenForward(selectedMessage)}
+              className="w-full px-5 py-4 text-left text-white font-black flex items-center gap-3 hover:bg-white/10 transition-colors"
+            >
+              <i className="fa-solid fa-share"></i> Forward
+            </button>
+
+            {selectedMessage.user_id === userId ? (
+              <button
+                onClick={() => void handleDeleteMessage(selectedMessage)}
+                className="w-full px-5 py-4 text-left text-red-300 font-black flex items-center gap-3 hover:bg-red-500/10 transition-colors border-t border-white/10"
+              >
+                <i className="fa-regular fa-trash-can"></i> Slet
+              </button>
+            ) : (
+              <button
+                onClick={() => void handleReportMessage(selectedMessage)}
+                className="w-full px-5 py-4 text-left text-orange-200 font-black flex items-center gap-3 hover:bg-orange-500/10 transition-colors border-t border-white/10"
+              >
+                <i className="fa-solid fa-triangle-exclamation"></i> Anmeld
+              </button>
+            )}
+
+            <button
+              onClick={() => setSelectedMessage(null)}
+              className="w-full px-5 py-4 text-center text-white/90 font-black border-t border-white/10 hover:bg-white/10 transition-colors"
+            >
+              Annuller
+            </button>
+          </div>
+        </div>
+      )}
+
+      {forwardMessage && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/45 flex items-end md:items-center justify-center p-4"
+          onClick={() => {
+            setForwardMessage(null);
+            setForwardingToThreadId(null);
+          }}
+        >
+          <div
+            className="w-full max-w-lg bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h4 className="text-lg font-black text-[#131921]">Forward besked</h4>
+              <p className="text-sm text-gray-500 font-semibold">Vælg hvilken samtale beskeden skal sendes til</p>
+            </div>
+
+            <div className="max-h-[55vh] overflow-y-auto p-3 space-y-2 bg-[#F8FAFC]">
+              {threads.length === 0 ? (
+                <p className="text-sm text-gray-500 p-3">Ingen tråde fundet.</p>
+              ) : (
+                threads.map((t) => (
+                  <button
+                    key={`forward-${t.id}`}
+                    onClick={() => void handleForwardMessageToThread(t)}
+                    disabled={!!forwardingToThreadId}
+                    className="w-full bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <img
+                      src={getThreadAvatarSrc(t)}
+                      alt={t.title}
+                      className="w-10 h-10 rounded-full object-cover border border-gray-200 bg-gray-100 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-black text-[#131921] truncate">{t.title}</div>
+                      <div className="text-[11px] uppercase tracking-widest text-gray-500 font-black">
+                        {t.isDm ? 'Privat' : t.forening?.navn}
+                      </div>
+                    </div>
+                    {forwardingToThreadId === t.id ? (
+                      <span className="text-xs font-black text-[#131921]">Sender...</span>
+                    ) : (
+                      <i className="fa-solid fa-arrow-right text-gray-400"></i>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="p-3 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  setForwardMessage(null);
+                  setForwardingToThreadId(null);
+                }}
+                className="w-full h-11 rounded-xl bg-[#131921] text-white font-black"
+              >
+                Luk
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <SiteFooter />
     </div>
   );
