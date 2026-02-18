@@ -39,6 +39,9 @@ const getAvatarUrl = (path: string | null | undefined) => {
   return data.publicUrl;
 };
 
+const buildAvatarFallback = (name: string) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'Bruger')}&background=E5E7EB&color=111827&size=128`;
+
 const formatTextWithLinks = (text: string) => {
   const cleanParts = text.split(/(\s+)/).map((word, i) => {
     if (word.startsWith('/forening/')) {
@@ -322,35 +325,44 @@ function BeskederContent() {
     }
   };
 
-  const handleDeleteThread = async () => {
-    if (!activeThreadId || !userId || !confirm('Vil du slette denne samtale?')) return;
+  const handleDeleteThreadById = async (threadId: string, isDmThread: boolean) => {
+    if (!userId || !confirm('Vil du slette denne samtale?')) return;
 
-    if (isDirectMessage) {
+    if (isDmThread) {
       const deletedAt = new Date().toISOString();
       const { error } = await supabase
         .from('dm_thread_state')
-        .upsert({ thread_id: activeThreadId, user_id: userId, deleted_at: deletedAt }, { onConflict: 'thread_id,user_id' });
+        .upsert({ thread_id: threadId, user_id: userId, deleted_at: deletedAt }, { onConflict: 'thread_id,user_id' });
 
       if (error) {
         alert('Fejl: ' + error.message);
         return;
       }
 
-      setDmDeletedMap((prev) => ({ ...prev, [activeThreadId]: deletedAt }));
-      setThreads((prev) => prev.filter((t) => t.id !== activeThreadId));
-      setActiveThreadId(null);
-      setMessages([]);
-      setIsDirectMessage(false);
-      setDmTargetUser(null);
+      setDmDeletedMap((prev) => ({ ...prev, [threadId]: deletedAt }));
+      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+      if (activeThreadId === threadId) {
+        setActiveThreadId(null);
+        setMessages([]);
+        setIsDirectMessage(false);
+        setDmTargetUser(null);
+      }
       return;
     }
 
-    const { error } = await supabase.from('forening_threads').delete().eq('id', activeThreadId);
+    const { error } = await supabase.from('forening_threads').delete().eq('id', threadId);
     if (!error) {
-      setThreads((prev) => prev.filter((t) => t.id !== activeThreadId));
-      setActiveThreadId(null);
-      setMessages([]);
+      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+      if (activeThreadId === threadId) {
+        setActiveThreadId(null);
+        setMessages([]);
+      }
     }
+  };
+
+  const handleDeleteThread = async () => {
+    if (!activeThreadId) return;
+    await handleDeleteThreadById(activeThreadId, isDirectMessage);
   };
 
   // --- INIT ---
@@ -621,13 +633,31 @@ function BeskederContent() {
     };
   }, [userId, activeThreadId]);
 
-  const activeThreadInfo = useMemo(() => {
-    return isDirectMessage
-      ? { title: dmTargetUser?.name || 'Besked', subtitle: 'Privat' }
-      : {
-          title: threads.find((t) => t.id === activeThreadId)?.title || 'Chat',
-          subtitle: threads.find((t) => t.id === activeThreadId)?.forening?.navn || '',
-        };
+  const getThreadAvatarSrc = (thread: ThreadItem) => {
+    if (thread.isDm) {
+      return thread.dmUserAvatar || buildAvatarFallback(thread.title || 'Bruger');
+    }
+    return buildAvatarFallback(thread.forening?.navn || thread.title || 'Forening');
+  };
+
+  const activeThreadMeta = useMemo(() => {
+    const activeThread = threads.find((t) => t.id === activeThreadId) || null;
+
+    if (isDirectMessage) {
+      const title = dmTargetUser?.name || activeThread?.title || 'Besked';
+      const avatar =
+        getAvatarUrl(dmTargetUser?.avatar_url) ||
+        activeThread?.dmUserAvatar ||
+        buildAvatarFallback(title);
+      return { title, subtitle: 'Privat', avatar };
+    }
+
+    const title = activeThread?.title || 'Chat';
+    return {
+      title,
+      subtitle: activeThread?.forening?.navn || '',
+      avatar: buildAvatarFallback(activeThread?.forening?.navn || title),
+    };
   }, [activeThreadId, isDirectMessage, dmTargetUser, threads]);
 
   if (loading) {
@@ -654,35 +684,68 @@ function BeskederContent() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-              {threads.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)}
-                  className={`w-full text-left p-4 rounded-2xl flex flex-col gap-1 transition-all ${
-                    activeThreadId === t.id
-                      ? 'bg-white shadow-md ring-1 ring-gray-200 scale-[1.02]'
-                      : 'hover:bg-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-black text-[15px] text-[#131921] truncate">{t.title}</span>
+              {threads.map((t, index) => {
+                const isActive = activeThreadId === t.id;
+                const rowTone = index % 2 === 0 ? 'bg-white' : 'bg-gray-100';
 
-                    {!!t.unreadCount && t.unreadCount > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="relative flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                        </span>
-                        <span className="text-[11px] font-black text-red-600">{t.unreadCount}</span>
+                return (
+                  <div
+                    key={t.id}
+                    className={`w-full p-3 rounded-2xl flex items-center gap-3 transition-all ${
+                      isActive
+                        ? 'bg-white shadow-md ring-1 ring-gray-200 scale-[1.02]'
+                        : `${rowTone} hover:bg-gray-200`
+                    }`}
+                  >
+                    <button
+                      onClick={() => handleSelectThread(t.id, !!t.isDm, userId!, t.dmUserId)}
+                      className="flex-1 min-w-0 text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={getThreadAvatarSrc(t)}
+                          alt={t.title}
+                          className="w-10 h-10 rounded-full object-cover border border-gray-200 bg-gray-200 shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.src = buildAvatarFallback(t.title || 'Bruger');
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-black text-[15px] text-[#131921] truncate">{t.title}</span>
+
+                            {!!t.unreadCount && t.unreadCount > 0 && (
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="relative flex h-3 w-3">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                </span>
+                                <span className="text-[11px] font-black text-red-600">{t.unreadCount}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <span className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
+                            {t.isDm ? 'Privat' : t.forening?.navn}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    </button>
 
-                  <span className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
-                    {t.isDm ? 'Privat' : t.forening?.navn}
-                  </span>
-                </button>
-              ))}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleDeleteThreadById(t.id, !!t.isDm);
+                      }}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                      aria-label="Slet tråd"
+                      title="Slet tråd"
+                    >
+                      <i className="fa-regular fa-trash-can"></i>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -697,10 +760,18 @@ function BeskederContent() {
                     >
                       <i className="fa-solid fa-arrow-left"></i>
                     </button>
-                    <div>
-                      <h3 className="font-black text-[#131921] text-xl">{activeThreadInfo.title}</h3>
+                    <img
+                      src={activeThreadMeta.avatar}
+                      alt={activeThreadMeta.title}
+                      className="w-11 h-11 rounded-full object-cover border border-gray-200 bg-gray-200"
+                      onError={(e) => {
+                        e.currentTarget.src = buildAvatarFallback(activeThreadMeta.title || 'Bruger');
+                      }}
+                    />
+                    <div className="min-w-0">
+                      <h3 className="font-black text-[#131921] text-xl truncate">{activeThreadMeta.title}</h3>
                       <p className="text-[11px] text-gray-500 font-black uppercase tracking-widest">
-                        {activeThreadInfo.subtitle}
+                        {activeThreadMeta.subtitle}
                       </p>
                     </div>
                   </div>
