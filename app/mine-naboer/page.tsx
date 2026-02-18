@@ -204,8 +204,27 @@ export default function MineNaboerPage() {
     }
   };
 
+  const findExistingDmThreadId = async (firstUserId: string, secondUserId: string) => {
+    const { data } = await supabase
+      .from('messages')
+      .select('thread_id, created_at')
+      .or(
+        `and(sender_id.eq.${firstUserId},receiver_id.eq.${secondUserId}),and(sender_id.eq.${secondUserId},receiver_id.eq.${firstUserId})`
+      )
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    return data?.[0]?.thread_id ?? null;
+  };
+
+  const getOrCreateDmThreadId = async (firstUserId: string, secondUserId: string) => {
+    const existingThreadId = await findExistingDmThreadId(firstUserId, secondUserId);
+    return existingThreadId || makeUuid();
+  };
+
   // --- 3. ACTIONS (Accept/Decline) ---
   const handleAccept = async (item: NeighborItem) => {
+    if (!currentUserId) return;
     try {
       const { error } = await supabase
         .from('neighbors')
@@ -215,7 +234,7 @@ export default function MineNaboerPage() {
       if (error) throw error;
 
       // Send bekræftelse i chat
-      const threadId = makeUuid();
+      const threadId = await getOrCreateDmThreadId(currentUserId!, item.user.id);
       await supabase.from('messages').insert({
         thread_id: threadId,
         sender_id: currentUserId,
@@ -289,7 +308,7 @@ export default function MineNaboerPage() {
       }
 
       // Send besked
-      const threadId = makeUuid();
+      const threadId = await getOrCreateDmThreadId(currentUserId, targetId);
       const msg = inviteMessage.trim() || "Hej! Jeg har sendt dig en anmodning under 'Mine Naboer'.";
       
       await supabase.from('messages').insert({
@@ -417,7 +436,7 @@ export default function MineNaboerPage() {
                   
                   <div className="flex w-full gap-2 mt-auto">
                     <button 
-                      onClick={() => router.push(`/beskeder?chatWith=${friend.user.id}`)}
+                      onClick={() => router.push(`/beskeder?dmUser=${friend.user.id}`)}
                       className="flex-1 bg-[#131921] text-white text-xs font-bold py-2 rounded-lg hover:bg-gray-800 transition-colors"
                     >
                       Chat

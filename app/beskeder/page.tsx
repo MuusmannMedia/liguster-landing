@@ -71,7 +71,7 @@ function BeskederContent() {
   const searchParams = useSearchParams();
 
   const threadIdFromUrl = searchParams.get('id');   // <- vigtigt
-  const dmUserIdFromUrl = searchParams.get('dmUser');
+  const dmUserIdFromUrl = searchParams.get('dmUser') || searchParams.get('chatWith');
 
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -103,6 +103,27 @@ function BeskederContent() {
   const getDmDeletedAt = (threadId: string | null) => {
     if (!threadId) return null;
     return dmDeletedMap[threadId] ?? null;
+  };
+
+  const makeUuid = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+
+  const findExistingDmThreadId = async (firstUserId: string, secondUserId: string) => {
+    const { data } = await supabase
+      .from('messages')
+      .select('thread_id, created_at')
+      .or(
+        `and(sender_id.eq.${firstUserId},receiver_id.eq.${secondUserId}),and(sender_id.eq.${secondUserId},receiver_id.eq.${firstUserId})`
+      )
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    return data?.[0]?.thread_id ?? null;
   };
 
   // --- persist menu-dot state til header ---
@@ -477,6 +498,17 @@ function BeskederContent() {
         } else {
           await markThreadAsRead(threadIdFromUrl, false);
         }
+      } else if (dmUserIdFromUrl) {
+        setIsDirectMessage(true);
+
+        const { data: tUser } = await supabase.from('users').select('*').eq('id', dmUserIdFromUrl).single();
+        if (tUser) setDmTargetUser(tUser);
+
+        const existingThreadId = await findExistingDmThreadId(cId, dmUserIdFromUrl);
+        const threadIdToOpen = existingThreadId || makeUuid();
+
+        setActiveThreadId(threadIdToOpen);
+        await markThreadAsRead(threadIdToOpen, true);
       }
 
       setLoading(false);
