@@ -686,7 +686,7 @@ function BeskederContent() {
             <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
               {threads.map((t, index) => {
                 const isActive = activeThreadId === t.id;
-                const rowTone = index % 2 === 0 ? 'bg-white' : 'bg-gray-100';
+                const rowTone = index % 2 === 0 ? 'bg-white' : 'bg-[#E8EDF3]';
 
                 return (
                   <div
@@ -694,7 +694,7 @@ function BeskederContent() {
                     className={`w-full p-3 rounded-2xl flex items-center gap-3 transition-all ${
                       isActive
                         ? 'bg-white shadow-md ring-1 ring-gray-200 scale-[1.02]'
-                        : `${rowTone} hover:bg-gray-200`
+                        : `${rowTone} hover:bg-[#DDE4EC]`
                     }`}
                   >
                     <button
