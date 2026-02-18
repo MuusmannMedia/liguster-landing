@@ -232,7 +232,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
 
-      <main className="flex-1 flex items-center justify-center p-4 py-20">
+      <main className="flex-1 content-shell flex items-center justify-center py-20">
         <div className="bg-white w-full max-w-md rounded-[30px] shadow-2xl p-8 md:p-10 relative">
           
           {/* Tilbage knap */}

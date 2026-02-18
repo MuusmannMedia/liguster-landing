@@ -127,8 +127,8 @@ export default function SiteHeader() {
 
   return (
     <nav className="bg-[#131921] text-white sticky top-0 z-[100] shadow-md border-b border-gray-800 overflow-x-clip">
-      <div className="max-w-6xl mx-auto px-2 md:px-4">
-        <div className="grid grid-cols-[auto_1fr] items-center gap-1 h-14 md:h-[5rem] md:max-w-5xl md:mx-auto md:flex md:justify-center md:gap-8">
+      <div className="content-shell">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-1 h-14 md:h-[5rem]">
           <div className="flex-shrink-0 flex items-center">
             <Link href="/opslag" className="relative h-10 w-10 md:h-16 md:w-52 lg:w-56 opacity-90 hover:opacity-100 transition-opacity">
               <Image
@@ -142,7 +142,7 @@ export default function SiteHeader() {
             </Link>
           </div>
 
-          <div className="min-w-0 flex justify-end md:justify-start">
+          <div className="min-w-0 flex justify-end">
             <div className="flex items-stretch gap-0.5 md:gap-1">
               {menuItems.map((item) => {
                 const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
@@ -170,7 +170,7 @@ export default function SiteHeader() {
                       )}
                     </div>
 
-                    <span className="hidden md:inline">{item.name}</span>
+                    <span className="hidden lg:inline">{item.name}</span>
                   </Link>
                 );
               })}
@@ -182,7 +182,7 @@ export default function SiteHeader() {
                 title="Log ud"
               >
                 <i className="fa-solid fa-right-from-bracket mb-0.5 md:mb-1 text-sm md:text-lg" aria-hidden="true"></i>
-                <span className="hidden md:inline">Log ud</span>
+                <span className="hidden lg:inline">Log ud</span>
               </button>
             </div>
           </div>

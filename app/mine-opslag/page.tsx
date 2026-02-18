@@ -204,8 +204,8 @@ export default function MineOpslagPage() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
 
-      <div className="bg-[#869FB9] py-6 px-4 shadow-sm relative z-10">
-        <div className="max-w-6xl mx-auto space-y-4">
+      <div className="bg-[#869FB9] py-6 shadow-sm relative z-10">
+        <div className="content-shell space-y-4">
           <button 
             className="w-full bg-[#131921] text-white font-bold text-lg py-4 rounded-2xl shadow-lg hover:bg-gray-900 transition-all uppercase tracking-wider flex items-center justify-center gap-2 transform hover:scale-[1.01]"
             onClick={() => setIsCreateOpen(true)}
@@ -215,7 +215,7 @@ export default function MineOpslagPage() {
         </div>
       </div>
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-8">
+      <main className="flex-1 content-shell py-8">
         
         {loading ? (
           <div className="flex justify-center mt-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#131921]"></div></div>

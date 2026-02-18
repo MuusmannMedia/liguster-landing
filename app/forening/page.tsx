@@ -266,8 +266,8 @@ export default function ForeningPage() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
       
-      <div className="sticky top-16 z-40 bg-[#869FB9] px-4 pb-6 pt-4 shadow-md rounded-b-[40px]">
-        <div className="max-w-4xl mx-auto space-y-4">
+      <div className="sticky top-16 z-40 bg-[#869FB9] pb-6 pt-4 shadow-md rounded-b-[40px]">
+        <div className="content-shell space-y-4">
           
           <div className="flex gap-3">
             <div className="flex-1 relative">
@@ -285,7 +285,7 @@ export default function ForeningPage() {
         </div>
       </div>
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-6 space-y-8">
+      <main className="flex-1 content-shell py-6 space-y-8">
         
         {/* INVITATIONER SEKTION */}
         {invites.length > 0 && (

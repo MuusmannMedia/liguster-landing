@@ -67,7 +67,7 @@ export default function SignupPage() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
 
-      <main className="flex-1 flex items-center justify-center p-4 py-12">
+      <main className="flex-1 content-shell flex items-center justify-center py-12">
         <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl p-8 md:p-12 relative border border-gray-100">
           
           {/* Tilbage knap */}

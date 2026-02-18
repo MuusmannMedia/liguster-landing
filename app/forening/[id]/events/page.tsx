@@ -66,7 +66,7 @@ export default function EventsPage() {
     <div className="min-h-screen bg-[#869FB9]">
       <SiteHeader />
 
-      <main className="max-w-4xl mx-auto p-4 bg-white min-h-screen mt-4 rounded-t-3xl shadow-xl">
+      <main className="content-shell py-4 bg-white min-h-screen mt-4 rounded-t-3xl shadow-xl">
         <div className="flex items-center justify-between mb-6 px-2 pt-2">
           <h1 className="text-2xl font-black text-[#131921]">Aktiviteter</h1>
 

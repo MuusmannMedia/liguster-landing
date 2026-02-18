@@ -16,7 +16,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen flex flex-col bg-[#0F141A]">
       <SiteHeader />
 
-      <main className="flex-1 w-full max-w-3xl mx-auto px-6 py-12">
+      <main className="flex-1 content-shell py-12">
         
         {/* Titel Sektion */}
         <h1 className="text-3xl md:text-4xl font-black text-white mb-2">Privatlivspolitik for Liguster</h1>

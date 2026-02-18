@@ -121,37 +121,39 @@ export default function OffentligeForeningerPage() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
 
-      <div className="bg-[#0D253F] px-4 pt-10 pb-16 text-center relative overflow-hidden">
-        <div className="max-w-3xl mx-auto relative z-10">
-          <h1 className="text-3xl md:text-4xl font-black text-white mb-4 tracking-tight">
-            Find dit næste fællesskab her
-          </h1>
-          <p className="text-white/80 text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-8">
-            Uanset om det er grundejerforeningen, dartklubben, en løbegruppe eller et nyt initiativ i opgangen.
-            Her kan du se de foreninger og klubber, der har åbnet dørene op på Liguster.
-            Kig indenfor - eller start dit eget fællesskab i dag.
-          </p>
+      <div className="bg-[#0D253F] pt-10 pb-16 text-center relative overflow-hidden">
+        <div className="content-shell relative z-10">
+          <div className="max-w-3xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-black text-white mb-4 tracking-tight">
+              Find dit næste fællesskab her
+            </h1>
+            <p className="text-white/80 text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-8">
+              Uanset om det er grundejerforeningen, dartklubben, en løbegruppe eller et nyt initiativ i opgangen.
+              Her kan du se de foreninger og klubber, der har åbnet dørene op på Liguster.
+              Kig indenfor - eller start dit eget fællesskab i dag.
+            </p>
 
-          <div className="relative max-w-md mx-auto">
-            <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#0D253F]" aria-hidden="true"></i>
-            <input
-              type="text"
-              className="w-full h-12 rounded-full pl-12 pr-4 bg-white text-[#222] placeholder-gray-500 outline-none shadow-lg focus:ring-4 focus:ring-white/20 transition-all"
-              placeholder="Søg efter navn, by eller interesse..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className="relative max-w-md mx-auto">
+              <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#0D253F]" aria-hidden="true"></i>
+              <input
+                type="text"
+                className="w-full h-12 rounded-full pl-12 pr-4 bg-white text-[#222] placeholder-gray-500 outline-none shadow-lg focus:ring-4 focus:ring-white/20 transition-all"
+                placeholder="Søg efter navn, by eller interesse..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            {!loading && (
+              <p className="text-white/70 text-xs md:text-sm mt-3 font-medium">{headerText}</p>
+            )}
           </div>
-
-          {!loading && (
-            <p className="text-white/70 text-xs md:text-sm mt-3 font-medium">{headerText}</p>
-          )}
         </div>
 
         <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none bg-gradient-to-br from-white to-transparent"></div>
       </div>
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 -mt-8 relative z-20 pb-20">
+      <main className="flex-1 content-shell -mt-8 relative z-20 pb-20">
         {loading ? (
           <div className="flex justify-center pt-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>

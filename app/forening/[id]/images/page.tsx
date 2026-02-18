@@ -35,7 +35,7 @@ export default function ImagesPage() {
       <SiteHeader />
 
       {/* ✅ VIGTIG: sæt tekstfarve på main så alt indeni har en “mørk default” */}
-      <main className="max-w-4xl mx-auto p-4 bg-white min-h-screen mt-4 rounded-t-3xl text-slate-900">
+      <main className="content-shell py-4 bg-white min-h-screen mt-4 rounded-t-3xl text-slate-900">
         <div className="flex items-center justify-between mb-6 px-2 pt-2">
           <h1 className="text-2xl font-black text-slate-900">Billeder</h1>
 

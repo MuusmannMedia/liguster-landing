@@ -229,8 +229,8 @@ export default function OpslagPage() {
       <SiteHeader />
 
       {/* Filter Bar */}
-      <div className="bg-[#869FB9] py-6 px-4 shadow-sm relative z-10">
-        <div className="max-w-4xl mx-auto space-y-4">
+      <div className="bg-[#869FB9] py-6 shadow-sm relative z-10">
+        <div className="content-shell space-y-4">
           
           <button 
             className="w-full bg-[#131921] text-white font-bold text-lg py-4 rounded-2xl shadow-lg hover:bg-gray-900 transition-all uppercase tracking-wider flex items-center justify-center gap-2 transform hover:scale-[1.01]"
@@ -316,7 +316,7 @@ export default function OpslagPage() {
         </div>
       </div>
 
-      <main className="flex-1 max-w-4xl mx-auto px-4 py-8 w-full">
+      <main className="flex-1 content-shell py-8">
         {filteredPosts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredPosts.map((post) => {

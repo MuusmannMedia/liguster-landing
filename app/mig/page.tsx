@@ -155,9 +155,9 @@ export default function MigPage() {
     <div className="min-h-screen flex flex-col bg-[#869FB9]">
       <SiteHeader />
 
-      <main className="flex-1 w-full max-w-2xl mx-auto p-4 pb-20 flex items-center justify-center">
+      <main className="flex-1 content-shell py-4 pb-20 flex items-center justify-center">
         
-        <div className="bg-white w-full rounded-[30px] p-8 shadow-xl flex flex-col items-center">
+        <div className="bg-white w-full max-w-2xl mx-auto rounded-[30px] p-8 shadow-xl flex flex-col items-center">
           
           {/* Avatar */}
           <div className="relative w-full aspect-[5/6] rounded-[24px] overflow-hidden mb-6 bg-gray-100 shadow-inner">

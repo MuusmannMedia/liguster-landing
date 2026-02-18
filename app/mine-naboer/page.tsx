@@ -274,8 +274,8 @@ export default function MineNaboerPage() {
       <SiteHeader />
 
       {/* TOP BAR / ACTION AREA */}
-      <div className="bg-[#869FB9] py-8 px-4 shadow-sm">
-        <div className="max-w-4xl mx-auto">
+      <div className="bg-[#869FB9] py-8 shadow-sm">
+        <div className="content-shell">
           {/* Tekst fjernet - kun knap tilbage, justeret til højre */}
           <div className="flex flex-col md:flex-row justify-end items-center gap-4">
             
@@ -289,7 +289,7 @@ export default function MineNaboerPage() {
         </div>
       </div>
 
-      <main className="flex-1 max-w-4xl mx-auto px-4 py-8 w-full space-y-8">
+      <main className="flex-1 content-shell py-8 space-y-8">
         
         {/* --- ANMODNINGER --- */}
         {requests.length > 0 && (
