@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type SyntheticEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient'; // Ret stien hvis nødvendigt
 import SiteHeader from '../../components/SiteHeader';
@@ -17,6 +17,59 @@ type NeighborItem = {
     username: string | null;
     avatar_url: string | null;
   };
+};
+
+const buildFallbackAvatar = (name: string | null | undefined, size = 200) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name?.trim() || 'Bruger')}&background=E5E7EB&color=111827&size=${size}`;
+
+const resolveAvatarUrl = (avatarUrl: string | null | undefined) => {
+  if (!avatarUrl) return null;
+
+  if (avatarUrl.startsWith('http')) {
+    try {
+      const url = new URL(avatarUrl);
+      const signedPrefix = '/storage/v1/object/sign/avatars/';
+      const publicPrefix = '/storage/v1/object/public/avatars/';
+
+      if (url.pathname.includes(signedPrefix)) {
+        const storagePath = decodeURIComponent(url.pathname.split(signedPrefix)[1] || '');
+        if (storagePath) {
+          const { data } = supabase.storage.from('avatars').getPublicUrl(storagePath);
+          return data.publicUrl;
+        }
+      }
+
+      if (url.pathname.includes(publicPrefix)) {
+        const storagePath = decodeURIComponent(url.pathname.split(publicPrefix)[1] || '');
+        if (storagePath) {
+          const { data } = supabase.storage.from('avatars').getPublicUrl(storagePath);
+          return data.publicUrl;
+        }
+      }
+    } catch {
+      // Ignorer parsing-fejl og returnér oprindelig URL
+    }
+
+    return avatarUrl;
+  }
+
+  const normalizedPath = avatarUrl.replace(/^\/+/, '');
+  const { data } = supabase.storage.from('avatars').getPublicUrl(normalizedPath);
+  return data.publicUrl;
+};
+
+const getAvatarSrc = (avatarUrl: string | null | undefined, name: string | null | undefined, size = 200) =>
+  resolveAvatarUrl(avatarUrl) || buildFallbackAvatar(name, size);
+
+const handleAvatarError = (
+  event: SyntheticEvent<HTMLImageElement>,
+  name: string | null | undefined,
+  size = 200
+) => {
+  const fallback = buildFallbackAvatar(name, size);
+  if (event.currentTarget.src !== fallback) {
+    event.currentTarget.src = fallback;
+  }
 };
 
 // Hjælper til ID-generering
@@ -303,9 +356,10 @@ export default function MineNaboerPage() {
                 <div key={req.id} className="bg-white p-4 rounded-2xl shadow-sm border border-orange-100 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <img 
-                      src={req.user.avatar_url || "https://placehold.co/100"} 
+                      src={getAvatarSrc(req.user.avatar_url, req.user.name, 100)}
                       alt={req.user.name || "User"} 
                       className="w-12 h-12 rounded-full bg-gray-100 object-cover"
+                      onError={(e) => handleAvatarError(e, req.user.name, 100)}
                     />
                     <div>
                       <p className="font-bold text-[#131921]">{req.user.name}</p>
@@ -350,9 +404,10 @@ export default function MineNaboerPage() {
                 <div key={friend.id} className="bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 flex flex-col items-center text-center">
                   <div className="relative mb-3">
                     <img 
-                      src={friend.user.avatar_url || "https://placehold.co/200"} 
+                      src={getAvatarSrc(friend.user.avatar_url, friend.user.name, 200)}
                       alt={friend.user.name || "User"} 
                       className="w-20 h-20 rounded-full bg-gray-100 object-cover border-4 border-white shadow-sm"
+                      onError={(e) => handleAvatarError(e, friend.user.name, 200)}
                     />
                     <div className="absolute bottom-0 right-0 w-5 h-5 bg-green-500 border-2 border-white rounded-full"></div>
                   </div>
@@ -428,9 +483,10 @@ export default function MineNaboerPage() {
                       <div key={user.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-xl transition-colors">
                         <div className="flex items-center gap-3">
                           <img 
-                            src={user.avatar_url || "https://placehold.co/50"} 
+                            src={getAvatarSrc(user.avatar_url, user.name, 50)}
                             className="w-10 h-10 rounded-full bg-gray-200" 
                             alt={user.name}
+                            onError={(e) => handleAvatarError(e, user.name, 50)}
                           />
                           <div>
                             <p className="font-bold text-sm text-[#131921]">{user.name}</p>
